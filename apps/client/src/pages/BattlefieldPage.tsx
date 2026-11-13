@@ -52,6 +52,15 @@ function Battlefield({ scene }: { scene: Scene }) {
     setSelection(null);
   }, [selection, update]);
 
+  const removeFromMap = useCallback(
+    (ref: Ref) => {
+      const removed = new Set(scene.tokens.filter((t) => sameRef(t.ref, ref)).map((t) => t.id));
+      update((s) => ({ ...s, tokens: s.tokens.filter((t) => !sameRef(t.ref, ref)) }));
+      setSelection((sel) => (sel?.layer === "tokens" && removed.has(sel.id) ? null : sel));
+    },
+    [scene.tokens, update],
+  );
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (isTyping(e) || document.querySelector('[role="dialog"]')) return;
@@ -131,6 +140,7 @@ function Battlefield({ scene }: { scene: Scene }) {
             onAddNpc={() => setNpcDialog(true)}
             selected={selectedOf("tokens", scene.tokens)}
             onRemoveToken={deleteSelection}
+            onRemoveFromMap={removeFromMap}
             onAddToInitiative={(ref: Ref) => useCombatStore.getState().apply((c) => addCombatant(c, ref))}
           />
         )}

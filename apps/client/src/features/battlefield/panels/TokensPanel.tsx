@@ -15,12 +15,15 @@ interface Props {
   onAddNpc: () => void;
   selected: Token | undefined;
   onRemoveToken: (id: string) => void;
+  /** Toglie i token dell'entità dalla scena attiva (l'entità resta in party/iniziativa). */
+  onRemoveFromMap: (ref: Ref) => void;
   onAddToInitiative: (ref: Ref) => void;
 }
 
-export function TokensPanel({ scene, resolve, pending, onPending, onAddNpc, selected, onRemoveToken, onAddToInitiative }: Props) {
+export function TokensPanel({ scene, resolve, pending, onPending, onAddNpc, selected, onRemoveToken, onRemoveFromMap, onAddToInitiative }: Props) {
   const characters = usePartyStore((s) => s.characters);
   const combat = useCombatStore((s) => s.combat);
+  const locked = scene.layers.tokens.locked;
   const onMap = (ref: Ref) => scene.tokens.some((t) => sameRef(t.ref, ref));
 
   const pcRefs: Ref[] = characters.map((c) => ({ kind: "pc", id: c.id }));
@@ -48,9 +51,18 @@ export function TokensPanel({ scene, resolve, pending, onPending, onAddNpc, sele
                 {e.name}
               </span>
               {placed ? (
-                <span className="muted" style={{ fontSize: "0.8rem" }}>
-                  sulla mappa
-                </span>
+                <button
+                  className={styles.onMap}
+                  onClick={() => onRemoveFromMap(ref)}
+                  disabled={locked}
+                  title={locked ? "Livello bloccato" : "Rimuovi dalla mappa"}
+                  aria-label={`Rimuovi ${e.name} dalla mappa`}
+                >
+                  <span className={styles.onMapLabel}>sulla mappa</span>
+                  <span className={styles.onMapAction} aria-hidden="true">
+                    ✕ Rimuovi
+                  </span>
+                </button>
               ) : (
                 <button onClick={() => onPending([ref])}>Piazza</button>
               )}

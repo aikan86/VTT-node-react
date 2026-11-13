@@ -11,6 +11,14 @@
 .list { display: flex; flex-direction: column; gap: 0.3rem; margin: 0; padding: 0; list-style: none; }
 .list li { display: flex; align-items: center; gap: 0.5rem; justify-content: space-between; padding: 0.3rem 0.4rem; background: var(--panel-2); border-radius: 6px; }
 .list li > span { display: flex; align-items: center; gap: 0.4rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* "sulla mappa": in hover/focus diventa il pulsante per togliere il token; le due scritte condividono la cella, niente salti */
+.list .onMap { display: grid; flex: none; padding: 0.15rem 0.45rem; font-size: 0.8rem; background: transparent; border-color: transparent; color: var(--muted); }
+.onMapLabel, .onMapAction { grid-area: 1 / 1; text-align: center; }
+.onMapAction { visibility: hidden; color: var(--danger); }
+.list .onMap:not(:disabled):is(:hover, :focus-visible) { border-color: var(--danger); background: var(--panel); cursor: pointer; }
+.onMap:not(:disabled):is(:hover, :focus-visible) .onMapLabel { visibility: hidden; }
+.onMap:not(:disabled):is(:hover, :focus-visible) .onMapAction { visibility: visible; }
+.list .onMap:disabled { opacity: 1; cursor: default; }
 .callout { padding: 0.6rem 0.7rem; border-radius: 6px; background: #2a2414; border: 1px solid var(--accent); font-size: 0.9rem; }
 .selected { padding: 0.7rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); display: flex; flex-direction: column; gap: 0.6rem; }
 .main { display: grid; grid-template-rows: auto 1fr; min-width: 0; min-height: 0; }
