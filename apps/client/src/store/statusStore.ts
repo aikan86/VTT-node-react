@@ -3,6 +3,9 @@ import { create } from "zustand";
 interface StatusState {
   error: string | null;
   pending: number;
+  /** Connessione agli aggiornamenti in tempo reale (null = non ancora tentata). */
+  live: boolean | null;
+  setLive: (connected: boolean) => void;
   report: (error: unknown) => void;
   dismiss: () => void;
   track: <T>(promise: Promise<T>) => Promise<T>;
@@ -11,6 +14,8 @@ interface StatusState {
 export const useStatusStore = create<StatusState>((set) => ({
   error: null,
   pending: 0,
+  live: null,
+  setLive: (live) => set({ live }),
   report: (error) => {
     console.error(error);
     set({ error: error instanceof Error ? error.message : String(error) });

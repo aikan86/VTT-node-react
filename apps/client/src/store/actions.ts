@@ -1,6 +1,5 @@
 import {
   addNpcs,
-  createId,
   findFreeCells,
   removeCombatant,
   removeRef,
@@ -67,8 +66,8 @@ export function renameNpc(npcId: string, name: string) {
 /** Crea PNG nel combattimento; restituisce i riferimenti creati. */
 export function createNpcs(template: NpcTemplate, quantity: number): Ref[] {
   let refs: Ref[] = [];
-  useCombatStore.getState().apply((combat) => {
-    const result = addNpcs(combat, template, quantity);
+  useCombatStore.getState().apply((combat, _getMod, ctx) => {
+    const result = addNpcs(combat, template, quantity, ctx.id);
     refs = result.npcs.map((n) => ({ kind: "npc", id: n.id }));
     return result.combat;
   });
@@ -77,11 +76,11 @@ export function createNpcs(template: NpcTemplate, quantity: number): Ref[] {
 
 /** Piazza token nella scena vicino a `start`, evitando le celle occupate. Ignora chi è già presente. */
 export function placeTokens(sceneId: string, refs: Ref[], start: Point, sizeOf: (ref: Ref) => number) {
-  useSceneStore.getState().update(sceneId, (scene: Scene) => {
+  useSceneStore.getState().update(sceneId, (scene: Scene, ctx) => {
     const missing = refs.filter((ref) => !scene.tokens.some((t) => sameRef(t.ref, ref)));
     const occupied = scene.tokens.map((t) => ({ x: t.x, y: t.y, size: sizeOf(t.ref) }));
     const spots = findFreeCells(occupied, missing.map(sizeOf), start, scene.grid);
-    const tokens = spots.map((spot, i) => ({ id: createId(), ref: missing[i]!, x: spot.x, y: spot.y }));
+    const tokens = spots.map((spot, i) => ({ id: ctx.id(), ref: missing[i]!, x: spot.x, y: spot.y }));
     return tokens.length ? { ...scene, tokens: [...scene.tokens, ...tokens] } : scene;
   });
 }

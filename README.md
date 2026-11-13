@@ -42,6 +42,20 @@ pnpm prod logs      # segue il log
 - Variabili opzionali: `VTT_PORT`, `VTT_HOST`, `VTT_HOME`.
 - L'istanza non riparte da sola dopo un riavvio del Mac: `pnpm prod start`.
 
+## Più tab, sincronizzazione e cronologia
+
+- Ogni documento (PG, scena, combattimento, tiro) ha una **versione**. Un salvataggio dichiara la versione su cui si basa (`If-Match`): se nel frattempo un altro tab ha salvato, il server risponde `409` e **non sovrascrive**. Il tab scarica la versione nuova e riapplica sopra solo le proprie modifiche.
+- Tutti i tab ricevono le modifiche **in tempo reale** (`/api/events`, Server-Sent Events). Se la connessione cade compare "● Non connesso"; al ritorno i dati vengono riallineati.
+- Un tab aperto con una versione vecchia dell'app non può più scrivere (`428`): basta ricaricarlo.
+- Il server conserva le **versioni precedenti** (ultime 200 per documento; le modifiche ravvicinate entro 5 s contano come una). Si recuperano anche documenti eliminati:
+
+```bash
+pnpm history list                            # documenti e numero di versioni
+pnpm history show combat current             # versioni del combattimento
+pnpm history restore combat current 12       # ripristina la versione 12 (arriva subito ai tab aperti)
+pnpm history --prod list                     # stessa cosa sull'istanza di deploy (8080)
+```
+
 ## Struttura
 
 - `packages/shared` — schemi zod (PG, PNG, combattimento, scene), dadi, griglia, PF e logica pura dell'iniziativa

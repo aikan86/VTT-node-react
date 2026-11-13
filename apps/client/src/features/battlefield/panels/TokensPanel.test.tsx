@@ -7,7 +7,10 @@ import { usePartyStore } from "../../../store/partyStore";
 import type { EntityView } from "../../../store/entities";
 import { TokensPanel } from "./TokensPanel";
 
-vi.mock("../../../api/http", () => ({ api: {} }));
+vi.mock("../../../api/http", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../api/http")>()),
+  api: {},
+}));
 
 const aria = newCharacter({ id: "pc-a", name: "Aria" });
 const borin = newCharacter({ id: "pc-b", name: "Borin" });
@@ -41,8 +44,11 @@ function renderPanel(scene: Scene, onRemoveFromMap = vi.fn()) {
 }
 
 beforeEach(() => {
-  usePartyStore.setState({ loaded: true, characters: [aria, borin] });
-  useCombatStore.setState({ loaded: true, combat: emptyCombat() });
+  usePartyStore.getState().hydrate([
+    { rev: 1, data: aria },
+    { rev: 1, data: borin },
+  ]);
+  useCombatStore.getState().hydrate({ rev: 0, data: emptyCombat() });
 });
 
 describe("TokensPanel", () => {

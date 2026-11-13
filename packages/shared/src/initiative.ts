@@ -54,8 +54,8 @@ export function addCombatant(combat: Combat, ref: Ref, idFn: () => string = crea
   return { ...combat, combatants: [...combat.combatants, { id: idFn(), ref, roll: null, acted: false, order, notes: "" }] };
 }
 
-export function addParty(combat: Combat, characters: readonly { id: string }[]): Combat {
-  return characters.reduce((acc, ch) => addCombatant(acc, { kind: "pc", id: ch.id }), combat);
+export function addParty(combat: Combat, characters: readonly { id: string }[], idFn: () => string = createId): Combat {
+  return characters.reduce((acc, ch) => addCombatant(acc, { kind: "pc", id: ch.id }, idFn), combat);
 }
 
 function nextNpcNumber(npcs: readonly Npc[], base: string): number {

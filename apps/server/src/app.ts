@@ -2,11 +2,14 @@ import { mkdirSync } from "node:fs";
 import Fastify, { type FastifyInstance } from "fastify";
 import multipart from "@fastify/multipart";
 import fastifyStatic from "@fastify/static";
-import { CharacterSchema, DmRollSchema, SceneSchema } from "@vtt/shared";
+import { COLLECTIONS, CharacterSchema, DmRollSchema, SceneSchema } from "@vtt/shared";
 import { openDb } from "./db";
-import { Repo } from "./repo";
+import { ChangeBus } from "./events";
+import { Repo, type HistoryOptions } from "./repo";
 import { registerDocumentRoutes } from "./routes/documents";
-import { registerCombatRoutes } from "./routes/combat";
+import { registerCombatRoutes, StoredCombatSchema } from "./routes/combat";
+import { registerEventRoutes } from "./routes/events";
+import { registerHistoryRoutes } from "./routes/history";
 import { registerUploadRoutes } from "./routes/uploads";
 
 export interface AppOptions {
@@ -15,6 +18,8 @@ export interface AppOptions {
   /** Se presente, serve il client compilato (modalità produzione). */
   clientDist?: string;
   logger?: boolean;
+  /** Conservazione della cronologia delle versioni (default: 200 versioni, raffiche di 5 s accorpate). */
+  history?: HistoryOptions;
 }
 
 export const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
@@ -28,25 +33,18 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
   await app.register(multipart, { limits: { fileSize: MAX_UPLOAD_BYTES, files: 1 } });
   await app.register(fastifyStatic, { root: opts.uploadsDir, prefix: "/uploads/", immutable: true, maxAge: "365d" });
 
-  registerDocumentRoutes(app, {
-    path: "/api/characters",
-    label: "Personaggio",
-    repo: new Repo(db, "characters", CharacterSchema),
-    schema: CharacterSchema,
-  });
-  registerDocumentRoutes(app, {
-    path: "/api/scenes",
-    label: "Scena",
-    repo: new Repo(db, "scenes", SceneSchema),
-    schema: SceneSchema,
-  });
-  registerDocumentRoutes(app, {
-    path: "/api/dm-rolls",
-    label: "Tiro",
-    repo: new Repo(db, "dm-rolls", DmRollSchema),
-    schema: DmRollSchema,
-  });
-  registerCombatRoutes(app, db);
+  const bus = new ChangeBus();
+  const characters = new Repo(db, COLLECTIONS.characters, CharacterSchema, bus, opts.history);
+  const scenes = new Repo(db, COLLECTIONS.scenes, SceneSchema, bus, opts.history);
+  const dmRolls = new Repo(db, COLLECTIONS.dmRolls, DmRollSchema, bus, opts.history);
+  const combat = new Repo(db, COLLECTIONS.combat, StoredCombatSchema, bus, opts.history);
+
+  registerDocumentRoutes(app, { path: "/api/characters", label: "Personaggio", repo: characters });
+  registerDocumentRoutes(app, { path: "/api/scenes", label: "Scena", repo: scenes });
+  registerDocumentRoutes(app, { path: "/api/dm-rolls", label: "Tiro", repo: dmRolls });
+  registerCombatRoutes(app, combat);
+  registerEventRoutes(app, bus);
+  registerHistoryRoutes(app, db, [characters, scenes, dmRolls, combat]);
   registerUploadRoutes(app, opts.uploadsDir);
 
   if (opts.clientDist) {

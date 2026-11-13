@@ -1,24 +1,45 @@
 import { create } from "zustand";
-import { newScene, type Scene } from "@vtt/shared";
-import { api } from "../api/http";
-import { createSaver } from "./debounce";
-import { track } from "./statusStore";
+import { newScene, type Scene, type Versioned } from "@vtt/shared";
+import { api, isPermanentError } from "../api/http";
+import { reportError, track } from "./statusStore";
+import { CollectionSync } from "./sync/collectionSync";
+import type { Op } from "./sync/docSync";
 
 const ACTIVE_KEY = "vtt.activeSceneId";
-const saver = createSaver<Scene>((s) => api.scenes.update(s), 300);
 
 interface SceneState {
   scenes: Scene[];
   activeId: string | null;
   loaded: boolean;
   load: () => Promise<void>;
+  hydrate: (list: Versioned<Scene>[]) => void;
   select: (id: string) => void;
   create: (name: string) => Promise<void>;
   remove: (id: string) => Promise<void>;
-  update: (id: string, fn: (scene: Scene) => Scene) => void;
-  /** Aggiorna tutte le scene (es. per rimuovere token orfani). */
-  updateAll: (fn: (scene: Scene) => Scene) => void;
+  /** Trasformazione pura della scena (rieseguibile su versioni più recenti: id nuovi da `ctx.id()`). */
+  update: (id: string, fn: Op<Scene>) => void;
+  /** Applica la trasformazione a tutte le scene che ne vengono modificate (es. per rimuovere token orfani). */
+  updateAll: (fn: Op<Scene>) => void;
 }
+
+function pickActive(scenes: Scene[], preferred: string | null): string | null {
+  if (preferred && scenes.some((s) => s.id === preferred)) return preferred;
+  return scenes[0]?.id ?? null;
+}
+
+export const sceneSync = new CollectionSync<Scene>({
+  api: {
+    list: () => api.scenes.list(),
+    create: (s) => track(api.scenes.create(s)),
+    update: (s, rev) => track(api.scenes.update(s, rev)),
+    remove: (id) => track(api.scenes.remove(id)),
+  },
+  delayMs: 300,
+  isPermanent: isPermanentError,
+  onError: reportError,
+  onChange: (scenes) =>
+    useSceneStore.setState((s) => ({ scenes, activeId: pickActive(scenes, s.activeId) })),
+});
 
 export const useSceneStore = create<SceneState>((set, get) => ({
   scenes: [],
@@ -26,15 +47,14 @@ export const useSceneStore = create<SceneState>((set, get) => ({
   loaded: false,
 
   load: async () => {
-    let scenes = await api.scenes.list();
-    if (scenes.length === 0) {
-      const first = newScene("Scena 1");
-      await api.scenes.create(first);
-      scenes = [first];
-    }
-    const stored = localStorage.getItem(ACTIVE_KEY);
-    const activeId = scenes.some((s) => s.id === stored) ? stored : scenes[0]!.id;
-    set({ scenes, activeId, loaded: true });
+    await sceneSync.load();
+    if (sceneSync.list.length === 0) await sceneSync.create(newScene("Scena 1"));
+    set({ activeId: pickActive(sceneSync.list, localStorage.getItem(ACTIVE_KEY)), loaded: true });
+  },
+
+  hydrate: (list) => {
+    sceneSync.hydrate(list);
+    set({ activeId: pickActive(sceneSync.list, get().activeId), loaded: true });
   },
 
   select: (id) => {
@@ -44,36 +64,23 @@ export const useSceneStore = create<SceneState>((set, get) => ({
 
   create: async (name) => {
     const scene = newScene(name);
-    await track(api.scenes.create(scene));
-    set((s) => ({ scenes: [...s.scenes, scene] }));
+    const created = sceneSync.create(scene);
     get().select(scene.id);
+    await created;
   },
 
   remove: async (id) => {
     if (get().scenes.length <= 1) return;
-    saver.cancel(id);
-    await track(api.scenes.remove(id));
-    const scenes = get().scenes.filter((s) => s.id !== id);
-    set({ scenes });
-    if (get().activeId === id) get().select(scenes[0]!.id);
+    await sceneSync.remove(id);
+    if (get().activeId === id) get().select(get().scenes[0]!.id);
   },
 
-  update: (id, fn) => {
-    let updated: Scene | undefined;
-    set((s) => ({
-      scenes: s.scenes.map((scene) => {
-        if (scene.id !== id) return scene;
-        updated = fn(scene);
-        return updated;
-      }),
-    }));
-    if (updated) saver.schedule(id, updated);
-  },
+  update: (id, fn) => sceneSync.update(id, fn),
 
   updateAll: (fn) => {
     for (const scene of get().scenes) {
-      const next = fn(scene);
-      if (next !== scene) get().update(scene.id, () => next);
+      // si prova sulla versione attuale; l'operazione registrata è la funzione, non il risultato
+      if (fn(scene, { id: () => "", rng: () => 0 }) !== scene) get().update(scene.id, fn);
     }
   },
 }));
@@ -82,4 +89,4 @@ export function useActiveScene(): Scene | undefined {
   return useSceneStore((s) => s.scenes.find((scene) => scene.id === s.activeId));
 }
 
-export const flushScenes = () => saver.flushAll();
+export const flushScenes = () => sceneSync.flushAll();

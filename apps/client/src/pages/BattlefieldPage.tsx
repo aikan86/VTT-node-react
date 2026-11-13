@@ -141,7 +141,7 @@ function Battlefield({ scene }: { scene: Scene }) {
             selected={selectedOf("tokens", scene.tokens)}
             onRemoveToken={deleteSelection}
             onRemoveFromMap={removeFromMap}
-            onAddToInitiative={(ref: Ref) => useCombatStore.getState().apply((c) => addCombatant(c, ref))}
+            onAddToInitiative={(ref: Ref) => useCombatStore.getState().apply((c, _getMod, ctx) => addCombatant(c, ref, ctx.id))}
           />
         )}
         {activeLayer === "effects" && (

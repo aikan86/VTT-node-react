@@ -4,10 +4,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useDmRollStore } from "../store/dmRollStore";
 import { DmRollsPage } from "./DmRollsPage";
 
-vi.mock("../api/http", () => ({
+vi.mock("../api/http", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../api/http")>()),
   api: {
     dmRolls: {
-      create: vi.fn(async (r: unknown) => r),
+      create: vi.fn(async (r: unknown) => ({ rev: 1, data: r })),
       remove: vi.fn(async () => undefined),
     },
   },
@@ -17,7 +18,7 @@ const bar = (face: number) => screen.getByRole("img", { name: new RegExp(`^${fac
 const rows = () => screen.getAllByTestId("dm-roll-row");
 
 beforeEach(() => {
-  useDmRollStore.setState({ loaded: true, rolls: [] });
+  useDmRollStore.getState().hydrate([]);
 });
 
 describe("DmRollsPage", () => {

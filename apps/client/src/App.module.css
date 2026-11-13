@@ -9,3 +9,4 @@
 .error { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 0.5rem 1rem; background: #4c1414; color: #fecaca; }
 .main { min-height: 0; overflow: hidden; }
 .center { display: grid; place-items: center; height: 100%; color: var(--muted); }
+.offline { color: var(--danger); font-weight: 600; }

@@ -7,26 +7,24 @@ import { usePartyStore } from "../store/partyStore";
 import { useSceneStore } from "../store/sceneStore";
 import { InitiativePage } from "./InitiativePage";
 
-vi.mock("../api/http", () => ({
-  api: {
-    characters: { update: vi.fn(async (c: unknown) => c) },
-    scenes: { update: vi.fn(async (s: unknown) => s) },
-    combat: { put: vi.fn(async (c: unknown) => c) },
-  },
-}));
+vi.mock("../api/http", async (importOriginal) => {
+  let rev = 1;
+  const saved = vi.fn(async () => ({ status: "ok" as const, rev: ++rev }));
+  return {
+    ...(await importOriginal<typeof import("../api/http")>()),
+    api: { characters: { update: saved }, scenes: { update: saved }, combat: { put: saved } },
+  };
+});
 
 const rowNames = () => screen.getAllByTestId("combatant-row").map((row) => within(row).getAllByText(/\S/)[0]!.textContent);
 
 beforeEach(() => {
-  usePartyStore.setState({
-    loaded: true,
-    characters: [
-      newCharacter({ id: "pc-a", name: "Aria", initiativeMod: 3 }),
-      newCharacter({ id: "pc-b", name: "Borin", initiativeMod: 0 }),
-    ],
-  });
-  useCombatStore.setState({ loaded: true, combat: emptyCombat() });
-  useSceneStore.setState({ loaded: true, scenes: [], activeId: null });
+  usePartyStore.getState().hydrate([
+    { rev: 1, data: newCharacter({ id: "pc-a", name: "Aria", initiativeMod: 3 }) },
+    { rev: 1, data: newCharacter({ id: "pc-b", name: "Borin", initiativeMod: 0 }) },
+  ]);
+  useCombatStore.getState().hydrate({ rev: 0, data: emptyCombat() });
+  useSceneStore.getState().hydrate([]);
   vi.stubGlobal("confirm", () => true);
 });
 

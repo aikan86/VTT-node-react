@@ -1,35 +1,70 @@
-import type { Character, Combat, DmRoll, Scene } from "@vtt/shared";
+import {
+  CLIENT_ID_HEADER,
+  createId,
+  type Character,
+  type Combat,
+  type DmRoll,
+  type Scene,
+  type Versioned,
+} from "@vtt/shared";
+import type { SaveResult } from "../store/sync/docSync";
+
+/** Identifica questo tab: il server lo rimanda negli eventi, così il tab ignora le proprie modifiche. */
+export const CLIENT_ID = createId();
 
 export class ApiError extends Error {
   constructor(
     readonly status: number,
     message: string,
+    readonly body: unknown = null,
   ) {
     super(message);
   }
 }
 
-async function request<T>(method: string, url: string, body?: unknown): Promise<T> {
+/** Errori per cui riprovare non serve (dati rifiutati dal server). */
+export const isPermanentError = (err: unknown) =>
+  err instanceof ApiError && err.status >= 400 && err.status < 500 && err.status !== 408 && err.status !== 429;
+
+async function request<T>(method: string, url: string, body?: unknown, headers: Record<string, string> = {}): Promise<T> {
   const payload = body === undefined ? undefined : JSON.stringify(body);
   const res = await fetch(url, {
     method,
-    headers: payload === undefined ? undefined : { "content-type": "application/json" },
+    headers: {
+      [CLIENT_ID_HEADER]: CLIENT_ID,
+      ...(payload === undefined ? {} : { "content-type": "application/json" }),
+      ...headers,
+    },
     body: payload,
     // permette ai salvataggi in coda di completarsi anche se la pagina viene chiusa (limite browser ~64KB)
     keepalive: method !== "GET" && (payload?.length ?? 0) < 60_000,
   });
   if (!res.ok) {
     const data = (await res.json().catch(() => null)) as { error?: string } | null;
-    throw new ApiError(res.status, data?.error ?? `Errore ${res.status}`);
+    throw new ApiError(res.status, data?.error ?? `Errore ${res.status}`, data);
   }
   return (res.status === 204 ? undefined : await res.json()) as T;
 }
 
+/** PUT condizionato alla versione: 409 = un altro tab ha salvato prima, 404 = eliminato altrove. */
+async function conditionalPut<T>(url: string, doc: unknown, baseRev: number): Promise<SaveResult<T>> {
+  try {
+    const saved = await request<Versioned<T>>("PUT", url, doc, { "if-match": String(baseRev) });
+    return { status: "ok", rev: saved.rev };
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 409) {
+      return { status: "conflict", current: (err.body as { current: Versioned<T> }).current };
+    }
+    if (err instanceof ApiError && err.status === 404) return { status: "gone" };
+    throw err;
+  }
+}
+
 function collection<T extends { id: string }>(base: string) {
   return {
-    list: () => request<T[]>("GET", base),
-    create: (doc: T) => request<T>("POST", base, doc),
-    update: (doc: T) => request<T>("PUT", `${base}/${encodeURIComponent(doc.id)}`, doc),
+    list: () => request<Versioned<T>[]>("GET", base),
+    create: (doc: T) => request<Versioned<T>>("POST", base, doc),
+    update: (doc: T, baseRev: number) => conditionalPut<T>(`${base}/${encodeURIComponent(doc.id)}`, doc, baseRev),
     remove: (id: string) => request<void>("DELETE", `${base}/${encodeURIComponent(id)}`),
   };
 }
@@ -39,16 +74,16 @@ export const api = {
   scenes: collection<Scene>("/api/scenes"),
   dmRolls: collection<DmRoll>("/api/dm-rolls"),
   combat: {
-    get: () => request<Combat>("GET", "/api/combat"),
-    put: (combat: Combat) => request<Combat>("PUT", "/api/combat", combat),
+    get: () => request<Versioned<Combat>>("GET", "/api/combat"),
+    put: (combat: Combat, baseRev: number) => conditionalPut<Combat>("/api/combat", combat, baseRev),
   },
   async upload(file: File): Promise<{ url: string }> {
     const form = new FormData();
     form.append("file", file);
-    const res = await fetch("/api/uploads", { method: "POST", body: form });
+    const res = await fetch("/api/uploads", { method: "POST", body: form, headers: { [CLIENT_ID_HEADER]: CLIENT_ID } });
     if (!res.ok) {
       const data = (await res.json().catch(() => null)) as { error?: string } | null;
-      throw new ApiError(res.status, data?.error ?? `Errore ${res.status}`);
+      throw new ApiError(res.status, data?.error ?? `Errore ${res.status}`, data);
     }
     return (await res.json()) as { url: string };
   },
