@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { Stage } from "react-konva";
 import type Konva from "konva";
-import { ELEMENT_COLORS, pxToCell, type Effect, type LayerKey, type MapElement, type Point, type Ref, type Scene, type Token } from "@vtt/shared";
+import { ELEMENT_COLORS, pxToCell, type Background, type Effect, type LayerKey, type MapElement, type Point, type Ref, type Scene, type Token } from "@vtt/shared";
 import type { EntityResolver } from "../../store/entities";
 import { clamp, worldSize } from "./geometry";
 import { useElementSize, useKeyHeld } from "./hooks";
-import { BackgroundLayer, GridLayer } from "./layers/BackgroundLayer";
+import { BACKGROUND_ID, BackgroundLayer, GridLayer } from "./layers/BackgroundLayer";
 import { EffectsLayer } from "./layers/EffectsLayer";
 import { ElementsLayer } from "./layers/ElementsLayer";
 import { TokensLayer } from "./layers/TokensLayer";
@@ -25,6 +25,7 @@ interface Props {
   onPlace: (cell: Point, world: Point) => void;
   onDrawElement: (rect: { x: number; y: number; w: number; h: number }) => void;
   onElementChange: (element: MapElement) => void;
+  onBackgroundChange: (background: Background) => void;
   onTokenMove: (token: Token) => void;
   onEffectChange: (effect: Effect) => void;
 }
@@ -168,7 +169,14 @@ export function BattleStage(props: Props) {
           onMouseLeave={handleMouseUp}
           onClick={handleClick}
         >
-          <BackgroundLayer scene={scene} />
+          <BackgroundLayer
+            scene={scene}
+            listening={listening("background")}
+            editable={editable("background")}
+            selected={selection?.layer === "background"}
+            onSelect={() => props.onSelect({ layer: "background", id: BACKGROUND_ID })}
+            onChange={props.onBackgroundChange}
+          />
           <GridLayer scene={scene} />
           <ElementsLayer
             scene={scene}

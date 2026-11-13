@@ -28,8 +28,14 @@ export type Grid = z.infer<typeof GridSchema>;
 
 export const BackgroundSchema = z.object({
   imageUrl: z.string().min(1),
+  /** Dimensioni mostrate sulla mappa (al caricamento: quelle originali dell'immagine). */
   widthPx: z.number().positive(),
   heightPx: z.number().positive(),
+  /** Angolo in alto a sinistra dell'immagine non ruotata, in pixel del mondo. */
+  x: z.number().default(0),
+  y: z.number().default(0),
+  /** Gradi, attorno al centro dell'immagine. */
+  rotation: z.number().default(0),
 });
 export type Background = z.infer<typeof BackgroundSchema>;
 

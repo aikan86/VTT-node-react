@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { addCombatant, createId, ELEMENT_COLORS, sameRef, type LayerKey, type Point, type Ref, type Scene } from "@vtt/shared";
 import { BattleStage } from "../features/battlefield/BattleStage";
 import { isTyping } from "../features/battlefield/hooks";
-import { snapTo } from "../features/battlefield/geometry";
+import { snapTo, withBackgroundGeometry } from "../features/battlefield/geometry";
 import { BackgroundPanel } from "../features/battlefield/panels/BackgroundPanel";
 import { EffectsPanel } from "../features/battlefield/panels/EffectsPanel";
 import { ElementsPanel } from "../features/battlefield/panels/ElementsPanel";
@@ -178,6 +178,7 @@ function Battlefield({ scene }: { scene: Scene }) {
             setSelection({ layer: "elements", id: element.id });
           }}
           onElementChange={(el) => replace("elements", el)}
+          onBackgroundChange={(bg) => update((s) => withBackgroundGeometry(s, bg))}
           onTokenMove={(token) => replace("tokens", token)}
           onEffectChange={(effect) => replace("effects", effect)}
         />
