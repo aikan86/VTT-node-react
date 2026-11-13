@@ -41,6 +41,11 @@ export function removeTokensFor(ref: Ref) {
   );
 }
 
+export function setEntityColor(ref: Ref, color: string) {
+  if (ref.kind === "pc") usePartyStore.getState().update(ref.id, { color });
+  else useCombatStore.getState().apply((combat) => updateNpc(combat, ref.id, { color }));
+}
+
 export function setEntityHp(ref: Ref, hp: Hp) {
   if (ref.kind === "pc") {
     usePartyStore.getState().update(ref.id, { hp });

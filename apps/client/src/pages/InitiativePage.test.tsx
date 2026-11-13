@@ -1,4 +1,4 @@
-import { act, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { emptyCombat, newCharacter } from "@vtt/shared";
@@ -137,6 +137,24 @@ describe("InitiativePage", () => {
     const borin = useCombatStore.getState().combat.combatants.find((c) => c.ref.id === "pc-b")!;
     expect(borin.notes).toBe("Prono");
     expect(screen.getByLabelText("Note di combattimento di Borin")).toHaveValue("Prono");
+  });
+
+  it("changes the color of a PC and of an NPC from the swatch", async () => {
+    const user = userEvent.setup();
+    render(<InitiativePage />);
+    await user.click(screen.getByRole("button", { name: "+ Aggiungi party" }));
+    await user.click(screen.getByRole("button", { name: "+ Aggiungi PNG" }));
+    const dialog = screen.getByRole("dialog", { name: "Aggiungi PNG" });
+    await user.clear(within(dialog).getByLabelText("Nome"));
+    await user.type(within(dialog).getByLabelText("Nome"), "Orco");
+    await user.click(within(dialog).getByRole("button", { name: "Aggiungi" }));
+
+    fireEvent.change(screen.getByLabelText("Colore di Aria"), { target: { value: "#123456" } });
+    expect(usePartyStore.getState().characters.find((c) => c.id === "pc-a")!.color).toBe("#123456");
+
+    fireEvent.change(screen.getByLabelText("Colore di Orco"), { target: { value: "#abcdef" } });
+    expect(useCombatStore.getState().combat.npcs[0]!.color).toBe("#abcdef");
+    expect(screen.getByLabelText("Colore di Orco")).toHaveValue("#abcdef");
   });
 
   it("ends combat after confirmation and clears rolls", async () => {

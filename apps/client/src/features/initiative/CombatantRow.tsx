@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { rollD20 } from "@vtt/shared";
 import { HpEditor } from "../../components/HpEditor";
 import { NumberInput } from "../../components/NumberInput";
-import { removeFromInitiative, renameNpc, setEntityHp } from "../../store/actions";
+import { removeFromInitiative, renameNpc, setEntityColor, setEntityHp } from "../../store/actions";
 import type { CombatantRowData } from "./useInitiative";
 import styles from "./Initiative.module.css";
 
@@ -38,7 +38,14 @@ export function CombatantRow({ row, active, onSetRoll, onSetNotes, onToggleActed
       </td>
       <td>
         <div className="row" style={{ flexWrap: "nowrap" }}>
-          <span className="swatch" style={{ background: entity.color }} />
+          <label className={styles.colorPicker} style={{ background: entity.color }} title="Cambia colore">
+            <input
+              type="color"
+              value={entity.color}
+              onChange={(e) => setEntityColor(entity.ref, e.target.value)}
+              aria-label={`Colore di ${entity.name}`}
+            />
+          </label>
           {editing ? (
             <NameInput
               name={entity.name}
