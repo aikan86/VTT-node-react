@@ -1,0 +1,109 @@
+import { act, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { emptyCombat, newCharacter } from "@vtt/shared";
+import { useCombatStore } from "../store/combatStore";
+import { usePartyStore } from "../store/partyStore";
+import { useSceneStore } from "../store/sceneStore";
+import { InitiativePage } from "./InitiativePage";
+
+vi.mock("../api/http", () => ({
+  api: {
+    characters: { update: vi.fn(async (c: unknown) => c) },
+    scenes: { update: vi.fn(async (s: unknown) => s) },
+    combat: { put: vi.fn(async (c: unknown) => c) },
+  },
+}));
+
+const rowNames = () => screen.getAllByTestId("combatant-row").map((row) => within(row).getAllByText(/\S/)[0]!.textContent);
+
+beforeEach(() => {
+  usePartyStore.setState({
+    loaded: true,
+    characters: [
+      newCharacter({ id: "pc-a", name: "Aria", initiativeMod: 3 }),
+      newCharacter({ id: "pc-b", name: "Borin", initiativeMod: 0 }),
+    ],
+  });
+  useCombatStore.setState({ loaded: true, combat: emptyCombat() });
+  useSceneStore.setState({ loaded: true, scenes: [], activeId: null });
+  vi.stubGlobal("confirm", () => true);
+});
+
+describe("InitiativePage", () => {
+  it("runs a full round: add party + npc, roll, start, tick turns, advance round", async () => {
+    const user = userEvent.setup();
+    render(<InitiativePage />);
+
+    await user.click(screen.getByRole("button", { name: "+ Aggiungi party" }));
+    expect(rowNames()).toEqual(["Aria", "Borin"]);
+    expect(screen.getByRole("button", { name: "+ Aggiungi party" })).toBeDisabled();
+
+    // PNG al volo
+    await user.click(screen.getByRole("button", { name: "+ Aggiungi PNG" }));
+    const dialog = screen.getByRole("dialog", { name: "Aggiungi PNG" });
+    const name = within(dialog).getByLabelText("Nome");
+    await user.clear(name);
+    await user.type(name, "Orco");
+    await user.click(within(dialog).getByRole("button", { name: "Aggiungi" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    // Tiri manuali: Aria 10+3=13, Borin 18+0=18, Orco (mod +2) 5+2=7
+    await user.type(screen.getByLabelText("d20 di Aria"), "10");
+    await user.type(screen.getByLabelText("d20 di Borin"), "18");
+    await user.type(screen.getByLabelText("d20 di Orco"), "5");
+    expect(rowNames()).toEqual(["Borin", "Aria", "Orco"]);
+    expect(screen.getAllByTestId("total").map((t) => t.textContent)).toEqual(["18", "13", "7"]);
+    expect(screen.getByRole("button", { name: "🎲 Tira tutti" })).toBeDisabled();
+
+    await user.click(screen.getByRole("button", { name: "⚔ Inizia combattimento" }));
+    expect(screen.getByTestId("round")).toHaveTextContent("1");
+    expect(screen.getAllByTestId("combatant-row")[0]).toHaveAttribute("aria-current", "step");
+
+    const next = () => user.click(screen.getByRole("button", { name: "Turno successivo ▶" }));
+    await next();
+    expect(screen.getByLabelText("Borin ha agito")).toBeChecked();
+    expect(screen.getAllByTestId("combatant-row")[1]).toHaveAttribute("aria-current", "step");
+
+    await next();
+    await next();
+    expect(screen.getByTestId("round")).toHaveTextContent("2");
+    for (const n of ["Aria", "Borin", "Orco"]) expect(screen.getByLabelText(`${n} ha agito`)).not.toBeChecked();
+    expect(screen.getAllByTestId("combatant-row")[0]).toHaveAttribute("aria-current", "step");
+  });
+
+  it("rolls only missing d20s with 'Tira tutti'", async () => {
+    const user = userEvent.setup();
+    render(<InitiativePage />);
+    await user.click(screen.getByRole("button", { name: "+ Aggiungi party" }));
+    await user.type(screen.getByLabelText("d20 di Aria"), "20");
+
+    await user.click(screen.getByRole("button", { name: "🎲 Tira tutti" }));
+    const combatants = useCombatStore.getState().combat.combatants;
+    expect(combatants.find((c) => c.ref.id === "pc-a")!.roll).toBe(20);
+    const borin = combatants.find((c) => c.ref.id === "pc-b")!.roll;
+    expect(borin).toBeGreaterThanOrEqual(1);
+    expect(borin).toBeLessThanOrEqual(20);
+  });
+
+  it("applies damage to a PC from the tracker and updates the party", async () => {
+    const user = userEvent.setup();
+    render(<InitiativePage />);
+    await user.click(screen.getByRole("button", { name: "+ Aggiungi party" }));
+    await user.type(screen.getByLabelText("Quantità PF per Aria"), "4");
+    await user.click(screen.getByRole("button", { name: "Danno a Aria" }));
+    expect(usePartyStore.getState().characters[0]!.hp.current).toBe(6);
+  });
+
+  it("ends combat after confirmation and clears rolls", async () => {
+    const user = userEvent.setup();
+    render(<InitiativePage />);
+    await user.click(screen.getByRole("button", { name: "+ Aggiungi party" }));
+    await user.click(screen.getByRole("button", { name: "🎲 Tira tutti" }));
+    await user.click(screen.getByRole("button", { name: "⚔ Inizia combattimento" }));
+    await user.click(screen.getByRole("button", { name: "Termina" }));
+    await act(async () => {});
+    expect(screen.getByTestId("round")).toHaveTextContent("—");
+    expect(useCombatStore.getState().combat.combatants.every((c) => c.roll === null)).toBe(true);
+  });
+});

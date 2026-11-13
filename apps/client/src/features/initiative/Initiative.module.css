@@ -1,0 +1,18 @@
+.bar { display: flex; gap: 1.5rem; align-items: center; flex-wrap: wrap; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.9rem 1.1rem; margin-bottom: 1rem; }
+.round { display: flex; flex-direction: column; align-items: center; min-width: 4.5rem; }
+.round span { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.round strong { font-size: 2rem; line-height: 1; font-variant-numeric: tabular-nums; }
+.turnInfo { flex: 1; min-width: 12rem; }
+.table { width: 100%; border-collapse: separate; border-spacing: 0 0.35rem; }
+.table th { text-align: left; font-weight: 500; font-size: 0.8rem; color: var(--muted); padding: 0 0.6rem; }
+.table td { padding: 0.45rem 0.6rem; background: var(--panel); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.table td:first-child { border-left: 1px solid var(--border); border-radius: var(--radius) 0 0 var(--radius); }
+.table td:last-child { border-right: 1px solid var(--border); border-radius: 0 var(--radius) var(--radius) 0; }
+.row { transition: opacity 0.15s; }
+.current td { background: #2a2414; border-color: var(--accent); }
+.acted { opacity: 0.45; }
+.down .name { text-decoration: line-through; }
+.name { font-weight: 600; }
+.turn { color: var(--accent); font-size: 0.8rem; font-weight: 600; }
+.num { font-variant-numeric: tabular-nums; text-align: center; }
+.total { font-size: 1.25rem; font-weight: 700; text-align: center; font-variant-numeric: tabular-nums; min-width: 3rem; }
