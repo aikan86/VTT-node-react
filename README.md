@@ -26,6 +26,22 @@ Altre variabili: `PORT` (3001), `HOST` (127.0.0.1).
 | `pnpm test` | Vitest su tutti i pacchetti |
 | `pnpm typecheck` | `tsc` su tutti i pacchetti |
 
+## Deploy locale (separato dallo sviluppo)
+
+Un'istanza "stabile" su **http://127.0.0.1:8080**, indipendente da `pnpm dev` (3001/5173): codice e dati propri.
+
+```bash
+pnpm release        # pubblica l'ULTIMO COMMIT: test + build, sostituisce la release e riavvia
+pnpm prod status    # stato, release installata, percorsi
+pnpm prod start | stop | restart
+pnpm prod logs      # segue il log
+```
+
+- Si pubblica solo ciò che è committato: le modifiche in corso in sviluppo non finiscono nel deploy.
+- Tutto sta in `~/Library/Application Support/VTT/`: `app/` (release attuale), `app.prev/` (precedente, ripristinata in automatico se l'avvio fallisce), `data/` (database e immagini, mai toccati dalle release), `vtt.log`.
+- Variabili opzionali: `VTT_PORT`, `VTT_HOST`, `VTT_HOME`.
+- L'istanza non riparte da sola dopo un riavvio del Mac: `pnpm prod start`.
+
 ## Struttura
 
 - `packages/shared` — schemi zod (PG, PNG, combattimento, scene), dadi, griglia, PF e logica pura dell'iniziativa
