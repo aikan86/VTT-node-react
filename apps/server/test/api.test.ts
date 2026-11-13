@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
-import { emptyCombat, newCharacter, newScene } from "@vtt/shared";
+import { emptyCombat, newCharacter, newDmRoll, newScene } from "@vtt/shared";
 import { buildApp } from "../src/app";
 
 let app: FastifyInstance;
@@ -90,6 +90,21 @@ describe("/api/scenes", () => {
     const scene = newScene();
     const bad = { ...scene, effects: [{ id: "e", shape: "star", x: 0, y: 0, sizeFt: 10, rotation: 0, color: "#ff0000", opacity: 0.5 }] };
     expect((await app.inject({ method: "POST", url: "/api/scenes", payload: bad })).statusCode).toBe(400);
+  });
+});
+
+describe("/api/dm-rolls", () => {
+  it("records, lists and deletes d20 rolls", async () => {
+    const roll = newDmRoll(20);
+    expect((await app.inject({ method: "POST", url: "/api/dm-rolls", payload: roll })).statusCode).toBe(201);
+    expect((await app.inject({ method: "GET", url: "/api/dm-rolls" })).json()).toEqual([roll]);
+    expect((await app.inject({ method: "DELETE", url: `/api/dm-rolls/${roll.id}` })).statusCode).toBe(204);
+    expect((await app.inject({ method: "GET", url: "/api/dm-rolls" })).json()).toEqual([]);
+  });
+
+  it("rejects results outside 1..20", async () => {
+    const roll = { ...newDmRoll(1), value: 21 };
+    expect((await app.inject({ method: "POST", url: "/api/dm-rolls", payload: roll })).statusCode).toBe(400);
   });
 });
 

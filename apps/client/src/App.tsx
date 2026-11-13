@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { Navigate, NavLink, Route, Routes } from "react-router";
 import { BattlefieldPage } from "./pages/BattlefieldPage";
+import { DmRollsPage } from "./pages/DmRollsPage";
 import { InitiativePage } from "./pages/InitiativePage";
 import { PartyPage } from "./pages/PartyPage";
 import { CombatStatus } from "./features/initiative/CombatStatus";
 import { flushCombat, useCombatStore } from "./store/combatStore";
+import { useDmRollStore } from "./store/dmRollStore";
 import { flushParty, usePartyStore } from "./store/partyStore";
 import { flushScenes, useSceneStore } from "./store/sceneStore";
 import { useStatusStore } from "./store/statusStore";
@@ -18,6 +20,7 @@ const boot = () =>
     usePartyStore.getState().load(),
     useCombatStore.getState().load(),
     useSceneStore.getState().load(),
+    useDmRollStore.getState().load(),
   ]).catch((err: unknown) => {
     bootPromise = null;
     throw err;
@@ -54,6 +57,7 @@ export function App() {
           <NavLink to="/mappa">Campo di battaglia</NavLink>
           <NavLink to="/party">Party</NavLink>
           <NavLink to="/iniziativa">Iniziativa</NavLink>
+          <NavLink to="/tiri-dm">Tiri DM</NavLink>
         </nav>
         <div className={styles.status}>
           {state === "ready" && <CombatStatus />}
@@ -77,6 +81,7 @@ export function App() {
             <Route path="/mappa" element={<BattlefieldPage />} />
             <Route path="/party" element={<PartyPage />} />
             <Route path="/iniziativa" element={<InitiativePage />} />
+            <Route path="/tiri-dm" element={<DmRollsPage />} />
             <Route path="*" element={<Navigate to="/mappa" replace />} />
           </Routes>
         )}

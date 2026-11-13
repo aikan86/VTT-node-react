@@ -2,7 +2,7 @@ import { mkdirSync } from "node:fs";
 import Fastify, { type FastifyInstance } from "fastify";
 import multipart from "@fastify/multipart";
 import fastifyStatic from "@fastify/static";
-import { CharacterSchema, SceneSchema } from "@vtt/shared";
+import { CharacterSchema, DmRollSchema, SceneSchema } from "@vtt/shared";
 import { openDb } from "./db";
 import { Repo } from "./repo";
 import { registerDocumentRoutes } from "./routes/documents";
@@ -39,6 +39,12 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
     label: "Scena",
     repo: new Repo(db, "scenes", SceneSchema),
     schema: SceneSchema,
+  });
+  registerDocumentRoutes(app, {
+    path: "/api/dm-rolls",
+    label: "Tiro",
+    repo: new Repo(db, "dm-rolls", DmRollSchema),
+    schema: DmRollSchema,
   });
   registerCombatRoutes(app, db);
   registerUploadRoutes(app, opts.uploadsDir);

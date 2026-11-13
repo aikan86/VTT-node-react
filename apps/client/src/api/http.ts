@@ -1,4 +1,4 @@
-import type { Character, Combat, Scene } from "@vtt/shared";
+import type { Character, Combat, DmRoll, Scene } from "@vtt/shared";
 
 export class ApiError extends Error {
   constructor(
@@ -37,6 +37,7 @@ function collection<T extends { id: string }>(base: string) {
 export const api = {
   characters: collection<Character>("/api/characters"),
   scenes: collection<Scene>("/api/scenes"),
+  dmRolls: collection<DmRoll>("/api/dm-rolls"),
   combat: {
     get: () => request<Combat>("GET", "/api/combat"),
     put: (combat: Combat) => request<Combat>("PUT", "/api/combat", combat),
