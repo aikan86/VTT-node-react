@@ -51,7 +51,7 @@ export function setRoll(combat: Combat, id: string, roll: number | null): Combat
 export function addCombatant(combat: Combat, ref: Ref, idFn: () => string = createId): Combat {
   if (combat.combatants.some((c) => sameRef(c.ref, ref))) return combat;
   const order = combat.combatants.reduce((max, c) => Math.max(max, c.order), -1) + 1;
-  return { ...combat, combatants: [...combat.combatants, { id: idFn(), ref, roll: null, acted: false, order }] };
+  return { ...combat, combatants: [...combat.combatants, { id: idFn(), ref, roll: null, acted: false, order, notes: "" }] };
 }
 
 export function addParty(combat: Combat, characters: readonly { id: string }[]): Combat {
@@ -87,6 +87,10 @@ export function addNpcs(
     npcs: [...combat.npcs, ...npcs],
   });
   return { combat: next, npcs };
+}
+
+export function setNotes(combat: Combat, id: string, notes: string): Combat {
+  return { ...combat, combatants: combat.combatants.map((c) => (c.id === id ? { ...c, notes } : c)) };
 }
 
 export function updateNpc(combat: Combat, npcId: string, patch: Partial<NpcTemplate>): Combat {

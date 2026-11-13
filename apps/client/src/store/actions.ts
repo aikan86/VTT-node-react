@@ -5,6 +5,7 @@ import {
   removeCombatant,
   removeRef,
   sameRef,
+  updateNpc,
   type Hp,
   type NpcTemplate,
   type Point,
@@ -49,6 +50,13 @@ export function setEntityHp(ref: Ref, hp: Hp) {
       npcs: combat.npcs.map((n) => (n.id === ref.id ? { ...n, hp } : n)),
     }));
   }
+}
+
+/** Rinomina un PNG; i nomi vuoti vengono ignorati. */
+export function renameNpc(npcId: string, name: string) {
+  const trimmed = name.trim();
+  if (!trimmed) return;
+  useCombatStore.getState().apply((combat) => updateNpc(combat, npcId, { name: trimmed }));
 }
 
 /** Crea PNG nel combattimento; restituisce i riferimenti creati. */

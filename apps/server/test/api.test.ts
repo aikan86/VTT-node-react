@@ -101,10 +101,17 @@ describe("/api/combat", () => {
       active: true,
       round: 3,
       currentId: "c1",
-      combatants: [{ id: "c1", ref: { kind: "pc", id: "p1" }, roll: 12, acted: false, order: 0 }],
+      combatants: [{ id: "c1", ref: { kind: "pc", id: "p1" }, roll: 12, acted: false, order: 0, notes: "Prono" }],
     };
     expect((await app.inject({ method: "PUT", url: "/api/combat", payload: combat })).statusCode).toBe(200);
     expect((await app.inject({ method: "GET", url: "/api/combat" })).json()).toEqual(combat);
+  });
+
+  it("fills in empty notes for combatants saved before notes existed", async () => {
+    const legacy = { ...emptyCombat(), combatants: [{ id: "c1", ref: { kind: "pc", id: "p1" }, roll: null, acted: false, order: 0 }] };
+    expect((await app.inject({ method: "PUT", url: "/api/combat", payload: legacy })).statusCode).toBe(200);
+    const res = (await app.inject({ method: "GET", url: "/api/combat" })).json();
+    expect(res.combatants[0].notes).toBe("");
   });
 
   it("rejects an invalid d20 roll", async () => {

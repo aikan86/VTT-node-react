@@ -13,6 +13,11 @@
 .acted { opacity: 0.45; }
 .down .name { text-decoration: line-through; }
 .name { font-weight: 600; }
+.nameButton { background: none; border: none; padding: 0; color: inherit; font: inherit; font-weight: 600; cursor: text; text-align: left; }
+.nameButton:hover { text-decoration: underline dotted; }
+.nameInput { width: 10rem; font-weight: 600; }
 .turn { color: var(--accent); font-size: 0.8rem; font-weight: 600; }
 .num { font-variant-numeric: tabular-nums; text-align: center; }
 .total { font-size: 1.25rem; font-weight: 700; text-align: center; font-variant-numeric: tabular-nums; min-width: 3rem; }
+.notesCell { width: 100%; min-width: 12rem; }
+.notes { width: 100%; min-height: 2rem; resize: vertical; field-sizing: content; max-height: 8rem; font-size: 0.9rem; line-height: 1.3; }

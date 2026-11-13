@@ -12,6 +12,7 @@ import {
   nextTurn,
   removeCombatant,
   rollAll,
+  setNotes,
   setRoll,
   sortCombatants,
   startCombat,
@@ -22,7 +23,7 @@ const mods: Record<string, number> = { a: 2, b: 5, c: 0, d: 2 };
 const getMod = (ref: Ref) => mods[ref.id] ?? 0;
 
 function c(id: string, roll: number | null, order = 0, acted = false): Combatant {
-  return { id, ref: { kind: "pc", id }, roll, acted, order };
+  return { id, ref: { kind: "pc", id }, roll, acted, order, notes: "" };
 }
 
 function combatOf(...combatants: Combatant[]): Combat {
@@ -92,7 +93,14 @@ describe("adding and removing", () => {
     combat = addCombatant(combat, { kind: "pc", id: "a" });
     expect(combat.combatants.map((x) => x.ref.id)).toEqual(["a", "b"]);
     expect(combat.combatants[1]!.order).toBeGreaterThan(combat.combatants[0]!.order);
-    expect(combat.combatants.every((x) => x.roll === null && !x.acted)).toBe(true);
+    expect(combat.combatants.every((x) => x.roll === null && !x.acted && x.notes === "")).toBe(true);
+  });
+
+  it("setNotes stores combat notes for one combatant", () => {
+    const combat = combatOf(c("a", null), c("b", null));
+    const next = setNotes(combat, "b", "Prono, concentrato su Benedizione");
+    expect(next.combatants.map((x) => x.notes)).toEqual(["", "Prono, concentrato su Benedizione"]);
+    expect(combat.combatants[1]!.notes).toBe("");
   });
 
   it("addParty adds only characters not already present", () => {
@@ -211,6 +219,11 @@ describe("turn flow", () => {
     expect(combat.currentId).toBeNull();
     expect(combat.combatants).toHaveLength(3);
     expect(combat.combatants.every((x) => x.roll === null && !x.acted)).toBe(true);
+  });
+
+  it("endCombat keeps combat notes", () => {
+    const combat = endCombat(setNotes(startCombat(base(), getMod), "a", "avvelenato"));
+    expect(combat.combatants.find((x) => x.id === "a")!.notes).toBe("avvelenato");
   });
 });
 

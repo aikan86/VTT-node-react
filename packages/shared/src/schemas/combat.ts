@@ -23,6 +23,8 @@ export const CombatantSchema = z.object({
   acted: z.boolean(),
   /** Usato solo per spareggiare a parità di totale e modificatore. */
   order: z.number().int(),
+  /** Appunti di combattimento (condizioni, concentrazione, reazioni…). */
+  notes: z.string().max(2000).default(""),
 });
 export type Combatant = z.infer<typeof CombatantSchema>;
 

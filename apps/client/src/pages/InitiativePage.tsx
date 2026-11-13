@@ -75,6 +75,7 @@ export function InitiativePage() {
               <th style={{ textAlign: "center" }}>Totale</th>
               <th style={{ textAlign: "center" }}>CA</th>
               <th>PF</th>
+              <th>Note</th>
               <th />
             </tr>
           </thead>
@@ -85,6 +86,7 @@ export function InitiativePage() {
                 row={row}
                 active={combat.active}
                 onSetRoll={actions.setRoll}
+                onSetNotes={actions.setNotes}
                 onToggleActed={actions.toggleActed}
                 onMove={actions.move}
               />

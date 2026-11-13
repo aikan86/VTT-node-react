@@ -95,6 +95,50 @@ describe("InitiativePage", () => {
     expect(usePartyStore.getState().characters[0]!.hp.current).toBe(6);
   });
 
+  it("renames an npc by clicking its name or the edit button", async () => {
+    const user = userEvent.setup();
+    render(<InitiativePage />);
+    await user.click(screen.getByRole("button", { name: "+ Aggiungi party" }));
+    await user.click(screen.getByRole("button", { name: "+ Aggiungi PNG" }));
+    const dialog = screen.getByRole("dialog", { name: "Aggiungi PNG" });
+    await user.clear(within(dialog).getByLabelText("Nome"));
+    await user.type(within(dialog).getByLabelText("Nome"), "Orco");
+    await user.click(within(dialog).getByRole("button", { name: "Aggiungi" }));
+
+    // PG non rinominabili dal tracker
+    expect(screen.queryByRole("button", { name: "Rinomina Aria" })).not.toBeInTheDocument();
+
+    // Click sul nome -> input, Invio conferma
+    await user.click(screen.getByRole("button", { name: "Orco" }));
+    const input = screen.getByLabelText("Nome di Orco");
+    await user.clear(input);
+    await user.type(input, "Capo orco{Enter}");
+    expect(useCombatStore.getState().combat.npcs[0]!.name).toBe("Capo orco");
+
+    // Tasto modifica -> Esc annulla
+    await user.click(screen.getByRole("button", { name: "Rinomina Capo orco" }));
+    await user.clear(screen.getByLabelText("Nome di Capo orco"));
+    await user.type(screen.getByLabelText("Nome di Capo orco"), "Altro{Escape}");
+    expect(useCombatStore.getState().combat.npcs[0]!.name).toBe("Capo orco");
+
+    // Nome vuoto non viene salvato
+    await user.click(screen.getByRole("button", { name: "Rinomina Capo orco" }));
+    await user.clear(screen.getByLabelText("Nome di Capo orco"));
+    await user.keyboard("{Enter}");
+    expect(useCombatStore.getState().combat.npcs[0]!.name).toBe("Capo orco");
+    expect(screen.getByRole("button", { name: "Capo orco" })).toBeInTheDocument();
+  });
+
+  it("edits combat notes for a combatant", async () => {
+    const user = userEvent.setup();
+    render(<InitiativePage />);
+    await user.click(screen.getByRole("button", { name: "+ Aggiungi party" }));
+    await user.type(screen.getByLabelText("Note di combattimento di Borin"), "Prono");
+    const borin = useCombatStore.getState().combat.combatants.find((c) => c.ref.id === "pc-b")!;
+    expect(borin.notes).toBe("Prono");
+    expect(screen.getByLabelText("Note di combattimento di Borin")).toHaveValue("Prono");
+  });
+
   it("ends combat after confirmation and clears rolls", async () => {
     const user = userEvent.setup();
     render(<InitiativePage />);
