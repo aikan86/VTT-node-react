@@ -48,9 +48,21 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
   registerUploadRoutes(app, opts.uploadsDir);
 
   if (opts.clientDist) {
-    await app.register(fastifyStatic, { root: opts.clientDist, prefix: "/", decorateReply: false, wildcard: false });
+    // L'HTML va sempre riconvalidato (punta agli asset della release corrente); gli asset hanno l'hash nel nome.
+    await app.register(fastifyStatic, {
+      root: opts.clientDist,
+      prefix: "/",
+      decorateReply: false,
+      wildcard: false,
+      cacheControl: false,
+      setHeaders: (res, path) => {
+        res.header("cache-control", path.endsWith(".html") ? "no-cache" : "public, max-age=31536000, immutable");
+      },
+    });
     app.setNotFoundHandler((req, reply) => {
-      if (req.method === "GET" && !req.url.startsWith("/api/")) return reply.sendFile("index.html", opts.clientDist!);
+      if (req.method === "GET" && !req.url.startsWith("/api/")) {
+        return reply.header("cache-control", "no-cache").sendFile("index.html", opts.clientDist!, { cacheControl: false });
+      }
       return reply.code(404).send({ error: "Non trovato" });
     });
   }

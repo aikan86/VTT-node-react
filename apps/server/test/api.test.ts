@@ -1,4 +1,4 @@
-import { mkdtempSync, readdirSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -164,5 +164,28 @@ describe("/api/uploads", () => {
     const res = await app.inject({ method: "POST", url: "/api/uploads", ...multipart("x.txt", "text/plain", Buffer.from("ciao")) });
     expect(res.statusCode).toBe(415);
     expect(readdirSync(uploadsDir)).toHaveLength(0);
+  });
+});
+
+describe("client hosting (production)", () => {
+  it("never caches the HTML shell, so a new release is picked up, while hashed assets are immutable", async () => {
+    const dist = mkdtempSync(join(tmpdir(), "vtt-dist-"));
+    mkdirSync(join(dist, "assets"));
+    writeFileSync(join(dist, "index.html"), "<!doctype html><title>VTT</title>");
+    writeFileSync(join(dist, "assets", "index-abc123.js"), "console.log(1)");
+    const prod = await buildApp({ dbPath: ":memory:", uploadsDir, clientDist: dist, logger: false });
+    try {
+      for (const url of ["/", "/mappa", "/iniziativa"]) {
+        const res = await prod.inject({ method: "GET", url });
+        expect(res.statusCode).toBe(200);
+        expect(res.headers["cache-control"]).toBe("no-cache");
+      }
+      const asset = await prod.inject({ method: "GET", url: "/assets/index-abc123.js" });
+      expect(asset.headers["cache-control"]).toContain("immutable");
+      expect((await prod.inject({ method: "GET", url: "/api/nope" })).statusCode).toBe(404);
+    } finally {
+      await prod.close();
+      rmSync(dist, { recursive: true, force: true });
+    }
   });
 });
