@@ -34,6 +34,7 @@ export function TokensPanel({ scene, resolve, pending, onPending, onAddNpc, sele
     ...inInitiativeOrder,
     ...[...pcRefs, ...npcRefs].filter((r) => !inInitiativeOrder.some((o) => sameRef(o, r))),
   ];
+  const currentRef = combat.active ? combat.combatants.find((c) => c.id === combat.currentId)?.ref : undefined;
   const missingPcs = pcRefs.filter((r) => !onMap(r));
   const missingNpcs = npcRefs.filter((r) => !onMap(r));
   const entity = selected && resolve(selected.ref);
@@ -50,12 +51,14 @@ export function TokensPanel({ scene, resolve, pending, onPending, onAddNpc, sele
           const e = resolve(ref);
           if (!e) return null;
           const placed = onMap(ref);
+          const current = currentRef !== undefined && sameRef(currentRef, ref);
           return (
-            <li key={ref.id}>
+            <li key={ref.id} className={current ? styles.current : undefined} aria-current={current ? "step" : undefined}>
               <span>
                 <span className="swatch" style={{ background: e.color }} />
                 <span data-testid="entity-name">{e.name}</span>
                 {ref.kind === "npc" && <span className="badge">PNG</span>}
+                {current && <span className={styles.turn}>◀ turno</span>}
               </span>
               {placed ? (
                 <button

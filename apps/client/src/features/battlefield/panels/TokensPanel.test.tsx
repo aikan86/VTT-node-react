@@ -81,6 +81,26 @@ describe("TokensPanel", () => {
     expect(add.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
+  it("highlights the combatant whose turn it is, as in the initiative tracker", () => {
+    const combatants = [
+      { id: "c1", ref: { kind: "pc" as const, id: "pc-a" }, roll: 15, acted: true, order: 0, notes: "" },
+      { id: "c2", ref: { kind: "pc" as const, id: "pc-b" }, roll: 10, acted: false, order: 1, notes: "" },
+    ];
+    useCombatStore.getState().hydrate({ rev: 1, data: { ...emptyCombat(), active: true, round: 1, currentId: "c2", combatants } });
+    renderPanel(sceneWithAria());
+    const items = within(screen.getByRole("list", { name: "Personaggi" })).getAllByRole("listitem");
+    expect(items[1]).toHaveAttribute("aria-current", "step");
+    expect(within(items[1]!).getByText("◀ turno")).toBeInTheDocument();
+    expect(items[0]).not.toHaveAttribute("aria-current");
+  });
+
+  it("highlights nobody when combat is not running", () => {
+    const combatants = [{ id: "c1", ref: { kind: "pc" as const, id: "pc-a" }, roll: 15, acted: false, order: 0, notes: "" }];
+    useCombatStore.getState().hydrate({ rev: 1, data: { ...emptyCombat(), currentId: "c1", combatants } });
+    renderPanel(sceneWithAria());
+    expect(screen.queryByText("◀ turno")).not.toBeInTheDocument();
+  });
+
   it("offers a remove-from-map button only for entities on the map", async () => {
     const onRemove = renderPanel(sceneWithAria());
     expect(screen.queryByRole("button", { name: "Rimuovi Borin dalla mappa" })).not.toBeInTheDocument();
