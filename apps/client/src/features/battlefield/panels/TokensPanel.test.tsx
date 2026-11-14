@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { emptyCombat, newCharacter, newScene, type Ref, type Scene } from "@vtt/shared";
@@ -14,8 +14,9 @@ vi.mock("../../../api/http", async (importOriginal) => ({
 
 const aria = newCharacter({ id: "pc-a", name: "Aria" });
 const borin = newCharacter({ id: "pc-b", name: "Borin" });
+const NAMES: Record<string, string> = { "pc-a": "Aria", "pc-b": "Borin", "pc-c": "Cael", "n1": "Goblin" };
 const resolve = (ref: Ref) =>
-  ({ ref, name: ref.id === "pc-a" ? "Aria" : "Borin", color: "#3b82f6", hp: aria.hp, ac: 15, initiativeMod: 0, size: 1 }) satisfies EntityView;
+  ({ ref, name: NAMES[ref.id] ?? ref.id, color: "#3b82f6", hp: aria.hp, ac: 15, initiativeMod: 0, size: 1 }) satisfies EntityView;
 
 function sceneWithAria(locked = false): Scene {
   const scene = newScene("Test");
@@ -52,6 +53,34 @@ beforeEach(() => {
 });
 
 describe("TokensPanel", () => {
+  it("lists characters in initiative order, the add button first and those outside the initiative last", () => {
+    const cael = newCharacter({ id: "pc-c", name: "Cael" });
+    usePartyStore.getState().hydrate([aria, borin, cael].map((data) => ({ rev: 1, data })));
+    const goblin = { id: "n1", name: "Goblin", color: "#ff0000", hp: { current: 7, max: 7, temp: 0 }, ac: 15, initiativeMod: 0, size: 1 };
+    useCombatStore.getState().hydrate({
+      rev: 1,
+      data: {
+        ...emptyCombat(),
+        npcs: [goblin],
+        combatants: [
+          { id: "c1", ref: { kind: "pc", id: "pc-a" }, roll: 5, acted: false, order: 0, notes: "" },
+          { id: "c2", ref: { kind: "npc", id: "n1" }, roll: 18, acted: false, order: 1, notes: "" },
+          { id: "c3", ref: { kind: "pc", id: "pc-b" }, roll: 12, acted: false, order: 2, notes: "" },
+        ],
+      },
+    });
+    renderPanel(sceneWithAria());
+    const list = screen.getByRole("list", { name: "Personaggi" });
+    expect(within(list).getAllByRole("listitem").map((li) => within(li).getByTestId("entity-name").textContent)).toEqual([
+      "Goblin",
+      "Borin",
+      "Aria",
+      "Cael",
+    ]);
+    const add = screen.getByRole("button", { name: "+ Aggiungi PNG" });
+    expect(add.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it("offers a remove-from-map button only for entities on the map", async () => {
     const onRemove = renderPanel(sceneWithAria());
     expect(screen.queryByRole("button", { name: "Rimuovi Borin dalla mappa" })).not.toBeInTheDocument();

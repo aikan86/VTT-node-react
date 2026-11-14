@@ -1,4 +1,4 @@
-import { sameRef, type Ref, type Scene, type Token } from "@vtt/shared";
+import { modLookupFrom, sameRef, sortCombatants, type Ref, type Scene, type Token } from "@vtt/shared";
 import { HpEditor } from "../../../components/HpEditor";
 import { useCombatStore } from "../../../store/combatStore";
 import type { EntityResolver } from "../../../store/entities";
@@ -28,6 +28,12 @@ export function TokensPanel({ scene, resolve, pending, onPending, onAddNpc, sele
 
   const pcRefs: Ref[] = characters.map((c) => ({ kind: "pc", id: c.id }));
   const npcRefs: Ref[] = combat.npcs.map((n) => ({ kind: "npc", id: n.id }));
+  // stesso ordine del tracker di iniziativa; chi non è nell'iniziativa va in fondo (prima i PG, poi i PNG)
+  const inInitiativeOrder = sortCombatants(combat.combatants, modLookupFrom(characters, combat.npcs)).map((c) => c.ref);
+  const allRefs = [
+    ...inInitiativeOrder,
+    ...[...pcRefs, ...npcRefs].filter((r) => !inInitiativeOrder.some((o) => sameRef(o, r))),
+  ];
   const missingPcs = pcRefs.filter((r) => !onMap(r));
   const missingNpcs = npcRefs.filter((r) => !onMap(r));
   const entity = selected && resolve(selected.ref);
@@ -39,7 +45,7 @@ export function TokensPanel({ scene, resolve, pending, onPending, onAddNpc, sele
         {empty}
       </span>
     ) : (
-      <ul className={styles.list}>
+      <ul className={styles.list} aria-label="Personaggi">
         {refs.map((ref) => {
           const e = resolve(ref);
           if (!e) return null;
@@ -48,7 +54,8 @@ export function TokensPanel({ scene, resolve, pending, onPending, onAddNpc, sele
             <li key={ref.id}>
               <span>
                 <span className="swatch" style={{ background: e.color }} />
-                {e.name}
+                <span data-testid="entity-name">{e.name}</span>
+                {ref.kind === "npc" && <span className="badge">PNG</span>}
               </span>
               {placed ? (
                 <button
@@ -81,17 +88,12 @@ export function TokensPanel({ scene, resolve, pending, onPending, onAddNpc, sele
       )}
 
       <section className={styles.section}>
-        <h3>Party</h3>
-        {list(pcRefs, "Nessun PG: creali nella pagina Party.")}
-        {missingPcs.length > 1 && <button onClick={() => onPending(missingPcs)}>Piazza tutto il party</button>}
-      </section>
-
-      <section className={styles.section}>
-        <h3>PNG</h3>
+        <h3>Personaggi</h3>
         <button className="primary" onClick={onAddNpc}>
           + Aggiungi PNG
         </button>
-        {list(npcRefs, "Nessun PNG nel combattimento.")}
+        {list(allRefs, "Nessun personaggio: crea i PG nella pagina Party o aggiungi un PNG.")}
+        {missingPcs.length > 1 && <button onClick={() => onPending(missingPcs)}>Piazza tutto il party</button>}
         {missingNpcs.length > 1 && <button onClick={() => onPending(missingNpcs)}>Piazza tutti i PNG</button>}
       </section>
 
