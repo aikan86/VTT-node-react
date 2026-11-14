@@ -4,7 +4,7 @@ import { api } from "../../../api/http";
 import { NumberInput } from "../../../components/NumberInput";
 import { reportError } from "../../../store/statusStore";
 import styles from "../Battlefield.module.css";
-import { backgroundBounds, withBackgroundGeometry } from "../geometry";
+import { withBackgroundGeometry } from "../geometry";
 
 interface Props {
   scene: Scene;
@@ -19,16 +19,6 @@ function loadImageSize(url: string): Promise<{ width: number; height: number }> 
     img.src = url;
   });
 }
-
-/** Righe/colonne sufficienti a coprire l'immagine (anche spostata o ruotata). */
-const fitGrid = (grid: Grid, bg: Background): Grid => {
-  const b = backgroundBounds(bg);
-  return {
-    ...grid,
-    cols: Math.max(1, Math.ceil((b.maxX - grid.offsetX) / grid.cellPx)),
-    rows: Math.max(1, Math.ceil((b.maxY - grid.offsetY) / grid.cellPx)),
-  };
-};
 
 export function BackgroundPanel({ scene, onUpdate }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
@@ -64,7 +54,7 @@ export function BackgroundPanel({ scene, onUpdate }: Props) {
       const { url } = await api.upload(file);
       const { width, height } = await loadImageSize(url);
       const background: Background = { imageUrl: url, widthPx: width, heightPx: height, x: 0, y: 0, rotation: 0 };
-      onUpdate((s) => ({ ...s, background, grid: fitGrid(s.grid, background) }));
+      onUpdate((s) => ({ ...s, background }));
     } catch (err) {
       reportError(err);
     } finally {
@@ -128,9 +118,9 @@ export function BackgroundPanel({ scene, onUpdate }: Props) {
               <NumberInput value={bg.rotation} onChange={(v) => setBg({ rotation: (((v ?? 0) % 360) + 360) % 360 })} min={-360} max={360} />
             </label>
           </div>
-          <label className="row">
+          <label className="row" style={{ flexWrap: "nowrap" }}>
             <input type="checkbox" checked={keepRatio} onChange={(e) => setKeepRatio(e.target.checked)} />
-            Mantieni proporzioni (campi numerici)
+            Mantieni proporzioni
           </label>
           <div className="row">
             <button onClick={() => setBg({ rotation: (bg.rotation + 90) % 360 })}>↻ Ruota 90°</button>
@@ -151,26 +141,6 @@ export function BackgroundPanel({ scene, onUpdate }: Props) {
             <NumberInput value={g.cellPx} onChange={(v) => v && setGrid({ cellPx: v })} min={8} max={400} />
           </label>
           <label className="field">
-            Piedi per cella
-            <NumberInput value={g.feetPerCell} onChange={(v) => v && setGrid({ feetPerCell: v })} min={1} max={100} />
-          </label>
-          <label className="field">
-            Offset X
-            <NumberInput value={g.offsetX} onChange={(v) => setGrid({ offsetX: v ?? 0 })} min={-400} max={400} />
-          </label>
-          <label className="field">
-            Offset Y
-            <NumberInput value={g.offsetY} onChange={(v) => setGrid({ offsetY: v ?? 0 })} min={-400} max={400} />
-          </label>
-          <label className="field">
-            Colonne
-            <NumberInput value={g.cols} onChange={(v) => v && setGrid({ cols: v })} min={1} max={500} />
-          </label>
-          <label className="field">
-            Righe
-            <NumberInput value={g.rows} onChange={(v) => v && setGrid({ rows: v })} min={1} max={500} />
-          </label>
-          <label className="field">
             Colore
             <input type="color" value={g.color} onChange={(e) => setGrid({ color: e.target.value })} />
           </label>
@@ -179,11 +149,6 @@ export function BackgroundPanel({ scene, onUpdate }: Props) {
             <input type="range" min={0} max={1} step={0.05} value={g.opacity} onChange={(e) => setGrid({ opacity: Number(e.target.value) })} />
           </label>
         </div>
-        {scene.background && (
-          <button onClick={() => onUpdate((s) => (s.background ? { ...s, grid: fitGrid(s.grid, s.background) } : s))}>
-            Adatta righe/colonne all'immagine
-          </button>
-        )}
       </section>
     </>
   );

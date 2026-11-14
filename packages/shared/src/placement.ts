@@ -6,15 +6,11 @@ export interface Footprint extends Point {
 
 /**
  * Trova celle libere per piazzare token di varie taglie, il più vicino possibile a `start`.
+ * La griglia non ha bordi: si cerca entro `radius` celle attorno a `start`.
  * A parità di distanza preferisce destra/basso, poi le righe più in alto.
- * Restituisce meno posizioni di `sizes.length` se la griglia è piena.
+ * Restituisce meno posizioni di `sizes.length` se nel raggio non c'è spazio.
  */
-export function findFreeCells(
-  occupied: readonly Footprint[],
-  sizes: readonly number[],
-  start: Point,
-  bounds: { cols: number; rows: number },
-): Point[] {
+export function findFreeCells(occupied: readonly Footprint[], sizes: readonly number[], start: Point, radius = 25): Point[] {
   const taken = new Set<string>();
   const mark = (f: Footprint) => {
     for (let dx = 0; dx < f.size; dx++) for (let dy = 0; dy < f.size; dy++) taken.add(`${f.x + dx},${f.y + dy}`);
@@ -22,7 +18,9 @@ export function findFreeCells(
   occupied.forEach(mark);
 
   const candidates: Point[] = [];
-  for (let y = 0; y < bounds.rows; y++) for (let x = 0; x < bounds.cols; x++) candidates.push({ x, y });
+  for (let y = start.y - radius; y <= start.y + radius; y++) {
+    for (let x = start.x - radius; x <= start.x + radius; x++) candidates.push({ x, y });
+  }
   const rank = (p: Point) => {
     const dx = p.x - start.x;
     const dy = p.y - start.y;
@@ -35,7 +33,6 @@ export function findFreeCells(
   });
 
   const fits = (p: Point, size: number) => {
-    if (p.x + size > bounds.cols || p.y + size > bounds.rows) return false;
     for (let dx = 0; dx < size; dx++) for (let dy = 0; dy < size; dy++) if (taken.has(`${p.x + dx},${p.y + dy}`)) return false;
     return true;
   };

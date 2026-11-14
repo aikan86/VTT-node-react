@@ -3,7 +3,7 @@ import { Stage } from "react-konva";
 import type Konva from "konva";
 import { ELEMENT_COLORS, pxToCell, type Background, type Effect, type LayerKey, type MapElement, type Point, type Ref, type Scene, type Token } from "@vtt/shared";
 import type { EntityResolver } from "../../store/entities";
-import { clamp, worldSize } from "./geometry";
+import { clamp, contentBounds } from "./geometry";
 import { useElementSize, useKeyHeld } from "./hooks";
 import { BACKGROUND_ID, BackgroundLayer, GridLayer } from "./layers/BackgroundLayer";
 import { EffectsLayer } from "./layers/EffectsLayer";
@@ -45,9 +45,11 @@ export function BattleStage(props: Props) {
 
   const fit = () => {
     if (!size.width || !size.height) return;
-    const world = worldSize(scene);
-    const scale = clamp(Math.min(size.width / world.width, size.height / world.height) * 0.95, MIN_SCALE, MAX_SCALE);
-    setView({ scale, x: (size.width - world.width * scale) / 2, y: (size.height - world.height * scale) / 2 });
+    const b = contentBounds(scene, (ref) => props.resolve(ref)?.size ?? 1);
+    const width = b.maxX - b.minX;
+    const height = b.maxY - b.minY;
+    const scale = clamp(Math.min(size.width / width, size.height / height) * 0.95, MIN_SCALE, MAX_SCALE);
+    setView({ scale, x: (size.width - width * scale) / 2 - b.minX * scale, y: (size.height - height * scale) / 2 - b.minY * scale });
   };
 
   // Adatta la vista alla prima apertura di ogni scena e quando cambia l'immagine di sfondo
@@ -112,8 +114,8 @@ export function BattleStage(props: Props) {
   };
 
   const draftRect = draw && {
-    x: clamp(Math.min(draw.start.x, draw.end.x), 0, scene.grid.cols - 1),
-    y: clamp(Math.min(draw.start.y, draw.end.y), 0, scene.grid.rows - 1),
+    x: Math.min(draw.start.x, draw.end.x),
+    y: Math.min(draw.start.y, draw.end.y),
     w: Math.abs(draw.end.x - draw.start.x) + 1,
     h: Math.abs(draw.end.y - draw.start.y) + 1,
   };
@@ -177,7 +179,7 @@ export function BattleStage(props: Props) {
             onSelect={() => props.onSelect({ layer: "background", id: BACKGROUND_ID })}
             onChange={props.onBackgroundChange}
           />
-          <GridLayer scene={scene} />
+          <GridLayer scene={scene} view={view} size={size} />
           <ElementsLayer
             scene={scene}
             listening={listening("elements")}

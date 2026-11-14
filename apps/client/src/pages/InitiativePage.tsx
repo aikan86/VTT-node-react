@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { topRightCell } from "../features/battlefield/geometry";
 import { AddNpcDialog } from "../features/initiative/AddNpcDialog";
 import { CombatantRow } from "../features/initiative/CombatantRow";
 import { useInitiative } from "../features/initiative/useInitiative";
@@ -103,7 +104,8 @@ export function InitiativePage() {
             const refs = createNpcs(template, quantity);
             const { activeId, scenes } = useSceneStore.getState();
             const scene = scenes.find((s) => s.id === activeId);
-            if (placeOnMap && scene) placeTokens(scene.id, refs, { x: scene.grid.cols - 1, y: 0 }, sizeOfRef);
+            // i nuovi PNG partono dall'angolo in alto a destra del contenuto della scena
+            if (placeOnMap && scene) placeTokens(scene.id, refs, topRightCell(scene, sizeOfRef), sizeOfRef);
             setNpcDialog(false);
           }}
         />

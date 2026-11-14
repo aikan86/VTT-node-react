@@ -13,16 +13,19 @@ export const LAYER_LABELS: Record<LayerKey, string> = {
 
 const LayerStateSchema = z.object({ visible: z.boolean(), locked: z.boolean() });
 
+/** Griglia senza bordi: copre tutto il campo di battaglia, si può piazzare ovunque (anche a coordinate negative). */
 export const GridSchema = z.object({
   cellPx: z.number().min(8).max(400),
-  offsetX: z.number(),
-  offsetY: z.number(),
-  cols: z.number().int().min(1).max(500),
-  rows: z.number().int().min(1).max(500),
+  /** Sfasamento delle linee: non più modificabile, mantenuto perché le scene esistenti non si spostino. */
+  offsetX: z.number().default(0),
+  offsetY: z.number().default(0),
+  /** Obsoleti (la griglia non ha più dimensioni): accettati e ignorati per le scene salvate prima. */
+  cols: z.number().int().min(1).optional(),
+  rows: z.number().int().min(1).optional(),
   color: ColorSchema,
   opacity: z.number().min(0).max(1),
   visible: z.boolean(),
-  feetPerCell: z.number().positive(),
+  feetPerCell: z.number().positive().default(5),
 });
 export type Grid = z.infer<typeof GridSchema>;
 
@@ -127,8 +130,6 @@ export function newScene(name = "Nuova scena"): Scene {
       cellPx: 50,
       offsetX: 0,
       offsetY: 0,
-      cols: 30,
-      rows: 20,
       color: "#000000",
       opacity: 0.35,
       visible: true,

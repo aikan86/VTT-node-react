@@ -1,4 +1,4 @@
-import type { Background, Scene } from "@vtt/shared";
+import { pxToCell, type Background, type Grid, type Point, type Ref, type Scene } from "@vtt/shared";
 
 export interface Bounds {
   minX: number;
@@ -19,15 +19,61 @@ export function backgroundBounds(bg: Background): Bounds {
   return { minX: cx - halfW, minY: cy - halfH, maxX: cx + halfW, maxY: cy + halfH };
 }
 
-/** Dimensioni del "mondo" in pixel: immagine di sfondo o area della griglia, la maggiore. */
-export function worldSize(scene: Scene): { width: number; height: number } {
+const EMPTY_AREA_CELLS = { cols: 30, rows: 20 };
+
+/** Area occupata dal contenuto della scena (immagine, token, elementi, effetti), per "Adatta". */
+export function contentBounds(scene: Scene, sizeOf: (ref: Ref) => number = () => 1): Bounds {
   const g = scene.grid;
-  const gridW = g.offsetX + g.cols * g.cellPx;
-  const gridH = g.offsetY + g.rows * g.cellPx;
-  const bg = scene.background ? backgroundBounds(scene.background) : null;
+  const boxes: Bounds[] = [];
+  const cellBox = (x: number, y: number, w: number, h: number): Bounds => ({
+    minX: g.offsetX + x * g.cellPx,
+    minY: g.offsetY + y * g.cellPx,
+    maxX: g.offsetX + (x + w) * g.cellPx,
+    maxY: g.offsetY + (y + h) * g.cellPx,
+  });
+  if (scene.background) boxes.push(backgroundBounds(scene.background));
+  for (const t of scene.tokens) {
+    const size = sizeOf(t.ref);
+    boxes.push(cellBox(t.x, t.y, size, size));
+  }
+  for (const el of scene.elements) boxes.push(cellBox(el.x, el.y, el.w, el.h));
+  for (const fx of scene.effects) {
+    const reach = fx.sizeFt / g.feetPerCell; // raggio, lato o lunghezza: approssimato per eccesso
+    boxes.push(cellBox(fx.x - reach, fx.y - reach, reach * 2, reach * 2));
+  }
+  if (boxes.length === 0) return cellBox(0, 0, EMPTY_AREA_CELLS.cols, EMPTY_AREA_CELLS.rows);
   return {
-    width: Math.max(gridW, bg?.maxX ?? 0),
-    height: Math.max(gridH, bg?.maxY ?? 0),
+    minX: Math.min(...boxes.map((b) => b.minX)),
+    minY: Math.min(...boxes.map((b) => b.minY)),
+    maxX: Math.max(...boxes.map((b) => b.maxX)),
+    maxY: Math.max(...boxes.map((b) => b.maxY)),
+  };
+}
+
+/** Cella all'angolo in alto a destra del contenuto: punto di partenza per piazzare nuovi token lontano dal party. */
+export function topRightCell(scene: Scene, sizeOf?: (ref: Ref) => number): Point {
+  const b = contentBounds(scene, sizeOf);
+  return pxToCell({ x: b.maxX - 1, y: b.minY }, scene.grid);
+}
+
+/** Sotto questa distanza tra le linee sullo schermo la griglia sarebbe solo rumore. */
+const MIN_CELL_ON_SCREEN_PX = 4;
+
+/** Linee della griglia (coordinate del mondo) che cadono nell'area visibile; null se troppo fitte. */
+export function gridLines(
+  g: Pick<Grid, "cellPx" | "offsetX" | "offsetY">,
+  view: { x: number; y: number; scale: number },
+  size: { width: number; height: number },
+): { xs: number[]; ys: number[] } | null {
+  if (g.cellPx * view.scale < MIN_CELL_ON_SCREEN_PX) return null;
+  const axis = (offset: number, from: number, to: number) => {
+    const lines: number[] = [];
+    for (let v = offset + Math.floor((from - offset) / g.cellPx) * g.cellPx; v <= to; v += g.cellPx) lines.push(v);
+    return lines;
+  };
+  return {
+    xs: axis(g.offsetX, -view.x / view.scale, (size.width - view.x) / view.scale),
+    ys: axis(g.offsetY, -view.y / view.scale, (size.height - view.y) / view.scale),
   };
 }
 

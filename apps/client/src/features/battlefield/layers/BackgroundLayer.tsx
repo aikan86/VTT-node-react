@@ -1,7 +1,8 @@
-import { Image as KImage, Layer, Rect, Shape, Transformer } from "react-konva";
+import { Image as KImage, Layer, Shape, Transformer } from "react-konva";
 import type { Background, Scene } from "@vtt/shared";
 import { useImage } from "../hooks";
-import { backgroundFromNode, worldSize } from "../geometry";
+import { backgroundFromNode, gridLines } from "../geometry";
+import type { View } from "../types";
 import { useTransformer } from "./useTransformer";
 
 export const BACKGROUND_ID = "background";
@@ -20,7 +21,6 @@ interface Props {
 export function BackgroundLayer({ scene, listening, editable, selected, onSelect, onChange }: Props) {
   const bg = scene.background;
   const image = useImage(bg?.imageUrl);
-  const { width, height } = worldSize(scene);
   const { transformer, register } = useTransformer(selected ? BACKGROUND_ID : null, editable);
 
   const commit = (node: { x(): number; y(): number; scaleX(): number; scaleY(): number; rotation(): number; scale(s: { x: number; y: number }): void }) => {
@@ -32,7 +32,6 @@ export function BackgroundLayer({ scene, listening, editable, selected, onSelect
 
   return (
     <Layer listening={listening} visible={scene.layers.background.visible}>
-      <Rect width={width} height={height} fill="#2a2925" listening={false} />
       {image && bg && (
         <KImage
           ref={register(BACKGROUND_ID)}
@@ -66,32 +65,36 @@ export function BackgroundLayer({ scene, listening, editable, selected, onSelect
   );
 }
 
-export function GridLayer({ scene }: { scene: Scene }) {
+/** Griglia senza bordi: si disegnano solo le linee nell'area visibile (ricalcolate a ogni pan/zoom). */
+export function GridLayer({ scene, view, size }: { scene: Scene; view: View; size: { width: number; height: number } }) {
   const g = scene.grid;
+  const lines = gridLines(g, view, size);
   return (
     <Layer listening={false} visible={g.visible}>
-      <Shape
-        stroke={g.color}
-        opacity={g.opacity}
-        strokeWidth={1}
-        strokeScaleEnabled={false}
-        sceneFunc={(ctx, shape) => {
-          const w = g.cols * g.cellPx;
-          const h = g.rows * g.cellPx;
-          ctx.beginPath();
-          for (let i = 0; i <= g.cols; i++) {
-            const x = g.offsetX + i * g.cellPx;
-            ctx.moveTo(x, g.offsetY);
-            ctx.lineTo(x, g.offsetY + h);
-          }
-          for (let j = 0; j <= g.rows; j++) {
-            const y = g.offsetY + j * g.cellPx;
-            ctx.moveTo(g.offsetX, y);
-            ctx.lineTo(g.offsetX + w, y);
-          }
-          ctx.strokeShape(shape);
-        }}
-      />
+      {lines && (
+        <Shape
+          stroke={g.color}
+          opacity={g.opacity}
+          strokeWidth={1}
+          strokeScaleEnabled={false}
+          sceneFunc={(ctx, shape) => {
+            const top = lines.ys[0]!;
+            const bottom = lines.ys[lines.ys.length - 1]! + g.cellPx;
+            const left = lines.xs[0]!;
+            const right = lines.xs[lines.xs.length - 1]! + g.cellPx;
+            ctx.beginPath();
+            for (const x of lines.xs) {
+              ctx.moveTo(x, top);
+              ctx.lineTo(x, bottom);
+            }
+            for (const y of lines.ys) {
+              ctx.moveTo(left, y);
+              ctx.lineTo(right, y);
+            }
+            ctx.strokeShape(shape);
+          }}
+        />
+      )}
     </Layer>
   );
 }

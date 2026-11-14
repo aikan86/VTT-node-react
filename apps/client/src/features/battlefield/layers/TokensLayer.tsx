@@ -53,11 +53,7 @@ export function TokensLayer({ scene, resolve, listening, editable, selectedId, c
             onTap={() => onSelect(token.id)}
             onDragStart={(e) => e.target.moveToTop()}
             onDragEnd={(e) => {
-              const cell = snapPxToCell(e.target.position(), g);
-              const next = {
-                x: clamp(cell.x, 0, g.cols - entity.size),
-                y: clamp(cell.y, 0, g.rows - entity.size),
-              };
+              const next = snapPxToCell(e.target.position(), g);
               e.target.position(cellToPx(next, g));
               onMove({ ...token, ...next });
             }}
