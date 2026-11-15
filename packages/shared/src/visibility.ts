@@ -49,6 +49,9 @@ export function sightSegments(scene: Pick<Scene, "elements" | "sightBlockers" | 
   return segments;
 }
 
+/** Sotto questa distanza (pixel del mondo) un incontro col segmento si considera alla partenza del raggio e si ignora. */
+const MIN_HIT_DISTANCE = 1e-6;
+
 /** Distanza lungo il raggio (origine `o`, direzione `dx, dy`) a cui incontra il segmento; null se non lo incontra. */
 function rayHit(o: Point, dx: number, dy: number, s: Segment): number | null {
   const sx = s.b.x - s.a.x;
@@ -59,7 +62,8 @@ function rayHit(o: Point, dx: number, dy: number, s: Segment): number | null {
   const ay = s.a.y - o.y;
   const t = (ax * sy - ay * sx) / denom;
   const u = (ax * dy - ay * dx) / denom;
-  if (t < 0 || u < -1e-9 || u > 1 + 1e-9) return null;
+  // t ≈ 0: l'origine sta sul segmento (es. un token centrato sul bordo di un muro); non deve accecare il raggio
+  if (t <= MIN_HIT_DISTANCE || u < -1e-9 || u > 1 + 1e-9) return null;
   return t;
 }
 

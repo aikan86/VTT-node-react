@@ -30,6 +30,13 @@ describe("visibilityPolygon", () => {
     expect(pointInPolygon({ x: -160, y: 0 }, poly)).toBe(false);
   });
 
+  it("is not blinded when the origin lies exactly on a segment", () => {
+    const poly = visibilityPolygon({ x: 100, y: 0 }, [wall], 200);
+    expect(pointInPolygon({ x: 50, y: 0 }, poly)).toBe(true);
+    expect(pointInPolygon({ x: 100, y: -150 }, poly)).toBe(true);
+    expect(pointInPolygon({ x: 100, y: 150 }, poly)).toBe(true);
+  });
+
   it("ignores segments that are out of range", () => {
     const far: Segment = { a: { x: 1000, y: -50 }, b: { x: 1000, y: 50 } };
     const poly = visibilityPolygon(origin, [far], 200);
