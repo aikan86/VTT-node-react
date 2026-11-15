@@ -5,7 +5,12 @@ export interface Selection {
   id: string;
 }
 
-export type ElementTool = "select" | ElementType;
+export type ElementTool = "select" | "sight" | ElementType;
+
+/** Colore degli ostacoli alla vista tracciati a mano. */
+export const SIGHT_COLOR = "#a855f7";
+/** Distanza (px sullo schermo) dal primo punto entro cui un clic chiude la forma. */
+export const CLOSE_TRACE_SCREEN_PX = 10;
 
 export interface EffectTool {
   placing: boolean;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BackgroundSchema, GridSchema, SceneSchema, newScene } from "@vtt/shared";
-import { appendPoint, backgroundBounds, backgroundFromNode, cellPointsToPx, contentBounds, gridLines, pxPointsToCells, snapAngle, translatePoints } from "./geometry";
+import { appendPoint, backgroundBounds, backgroundFromNode, calibrateBackground, cellLengthIn, cellPointsToPx, contentBounds, gridLines, pxPointsToCells, snapAngle, translatePoints } from "./geometry";
 
 const bg = (patch = {}) => BackgroundSchema.parse({ imageUrl: "/uploads/a.png", widthPx: 200, heightPx: 100, ...patch });
 
@@ -139,5 +139,56 @@ describe("drawing geometry", () => {
     expect(b.minX).toBe(-100);
     expect(b.maxX).toBe(2000);
     expect(b.maxY).toBeGreaterThanOrEqual(1300);
+  });
+});
+
+describe("calibrateBackground", () => {
+  const grid = { cellPx: 50, offsetX: 0, offsetY: 0 };
+
+  it("leaves the image unchanged when the distance already matches the grid", () => {
+    // 100 px sull'immagine = 2 caselle = 100 px di griglia
+    expect(calibrateBackground(bg(), { x: 0, y: 0 }, { x: 100, y: 0 }, 2, grid)).toMatchObject({ x: 0, y: 0, widthPx: 200, heightPx: 100 });
+  });
+
+  it("scales the image around the first point, which stays where it was clicked", () => {
+    // 50 px sull'immagine = 2 caselle: serve scala 2, con p1 fermo in (10, 10)
+    const next = calibrateBackground(bg(), { x: 10, y: 10 }, { x: 10, y: 60 }, 2, grid)!;
+    expect(next).toMatchObject({ widthPx: 400, heightPx: 200, x: -10, y: -10 });
+    // p1 era a (10, 10) dall'angolo dell'immagine, ora a (20, 20) dal nuovo angolo (-10, -10) → ancora (10, 10)
+    expect(next.x + 20).toBeCloseTo(10);
+  });
+
+  it("keeps the rotation and the image source", () => {
+    const next = calibrateBackground(bg({ rotation: 90 }), { x: 0, y: 0 }, { x: 50, y: 0 }, 1, grid)!;
+    expect(next.rotation).toBe(90);
+    expect(next.imageUrl).toBe("/uploads/a.png");
+  });
+
+  it("can snap the first point to the nearest grid intersection", () => {
+    const next = calibrateBackground(bg(), { x: 10, y: 10 }, { x: 10, y: 60 }, 2, grid, true)!;
+    expect(next).toMatchObject({ widthPx: 400, heightPx: 200, x: -20, y: -20 });
+  });
+
+  it("respects the grid offset when snapping", () => {
+    const next = calibrateBackground(bg(), { x: 10, y: 10 }, { x: 10, y: 60 }, 2, { cellPx: 50, offsetX: 25, offsetY: 25 }, true)!;
+    // linee a 25, 75, ...: l'incrocio più vicino a (10, 10) è (25, 25)
+    expect(next.x + 20).toBeCloseTo(25);
+    expect(next.y + 20).toBeCloseTo(25);
+  });
+
+  it("rejects coincident points, invalid distances and results beyond the limits", () => {
+    expect(calibrateBackground(bg(), { x: 5, y: 5 }, { x: 5, y: 5 }, 2, grid)).toBeNull();
+    expect(calibrateBackground(bg(), { x: 0, y: 0 }, { x: 50, y: 0 }, 0, grid)).toBeNull();
+    expect(calibrateBackground(bg(), { x: 0, y: 0 }, { x: 50, y: 0 }, Number.NaN, grid)).toBeNull();
+    expect(calibrateBackground(bg(), { x: 0, y: 0 }, { x: 0.01, y: 0 }, 100, grid)).toBeNull();
+  });
+});
+
+describe("cellLengthIn", () => {
+  it("uses the grid definition (5 ft = 1,5 m)", () => {
+    expect(cellLengthIn("cells", 5)).toBe(1);
+    expect(cellLengthIn("ft", 5)).toBe(5);
+    expect(cellLengthIn("m", 5)).toBeCloseTo(1.5);
+    expect(cellLengthIn("m", 10)).toBeCloseTo(3);
   });
 });

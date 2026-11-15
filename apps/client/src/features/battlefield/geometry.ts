@@ -1,4 +1,4 @@
-import { pxToCell, type Background, type Grid, type Point, type Ref, type Scene } from "@vtt/shared";
+import { cellToPx, pxToCell, snapPxToCell, type Background, type Grid, type Point, type Ref, type Scene } from "@vtt/shared";
 
 export interface Bounds {
   minX: number;
@@ -155,4 +155,57 @@ export function withBackgroundGeometry(scene: Scene, next: Pick<Background, "ima
   if (!bg || bg.imageUrl !== next.imageUrl) return scene;
   const { x, y, widthPx, heightPx, rotation } = next;
   return { ...scene, background: { ...bg, x, y, widthPx, heightPx, rotation } };
+}
+
+/** Metri per piede secondo la convenzione di D&D: 5 ft = 1,5 m. */
+export const METERS_PER_FOOT = 0.3;
+
+export type DistanceUnit = "cells" | "m" | "ft";
+
+export const DISTANCE_UNITS: { value: DistanceUnit; label: string }[] = [
+  { value: "m", label: "metri" },
+  { value: "ft", label: "piedi" },
+  { value: "cells", label: "caselle" },
+];
+
+/** Lunghezza di una cella nell'unità scelta (la griglia la definisce in piedi: `feetPerCell`). */
+export function cellLengthIn(unit: DistanceUnit, feetPerCell: number): number {
+  if (unit === "cells") return 1;
+  return unit === "ft" ? feetPerCell : feetPerCell * METERS_PER_FOOT;
+}
+
+const MIN_BACKGROUND_SIDE_PX = 1;
+const MAX_BACKGROUND_SIDE_PX = 40000;
+const round2 = (v: number) => Math.round(v * 100) / 100;
+
+/**
+ * Calibra l'immagine: `p1` e `p2` (pixel del mondo, sull'immagine) distano `cells` caselle.
+ * L'immagine viene scalata attorno a `p1` (che resta fermo), senza cambiare la rotazione.
+ * Con `alignToGrid` l'immagine viene poi spostata perché `p1` cada sull'incrocio di griglia più vicino.
+ * Restituisce null se i punti coincidono, la distanza non è valida o l'immagine uscirebbe dai limiti.
+ */
+export function calibrateBackground(
+  bg: Background,
+  p1: Point,
+  p2: Point,
+  cells: number,
+  grid: Pick<Grid, "cellPx" | "offsetX" | "offsetY">,
+  alignToGrid = false,
+): Background | null {
+  const pixelDistance = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+  if (!(pixelDistance > 0) || !(cells > 0) || !Number.isFinite(cells)) return null;
+  const k = (cells * grid.cellPx) / pixelDistance;
+  const widthPx = round2(bg.widthPx * k);
+  const heightPx = round2(bg.heightPx * k);
+  if ([widthPx, heightPx].some((side) => side < MIN_BACKGROUND_SIDE_PX || side > MAX_BACKGROUND_SIDE_PX)) return null;
+
+  // il centro (attorno a cui ruota l'immagine) si sposta insieme alla scala, rispetto a p1
+  let cx = p1.x + k * (bg.x + bg.widthPx / 2 - p1.x);
+  let cy = p1.y + k * (bg.y + bg.heightPx / 2 - p1.y);
+  if (alignToGrid) {
+    const corner = cellToPx(snapPxToCell(p1, grid), grid);
+    cx += corner.x - p1.x;
+    cy += corner.y - p1.y;
+  }
+  return { ...bg, widthPx, heightPx, x: round2(cx - widthPx / 2), y: round2(cy - heightPx / 2) };
 }
