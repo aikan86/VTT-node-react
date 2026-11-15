@@ -1,15 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { Stage } from "react-konva";
 import type Konva from "konva";
-import { ELEMENT_COLORS, pxToCell, type Background, type Effect, type LayerKey, type MapElement, type Point, type Ref, type Scene, type Token } from "@vtt/shared";
+import { ELEMENT_COLORS, pxToCell, type Background, type Drawing, type Effect, type LayerKey, type MapElement, type Point, type Ref, type Scene, type Token } from "@vtt/shared";
 import type { EntityResolver } from "../../store/entities";
-import { clamp, contentBounds } from "./geometry";
+import { appendPoint, clamp, contentBounds, snapAngle } from "./geometry";
 import { useElementSize, useKeyHeld } from "./hooks";
 import { BACKGROUND_ID, BackgroundLayer, GridLayer } from "./layers/BackgroundLayer";
 import { EffectsLayer } from "./layers/EffectsLayer";
 import { ElementsLayer } from "./layers/ElementsLayer";
 import { TokensLayer } from "./layers/TokensLayer";
-import type { ElementTool, Selection, View } from "./types";
+import type { DrawTool, ElementTool, Selection, SketchDraft, View } from "./types";
 import styles from "./Battlefield.module.css";
 
 interface Props {
@@ -18,6 +18,7 @@ interface Props {
   activeLayer: LayerKey;
   selection: Selection | null;
   elementTool: ElementTool;
+  drawTool: DrawTool;
   /** Click "di posizionamento" attivo (token in attesa, effetto da piazzare). */
   placing: boolean;
   currentRef: Ref | null;
@@ -28,19 +29,26 @@ interface Props {
   onBackgroundChange: (background: Background) => void;
   onTokenMove: (token: Token) => void;
   onEffectChange: (effect: Effect) => void;
+  onSketch: (sketch: SketchDraft) => void;
+  onDrawingChange: (drawing: Drawing) => void;
+  onEraseDrawing: (id: string) => void;
 }
+
+/** Sotto questa distanza sullo schermo un tratto non viene salvato e i punti a mano libera vengono scartati. */
+const MIN_STROKE_SCREEN_PX = 3;
 
 const MIN_SCALE = 0.1;
 const MAX_SCALE = 6;
 
 export function BattleStage(props: Props) {
-  const { scene, activeLayer, selection, elementTool, placing } = props;
+  const { scene, activeLayer, selection, elementTool, drawTool, placing } = props;
   const [containerRef, size] = useElementSize<HTMLDivElement>();
   const [view, setView] = useState<View>({ x: 0, y: 0, scale: 1 });
   const spaceHeld = useKeyHeld("Space");
   const pan = useRef<{ pointer: Point; view: View; moved: boolean } | null>(null);
   const [panning, setPanning] = useState(false);
   const [draw, setDraw] = useState<{ start: Point; end: Point } | null>(null);
+  const [sketch, setSketch] = useState<SketchDraft | null>(null);
   const fittedScene = useRef<string | null>(null);
 
   const fit = () => {
@@ -72,8 +80,12 @@ export function BattleStage(props: Props) {
 
   const locked = scene.layers[activeLayer].locked;
   const drawing = activeLayer === "elements" && elementTool !== "select" && !locked;
-  const editable = (layer: LayerKey) => activeLayer === layer && !locked && !spaceHeld && !drawing && !placing;
-  const listening = (layer: LayerKey) => activeLayer === layer && !spaceHeld;
+  const sketchKind = activeLayer === "effects" && !locked && (drawTool.mode === "line" || drawTool.mode === "freehand") ? drawTool.mode : null;
+  const erasing = activeLayer === "effects" && !locked && drawTool.mode === "eraser";
+  const editable = (layer: LayerKey) => activeLayer === layer && !locked && !spaceHeld && !drawing && !placing && !sketchKind && !erasing;
+  // mentre si traccia, i click passano allo Stage anche sopra gli effetti esistenti
+  const listening = (layer: LayerKey) => activeLayer === layer && !spaceHeld && !sketchKind;
+  const minStroke = MIN_STROKE_SCREEN_PX / view.scale;
 
   const worldPointer = (stage: Konva.Stage): Point | null => stage.getRelativePointerPosition();
 
@@ -94,6 +106,11 @@ export function BattleStage(props: Props) {
       const cell = pxToCell(world, scene.grid);
       setDraw({ start: cell, end: cell });
     }
+    if (e.evt.button === 0 && sketchKind) {
+      const world = worldPointer(stage);
+      if (!world) return;
+      setSketch({ kind: sketchKind, points: sketchKind === "line" ? [world.x, world.y, world.x, world.y] : [world.x, world.y] });
+    }
   };
 
   const handleMouseMove = (e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -110,6 +127,19 @@ export function BattleStage(props: Props) {
     if (draw) {
       const world = worldPointer(stage);
       if (world) setDraw({ ...draw, end: pxToCell(world, scene.grid) });
+    }
+    if (sketch) {
+      const world = worldPointer(stage);
+      if (!world) return;
+      if (sketch.kind === "line") {
+        const [x = 0, y = 0] = sketch.points;
+        const start = { x, y };
+        const end = e.evt.shiftKey ? snapAngle(start, world) : world;
+        setSketch({ ...sketch, points: [start.x, start.y, end.x, end.y] });
+      } else {
+        const points = appendPoint(sketch.points, world, minStroke);
+        if (points !== sketch.points) setSketch({ ...sketch, points });
+      }
     }
   };
 
@@ -130,10 +160,16 @@ export function BattleStage(props: Props) {
       props.onDrawElement(draftRect);
       setDraw(null);
     }
+    if (sketch) {
+      const [x1 = 0, y1 = 0, x2 = 0, y2 = 0] = sketch.points;
+      const long = sketch.kind === "line" ? Math.hypot(x2 - x1, y2 - y1) >= minStroke : sketch.points.length >= 4;
+      if (long) props.onSketch(sketch);
+      setSketch(null);
+    }
   };
 
   const handleClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
-    if (e.evt.button !== 0 || spaceHeld || drawing) return;
+    if (e.evt.button !== 0 || spaceHeld || drawing || sketchKind || erasing) return;
     const stage = e.target.getStage();
     if (!stage) return;
     if (placing) {
@@ -147,7 +183,8 @@ export function BattleStage(props: Props) {
   const selectedIn = (layer: LayerKey) => (selection?.layer === layer ? selection.id : null);
   const select = (layer: LayerKey) => (id: string) => props.onSelect({ layer, id });
 
-  const cursor = panning ? "grabbing" : spaceHeld ? "grab" : drawing || placing ? "crosshair" : "default";
+  const textMode = activeLayer === "effects" && drawTool.mode === "text";
+  const cursor = panning ? "grabbing" : spaceHeld ? "grab" : erasing ? "cell" : textMode && placing ? "text" : drawing || placing || sketchKind ? "crosshair" : "default";
   const elementColor = elementTool === "select" ? "#ffffff" : ELEMENT_COLORS[elementTool];
 
   return (
@@ -204,8 +241,13 @@ export function BattleStage(props: Props) {
             listening={listening("effects")}
             editable={editable("effects")}
             selectedId={selectedIn("effects")}
+            erasing={erasing}
+            viewScale={view.scale}
+            draft={sketch && { ...sketch, color: drawTool.color, strokeWidth: drawTool.strokeWidth }}
             onSelect={select("effects")}
             onChange={props.onEffectChange}
+            onDrawingChange={props.onDrawingChange}
+            onErase={props.onEraseDrawing}
           />
         </Stage>
       )}

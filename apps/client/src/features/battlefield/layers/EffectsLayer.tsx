@@ -1,7 +1,9 @@
 import { Circle, Layer, Line, Rect, Transformer } from "react-konva";
 import type Konva from "konva";
-import { feetToPx, type Effect, type Scene } from "@vtt/shared";
+import { feetToPx, type Drawing, type Effect, type Scene } from "@vtt/shared";
 import { snapTo } from "../geometry";
+import type { SketchDraft } from "../types";
+import { Drawings } from "./Drawings";
 import { useTransformer } from "./useTransformer";
 
 interface Props {
@@ -9,11 +11,17 @@ interface Props {
   listening: boolean;
   editable: boolean;
   selectedId: string | null;
+  erasing: boolean;
+  viewScale: number;
+  draft: (SketchDraft & { color: string; strokeWidth: number }) | null;
   onSelect: (id: string) => void;
   onChange: (effect: Effect) => void;
+  onDrawingChange: (drawing: Drawing) => void;
+  onErase: (id: string) => void;
 }
 
-export function EffectsLayer({ scene, listening, editable, selectedId, onSelect, onChange }: Props) {
+/** Aree degli effetti e, sopra, i disegni (testo, linee, mano libera). */
+export function EffectsLayer({ scene, listening, editable, selectedId, erasing, onSelect, onChange, ...drawing }: Props) {
   const g = scene.grid;
   const selected = scene.effects.find((e) => e.id === selectedId);
   const { transformer, register } = useTransformer(selectedId, editable && selected?.shape !== "circle");
@@ -33,8 +41,8 @@ export function EffectsLayer({ scene, listening, editable, selectedId, onSelect,
           strokeWidth: 2,
           strokeScaleEnabled: false,
           draggable: editable,
-          onMouseDown: () => onSelect(effect.id),
-          onTap: () => onSelect(effect.id),
+          onMouseDown: () => !erasing && onSelect(effect.id),
+          onTap: () => !erasing && onSelect(effect.id),
           onDragEnd: (e: Konva.KonvaEventObject<DragEvent>) => {
             // origine agganciata a mezza cella (centri e incroci della griglia)
             const x = snapTo((e.target.x() - g.offsetX) / g.cellPx, 0.5);
@@ -63,6 +71,18 @@ export function EffectsLayer({ scene, listening, editable, selectedId, onSelect,
         }
       })}
       <Transformer ref={transformer} resizeEnabled={false} rotationSnaps={[0, 45, 90, 135, 180, 225, 270, 315]} rotationSnapTolerance={8} />
+      <Drawings
+        drawings={scene.drawings}
+        grid={g}
+        editable={editable}
+        erasing={erasing}
+        selectedId={selectedId}
+        viewScale={drawing.viewScale}
+        draft={drawing.draft}
+        onSelect={onSelect}
+        onChange={drawing.onDrawingChange}
+        onErase={drawing.onErase}
+      />
     </Layer>
   );
 }

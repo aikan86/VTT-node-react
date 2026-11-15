@@ -41,6 +41,20 @@ export function contentBounds(scene: Scene, sizeOf: (ref: Ref) => number = () =>
     const reach = fx.sizeFt / g.feetPerCell; // raggio, lato o lunghezza: approssimato per eccesso
     boxes.push(cellBox(fx.x - reach, fx.y - reach, reach * 2, reach * 2));
   }
+  for (const d of scene.drawings) {
+    if (d.kind === "text") {
+      // stima per eccesso: larghezza media di un carattere ≈ 0,6 em
+      const longest = Math.max(1, ...d.text.split("\n").map((l) => l.length));
+      const lines = d.text.split("\n").length;
+      boxes.push(cellBox(d.x, d.y, (longest * d.fontSize * 0.6) / g.cellPx, (lines * d.fontSize * 1.2) / g.cellPx));
+    } else {
+      const xs = d.points.filter((_, i) => i % 2 === 0);
+      const ys = d.points.filter((_, i) => i % 2 === 1);
+      const minX = Math.min(...xs);
+      const minY = Math.min(...ys);
+      boxes.push(cellBox(minX, minY, Math.max(...xs) - minX, Math.max(...ys) - minY));
+    }
+  }
   if (boxes.length === 0) return cellBox(0, 0, EMPTY_AREA_CELLS.cols, EMPTY_AREA_CELLS.rows);
   return {
     minX: Math.min(...boxes.map((b) => b.minX)),
@@ -98,6 +112,36 @@ export function backgroundFromNode(bg: Background, node: NodeTransform): Backgro
     y: Math.round(node.y - heightPx / 2),
     rotation: ((Math.round(node.rotation) % 360) + 360) % 360,
   };
+}
+
+type GridGeom = Pick<Grid, "cellPx" | "offsetX" | "offsetY">;
+
+/** Coordinata in celle arrotondata al millesimo: abbastanza precisa, documento più leggero. */
+export const roundCell = (v: number) => Math.round(v * 1000) / 1000;
+
+/** Lista appiattita [x1, y1, x2, y2, ...] da pixel del mondo a celle. */
+export const pxPointsToCells = (points: number[], g: GridGeom) =>
+  points.map((v, i) => roundCell((v - (i % 2 === 0 ? g.offsetX : g.offsetY)) / g.cellPx));
+
+/** Lista appiattita [x1, y1, x2, y2, ...] da celle a pixel del mondo. */
+export const cellPointsToPx = (points: number[], g: GridGeom) =>
+  points.map((v, i) => (i % 2 === 0 ? g.offsetX : g.offsetY) + v * g.cellPx);
+
+export const translatePoints = (points: number[], dx: number, dy: number) => points.map((v, i) => v + (i % 2 === 0 ? dx : dy));
+
+/** Fine del segmento ruotata sul multiplo di `stepDeg` più vicino, mantenendo la lunghezza (Shift mentre si traccia). */
+export function snapAngle(from: Point, to: Point, stepDeg = 45): Point {
+  const length = Math.hypot(to.x - from.x, to.y - from.y);
+  const step = (stepDeg * Math.PI) / 180;
+  const angle = Math.round(Math.atan2(to.y - from.y, to.x - from.x) / step) * step;
+  return { x: from.x + length * Math.cos(angle), y: from.y + length * Math.sin(angle) };
+}
+
+/** Aggiunge il punto al tratto a mano libera solo se dista almeno `minDist` dall'ultimo (stessa lista altrimenti). */
+export function appendPoint(points: number[], p: Point, minDist: number): number[] {
+  const [lastX, lastY] = points.slice(-2);
+  if (lastX !== undefined && lastY !== undefined && Math.hypot(p.x - lastX, p.y - lastY) < minDist) return points;
+  return [...points, p.x, p.y];
 }
 
 /** Arrotonda al multiplo di `step` più vicino. */

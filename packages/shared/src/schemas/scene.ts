@@ -103,6 +103,47 @@ export const EffectSchema = z.object({
 });
 export type Effect = z.infer<typeof EffectSchema>;
 
+/**
+ * Annotazioni a mano sul livello Effetti. Coordinate in celle (frazionarie), così seguono la griglia;
+ * spessori e dimensioni del testo in pixel del mondo.
+ */
+const CellCoord = z.number().min(-100_000).max(100_000);
+
+export const TextDrawingSchema = z.object({
+  id: IdSchema,
+  kind: z.literal("text"),
+  x: CellCoord,
+  y: CellCoord,
+  text: z.string().max(500),
+  fontSize: z.number().min(4).max(400),
+  rotation: z.number(),
+  color: ColorSchema,
+});
+
+export const LineDrawingSchema = z.object({
+  id: IdSchema,
+  kind: z.literal("line"),
+  /** [x1, y1, x2, y2] */
+  points: z.tuple([CellCoord, CellCoord, CellCoord, CellCoord]),
+  strokeWidth: z.number().min(1).max(100),
+  color: ColorSchema,
+});
+
+export const FreehandDrawingSchema = z.object({
+  id: IdSchema,
+  kind: z.literal("freehand"),
+  /** Coppie x, y appiattite: [x1, y1, x2, y2, ...] */
+  points: z.array(CellCoord).min(4).max(10_000).refine((p) => p.length % 2 === 0, "Coordinate a coppie"),
+  strokeWidth: z.number().min(1).max(100),
+  color: ColorSchema,
+});
+
+export const DrawingSchema = z.discriminatedUnion("kind", [TextDrawingSchema, LineDrawingSchema, FreehandDrawingSchema]);
+export type Drawing = z.infer<typeof DrawingSchema>;
+export type TextDrawing = z.infer<typeof TextDrawingSchema>;
+export type LineDrawing = z.infer<typeof LineDrawingSchema>;
+export type FreehandDrawing = z.infer<typeof FreehandDrawingSchema>;
+
 export const SceneSchema = z.object({
   id: IdSchema,
   name: z.string().trim().min(1).max(80),
@@ -117,6 +158,8 @@ export const SceneSchema = z.object({
   elements: z.array(MapElementSchema),
   tokens: z.array(TokenSchema),
   effects: z.array(EffectSchema),
+  /** Assente nelle scene salvate prima dei disegni. */
+  drawings: z.array(DrawingSchema).default([]),
 });
 export type Scene = z.infer<typeof SceneSchema>;
 
@@ -139,6 +182,7 @@ export function newScene(name = "Nuova scena"): Scene {
     elements: [],
     tokens: [],
     effects: [],
+    drawings: [],
   };
 }
 

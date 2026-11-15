@@ -15,6 +15,23 @@ export interface EffectTool {
   color: string;
 }
 
+/** Strumenti di disegno del livello Effetti: la gomma elimina per intero i disegni che tocca. */
+export type DrawMode = "text" | "line" | "freehand" | "eraser";
+
+export interface DrawTool {
+  mode: DrawMode | null;
+  color: string;
+  /** Pixel del mondo. */
+  strokeWidth: number;
+  fontSize: number;
+}
+
+/** Tratto in corso di disegno, in pixel del mondo. */
+export interface SketchDraft {
+  kind: "line" | "freehand";
+  points: number[];
+}
+
 export interface View {
   x: number;
   y: number;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { BackgroundSchema, GridSchema, newScene } from "@vtt/shared";
-import { backgroundBounds, backgroundFromNode, contentBounds, gridLines } from "./geometry";
+import { BackgroundSchema, GridSchema, SceneSchema, newScene } from "@vtt/shared";
+import { appendPoint, backgroundBounds, backgroundFromNode, cellPointsToPx, contentBounds, gridLines, pxPointsToCells, snapAngle, translatePoints } from "./geometry";
 
 const bg = (patch = {}) => BackgroundSchema.parse({ imageUrl: "/uploads/a.png", widthPx: 200, heightPx: 100, ...patch });
 
@@ -76,5 +76,68 @@ describe("contentBounds", () => {
       effects: [{ id: "f", shape: "circle" as const, x: 20, y: 10, sizeFt: 10, rotation: 0, color: "#ff0000", opacity: 0.4 }],
     };
     expect(contentBounds(scene, () => 2)).toEqual({ minX: -200, minY: -150, maxX: 1100, maxY: 600 });
+  });
+});
+
+describe("drawings", () => {
+  it("are empty for scenes saved before they existed", () => {
+    const { drawings: _d, ...old } = newScene();
+    expect(SceneSchema.parse(old).drawings).toEqual([]);
+  });
+
+  it("validate text, straight lines and freehand strokes", () => {
+    const scene = {
+      ...newScene(),
+      drawings: [
+        { id: "t", kind: "text", x: 1.5, y: 2, text: "Trappola", fontSize: 24, rotation: 0, color: "#ffffff" },
+        { id: "l", kind: "line", points: [0, 0, 3, 4], strokeWidth: 3, color: "#ff0000" },
+        { id: "f", kind: "freehand", points: [0, 0, 1, 1, 2, 0], strokeWidth: 3, color: "#00ff00" },
+      ],
+    };
+    expect(SceneSchema.parse(scene).drawings).toHaveLength(3);
+    const odd = { ...scene, drawings: [{ id: "f", kind: "freehand", points: [0, 0, 1, 1, 2], strokeWidth: 3, color: "#00ff00" }] };
+    expect(SceneSchema.safeParse(odd).success).toBe(false);
+  });
+});
+
+describe("drawing geometry", () => {
+  const grid = { cellPx: 50, offsetX: 10, offsetY: 20 };
+
+  it("converts flat point lists between world pixels and cells", () => {
+    expect(pxPointsToCells([10, 20, 110, 45], grid)).toEqual([0, 0, 2, 0.5]);
+    expect(cellPointsToPx([0, 0, 2, 0.5], grid)).toEqual([10, 20, 110, 45]);
+  });
+
+  it("translates every point", () => {
+    expect(translatePoints([0, 0, 1, 2], 0.5, -1)).toEqual([0.5, -1, 1.5, 1]);
+  });
+
+  it("snaps a segment to the nearest multiple of 45° keeping its length", () => {
+    const end = snapAngle({ x: 0, y: 0 }, { x: 10, y: 1 });
+    expect(end.x).toBeCloseTo(Math.hypot(10, 1));
+    expect(end.y).toBeCloseTo(0);
+    const diag = snapAngle({ x: 5, y: 5 }, { x: 15, y: 14 });
+    expect(diag.x - 5).toBeCloseTo(diag.y - 5);
+    expect(Math.hypot(diag.x - 5, diag.y - 5)).toBeCloseTo(Math.hypot(10, 9));
+  });
+
+  it("adds a freehand point only when far enough from the last one", () => {
+    const points = [0, 0];
+    expect(appendPoint(points, { x: 1, y: 1 }, 3)).toBe(points);
+    expect(appendPoint(points, { x: 3, y: 0 }, 3)).toEqual([0, 0, 3, 0]);
+  });
+
+  it("includes drawings in the content area", () => {
+    const scene = {
+      ...newScene(),
+      drawings: [
+        { id: "l", kind: "line" as const, points: [-2, 0, 40, 1] as [number, number, number, number], strokeWidth: 3, color: "#ff0000" },
+        { id: "t", kind: "text" as const, x: 0, y: 25, text: "Qui", fontSize: 50, rotation: 0, color: "#ffffff" },
+      ],
+    };
+    const b = contentBounds(scene);
+    expect(b.minX).toBe(-100);
+    expect(b.maxX).toBe(2000);
+    expect(b.maxY).toBeGreaterThanOrEqual(1300);
   });
 });
