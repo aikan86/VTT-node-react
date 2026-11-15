@@ -77,6 +77,11 @@ describe("contentBounds", () => {
     };
     expect(contentBounds(scene, () => 2)).toEqual({ minX: -200, minY: -150, maxX: 1100, maxY: 600 });
   });
+
+  it("covers hand-traced sight blockers", () => {
+    const scene = { ...newScene(), sightBlockers: [{ id: "b", points: [40, 2, 44, 2, 42, 35] }] };
+    expect(contentBounds(scene)).toEqual({ minX: 2000, minY: 100, maxX: 2200, maxY: 1750 });
+  });
 });
 
 describe("drawings", () => {

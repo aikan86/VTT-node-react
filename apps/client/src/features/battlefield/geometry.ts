@@ -21,7 +21,7 @@ export function backgroundBounds(bg: Background): Bounds {
 
 const EMPTY_AREA_CELLS = { cols: 30, rows: 20 };
 
-/** Area occupata dal contenuto della scena (immagine, token, elementi, effetti), per "Adatta". */
+/** Area occupata dal contenuto della scena (immagine, token, elementi, ostacoli alla vista, effetti, disegni), per "Adatta". */
 export function contentBounds(scene: Scene, sizeOf: (ref: Ref) => number = () => 1): Bounds {
   const g = scene.grid;
   const boxes: Bounds[] = [];
@@ -37,6 +37,14 @@ export function contentBounds(scene: Scene, sizeOf: (ref: Ref) => number = () =>
     boxes.push(cellBox(t.x, t.y, size, size));
   }
   for (const el of scene.elements) boxes.push(cellBox(el.x, el.y, el.w, el.h));
+  const pointsBox = (points: number[]) => {
+    const xs = points.filter((_, i) => i % 2 === 0);
+    const ys = points.filter((_, i) => i % 2 === 1);
+    const minX = Math.min(...xs);
+    const minY = Math.min(...ys);
+    return cellBox(minX, minY, Math.max(...xs) - minX, Math.max(...ys) - minY);
+  };
+  for (const b of scene.sightBlockers) boxes.push(pointsBox(b.points));
   for (const fx of scene.effects) {
     const reach = fx.sizeFt / g.feetPerCell; // raggio, lato o lunghezza: approssimato per eccesso
     boxes.push(cellBox(fx.x - reach, fx.y - reach, reach * 2, reach * 2));
@@ -48,11 +56,7 @@ export function contentBounds(scene: Scene, sizeOf: (ref: Ref) => number = () =>
       const lines = d.text.split("\n").length;
       boxes.push(cellBox(d.x, d.y, (longest * d.fontSize * 0.6) / g.cellPx, (lines * d.fontSize * 1.2) / g.cellPx));
     } else {
-      const xs = d.points.filter((_, i) => i % 2 === 0);
-      const ys = d.points.filter((_, i) => i % 2 === 1);
-      const minX = Math.min(...xs);
-      const minY = Math.min(...ys);
-      boxes.push(cellBox(minX, minY, Math.max(...xs) - minX, Math.max(...ys) - minY));
+      boxes.push(pointsBox(d.points));
     }
   }
   if (boxes.length === 0) return cellBox(0, 0, EMPTY_AREA_CELLS.cols, EMPTY_AREA_CELLS.rows);
