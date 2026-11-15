@@ -11,6 +11,7 @@ import { registerCombatRoutes, StoredCombatSchema } from "./routes/combat";
 import { registerEventRoutes } from "./routes/events";
 import { registerHistoryRoutes } from "./routes/history";
 import { registerUploadRoutes } from "./routes/uploads";
+import { registerTransferRoutes } from "./routes/transfer";
 
 export interface AppOptions {
   dbPath: string;
@@ -46,6 +47,7 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
   registerEventRoutes(app, bus);
   registerHistoryRoutes(app, db, [characters, scenes, dmRolls, combat]);
   registerUploadRoutes(app, opts.uploadsDir);
+  registerTransferRoutes(app, { characters, scenes, dmRolls, combat }, opts.uploadsDir);
 
   if (opts.clientDist) {
     // L'HTML va sempre riconvalidato (punta agli asset della release corrente); gli asset hanno l'hash nel nome.

@@ -56,6 +56,11 @@ pnpm history restore combat current 12       # ripristina la versione 12 (arriva
 pnpm history --prod list                     # stessa cosa sull'istanza di deploy (8080)
 ```
 
+## Esporta / importa
+
+- **⬇ Esporta** (in alto a destra) scarica tutto lo stato in un file `vtt-AAAA-MM-GG-HHMM.json`: PG, scene, combattimento, tiri del DM e le immagini usate (in base64), quindi il file funziona anche su un'altra installazione.
+- **⬆ Importa** sostituisce tutto lo stato con quello del file, previa conferma: i documenti assenti dal file vengono eliminati. Il file viene validato per intero prima di scrivere qualsiasi cosa; lo stato sostituito resta recuperabile con `pnpm history`.
+
 ## Struttura
 
 - `packages/shared` — schemi zod (PG, PNG, combattimento, scene), dadi, griglia, PF e logica pura dell'iniziativa

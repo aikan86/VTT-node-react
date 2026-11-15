@@ -7,6 +7,7 @@ import { DmRollsPage } from "./pages/DmRollsPage";
 import { InitiativePage } from "./pages/InitiativePage";
 import { PartyPage } from "./pages/PartyPage";
 import { CombatStatus } from "./features/initiative/CombatStatus";
+import { TransferButtons } from "./features/transfer/TransferButtons";
 import { flushCombat, receiveCombat, resyncCombat, useCombatStore } from "./store/combatStore";
 import { dmRollSync, useDmRollStore } from "./store/dmRollStore";
 import { flushParty, partySync, usePartyStore } from "./store/partyStore";
@@ -109,6 +110,7 @@ export function App() {
               ● Non connesso
             </span>
           )}
+          {state === "ready" && <TransferButtons />}
         </div>
       </header>
       {error ? (

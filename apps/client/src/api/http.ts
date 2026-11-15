@@ -87,4 +87,23 @@ export const api = {
     }
     return (await res.json()) as { url: string };
   },
+  /** Indirizzo che scarica l'intero stato come file JSON. */
+  exportUrl: "/api/export",
+  /** Sostituisce l'intero stato con quello del file esportato (inviato così com'è, senza rielaborarlo). */
+  async importState(file: Blob): Promise<void> {
+    const res = await fetch("/api/import", {
+      method: "POST",
+      body: file,
+      headers: { "content-type": "application/json", [CLIENT_ID_HEADER]: CLIENT_ID },
+    });
+    if (res.ok) return;
+    const data = (await res.json().catch(() => null)) as { error?: string } | null;
+    const message =
+      res.status === 400
+        ? "File non valido: non è un salvataggio VTT compatibile"
+        : res.status === 413
+          ? "File troppo grande"
+          : (data?.error ?? `Errore ${res.status}`);
+    throw new ApiError(res.status, message, data);
+  },
 };
