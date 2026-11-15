@@ -146,14 +146,16 @@ export type FreehandDrawing = z.infer<typeof FreehandDrawingSchema>;
 
 /**
  * Poligono tracciato a mano che blocca la vista (un edificio, un gruppo di alberi, una roccia…).
- * Coordinate in celle (frazionarie) a coppie [x1, y1, x2, y2, ...]: seguono la griglia. Almeno 3 vertici.
+ * Coordinate in celle (frazionarie) a coppie [x1, y1, x2, y2, ...]: seguono la griglia. Da 3 a MAX_SIGHT_BLOCKER_VERTICES vertici.
  */
+export const MAX_SIGHT_BLOCKER_VERTICES = 200;
+
 export const SightBlockerSchema = z.object({
   id: IdSchema,
   points: z
     .array(CellCoord)
     .min(6)
-    .max(400)
+    .max(MAX_SIGHT_BLOCKER_VERTICES * 2)
     .refine((p) => p.length % 2 === 0, "Coordinate a coppie"),
 });
 export type SightBlocker = z.infer<typeof SightBlockerSchema>;

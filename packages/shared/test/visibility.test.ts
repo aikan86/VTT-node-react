@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SceneSchema, newScene } from "../src/schemas/scene";
+import { MAX_SIGHT_BLOCKER_VERTICES, SceneSchema, newScene } from "../src/schemas/scene";
 import { pointInPolygon, sightSegments, visibilityPolygon, visionRadiusPx, type Segment } from "../src/visibility";
 
 const origin = { x: 0, y: 0 };
@@ -108,6 +108,13 @@ describe("scene schema", () => {
     expect(SceneSchema.safeParse({ ...s, sightBlockers: [{ id: "a", points: [0, 0, 1, 1] }] }).success).toBe(false);
     expect(SceneSchema.safeParse({ ...s, sightBlockers: [{ id: "a", points: [0, 0, 1, 1, 2] }] }).success).toBe(false);
     expect(SceneSchema.safeParse({ ...s, sightBlockers: [{ id: "a", points: [0, 0, 1, 0, 1, 1] }] }).success).toBe(true);
+  });
+
+  it("accepts up to MAX_SIGHT_BLOCKER_VERTICES vertices", () => {
+    const s = newScene();
+    const polygon = (n: number) => Array.from({ length: n }, (_, i) => [Math.cos(i), Math.sin(i)]).flat();
+    expect(SceneSchema.safeParse({ ...s, sightBlockers: [{ id: "a", points: polygon(MAX_SIGHT_BLOCKER_VERTICES) }] }).success).toBe(true);
+    expect(SceneSchema.safeParse({ ...s, sightBlockers: [{ id: "a", points: polygon(MAX_SIGHT_BLOCKER_VERTICES + 1) }] }).success).toBe(false);
   });
 });
 

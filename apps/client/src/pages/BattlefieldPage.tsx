@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { addCombatant, createId, ELEMENT_COLORS, sameRef, type Drawing, type LayerKey, type Point, type Ref, type Scene } from "@vtt/shared";
+import { addCombatant, createId, ELEMENT_COLORS, MAX_SIGHT_BLOCKER_VERTICES, sameRef, type Drawing, type LayerKey, type Point, type Ref, type Scene } from "@vtt/shared";
 import { BattleStage } from "../features/battlefield/BattleStage";
 import { isTyping } from "../features/battlefield/hooks";
 import { calibrateBackground, pxPointsToCells, snapTo, withBackgroundGeometry } from "../features/battlefield/geometry";
@@ -280,7 +280,11 @@ function Battlefield({ scene }: { scene: Scene }) {
           }}
           onElementChange={(el) => replace("elements", el)}
           tracePoints={trace}
-          onTracePoint={(p) => setTrace((t) => (t.length > 0 && Math.hypot(p.x - t[t.length - 1]!.x, p.y - t[t.length - 1]!.y) < 1 ? t : [...t, p]))}
+          onTracePoint={(p) =>
+            setTrace((t) =>
+              t.length >= MAX_SIGHT_BLOCKER_VERTICES || (t.length > 0 && Math.hypot(p.x - t[t.length - 1]!.x, p.y - t[t.length - 1]!.y) < 1) ? t : [...t, p],
+            )
+          }
           onTraceClose={closeTrace}
           onBlockerChange={(b) => replace("sightBlockers", b)}
           onBackgroundChange={(bg) => update((s) => withBackgroundGeometry(s, bg))}
