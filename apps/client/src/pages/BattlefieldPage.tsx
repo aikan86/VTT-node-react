@@ -75,7 +75,9 @@ function Battlefield({ scene }: { scene: Scene }) {
       trace.flatMap((p) => [p.x, p.y]),
       scene.grid,
     );
-    update((s) => ({ ...s, sightBlockers: [...s.sightBlockers, { id: createId(), points }] }));
+    // id generato fuori dall'operazione: l'update può essere rieseguito e deve produrre sempre lo stesso ostacolo
+    const blocker = { id: createId(), points };
+    update((s) => ({ ...s, sightBlockers: [...s.sightBlockers, blocker] }));
     setTrace([]);
   }, [trace, scene.grid, update]);
 
