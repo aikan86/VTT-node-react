@@ -68,6 +68,8 @@ export const MapElementSchema = z.object({
   rotation: z.number(),
   color: ColorSchema,
   label: z.string().max(80).optional(),
+  /** Solo per le porte: aperta non blocca la vista. Assente = chiusa. */
+  open: z.boolean().optional(),
 });
 export type MapElement = z.infer<typeof MapElementSchema>;
 
@@ -144,6 +146,33 @@ export type TextDrawing = z.infer<typeof TextDrawingSchema>;
 export type LineDrawing = z.infer<typeof LineDrawingSchema>;
 export type FreehandDrawing = z.infer<typeof FreehandDrawingSchema>;
 
+/**
+ * Poligono tracciato a mano che blocca la vista (un edificio, un gruppo di alberi, una roccia…).
+ * Coordinate in celle (frazionarie) a coppie [x1, y1, x2, y2, ...]: seguono la griglia. Da 3 a MAX_SIGHT_BLOCKER_VERTICES vertici.
+ */
+export const MAX_SIGHT_BLOCKER_VERTICES = 200;
+
+export const SightBlockerSchema = z.object({
+  id: IdSchema,
+  points: z
+    .array(CellCoord)
+    .min(6)
+    .max(MAX_SIGHT_BLOCKER_VERTICES * 2)
+    .refine((p) => p.length % 2 === 0, "Coordinate a coppie"),
+});
+export type SightBlocker = z.infer<typeof SightBlockerSchema>;
+
+/** Visione del party: i personaggi sulla mappa vedono a 360°, fino a `radiusFt` (0 = senza limite), ostacolati da muri e ostacoli. */
+export const VisionSchema = z.object({
+  enabled: z.boolean(),
+  radiusFt: z.number().min(0).max(10_000),
+  /** Opacità dell'oscurità sulle zone non visibili (il DM le vede comunque, attenuate). */
+  darkness: z.number().min(0).max(1),
+});
+export type Vision = z.infer<typeof VisionSchema>;
+
+export const DEFAULT_VISION: Vision = { enabled: false, radiusFt: 60, darkness: 0.7 };
+
 export const SceneSchema = z.object({
   id: IdSchema,
   name: z.string().trim().min(1).max(80),
@@ -160,6 +189,9 @@ export const SceneSchema = z.object({
   effects: z.array(EffectSchema),
   /** Assente nelle scene salvate prima dei disegni. */
   drawings: z.array(DrawingSchema).default([]),
+  /** Assenti nelle scene salvate prima della visione del party. */
+  sightBlockers: z.array(SightBlockerSchema).default([]),
+  vision: VisionSchema.default(DEFAULT_VISION),
 });
 export type Scene = z.infer<typeof SceneSchema>;
 
@@ -183,6 +215,8 @@ export function newScene(name = "Nuova scena"): Scene {
     tokens: [],
     effects: [],
     drawings: [],
+    sightBlockers: [],
+    vision: { ...DEFAULT_VISION },
   };
 }
 

@@ -4,6 +4,7 @@ export * from "./schemas/combat";
 export * from "./schemas/scene";
 export * from "./dice";
 export * from "./grid";
+export * from "./visibility";
 export * from "./hp";
 export * from "./initiative";
 export * from "./placement";

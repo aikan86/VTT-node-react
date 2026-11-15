@@ -18,7 +18,9 @@ function styleOf(el: MapElement) {
     case "difficult":
       return { fill: el.color, opacity: 0.35, stroke: el.color, dash: [6, 4], strokeWidth: 2 };
     case "door":
-      return { fill: el.color, opacity: 0.95, stroke: "#fbbf24", strokeWidth: 2 };
+      return el.open
+        ? { fill: el.color, opacity: 0.35, stroke: "#fbbf24", dash: [6, 4], strokeWidth: 2 }
+        : { fill: el.color, opacity: 0.95, stroke: "#fbbf24", strokeWidth: 2 };
     default:
       return { fill: el.color, opacity: 0.95, stroke: "#111827", strokeWidth: 1 };
   }

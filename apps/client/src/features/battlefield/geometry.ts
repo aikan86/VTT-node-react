@@ -1,4 +1,5 @@
-import { pxToCell, type Background, type Grid, type Point, type Ref, type Scene } from "@vtt/shared";
+import { cellToPx, pxToCell, snapPxToCell, type Background, type Grid, type Point, type Ref, type Scene } from "@vtt/shared";
+import { CLOSE_TRACE_SCREEN_PX } from "./types";
 
 export interface Bounds {
   minX: number;
@@ -21,7 +22,7 @@ export function backgroundBounds(bg: Background): Bounds {
 
 const EMPTY_AREA_CELLS = { cols: 30, rows: 20 };
 
-/** Area occupata dal contenuto della scena (immagine, token, elementi, effetti), per "Adatta". */
+/** Area occupata dal contenuto della scena (immagine, token, elementi, ostacoli alla vista, effetti, disegni), per "Adatta". */
 export function contentBounds(scene: Scene, sizeOf: (ref: Ref) => number = () => 1): Bounds {
   const g = scene.grid;
   const boxes: Bounds[] = [];
@@ -37,6 +38,14 @@ export function contentBounds(scene: Scene, sizeOf: (ref: Ref) => number = () =>
     boxes.push(cellBox(t.x, t.y, size, size));
   }
   for (const el of scene.elements) boxes.push(cellBox(el.x, el.y, el.w, el.h));
+  const pointsBox = (points: number[]) => {
+    const xs = points.filter((_, i) => i % 2 === 0);
+    const ys = points.filter((_, i) => i % 2 === 1);
+    const minX = Math.min(...xs);
+    const minY = Math.min(...ys);
+    return cellBox(minX, minY, Math.max(...xs) - minX, Math.max(...ys) - minY);
+  };
+  for (const b of scene.sightBlockers) boxes.push(pointsBox(b.points));
   for (const fx of scene.effects) {
     const reach = fx.sizeFt / g.feetPerCell; // raggio, lato o lunghezza: approssimato per eccesso
     boxes.push(cellBox(fx.x - reach, fx.y - reach, reach * 2, reach * 2));
@@ -48,11 +57,7 @@ export function contentBounds(scene: Scene, sizeOf: (ref: Ref) => number = () =>
       const lines = d.text.split("\n").length;
       boxes.push(cellBox(d.x, d.y, (longest * d.fontSize * 0.6) / g.cellPx, (lines * d.fontSize * 1.2) / g.cellPx));
     } else {
-      const xs = d.points.filter((_, i) => i % 2 === 0);
-      const ys = d.points.filter((_, i) => i % 2 === 1);
-      const minX = Math.min(...xs);
-      const minY = Math.min(...ys);
-      boxes.push(cellBox(minX, minY, Math.max(...xs) - minX, Math.max(...ys) - minY));
+      boxes.push(pointsBox(d.points));
     }
   }
   if (boxes.length === 0) return cellBox(0, 0, EMPTY_AREA_CELLS.cols, EMPTY_AREA_CELLS.rows);
@@ -137,11 +142,25 @@ export function snapAngle(from: Point, to: Point, stepDeg = 45): Point {
   return { x: from.x + length * Math.cos(angle), y: from.y + length * Math.sin(angle) };
 }
 
+/** Il punto è abbastanza lontano dall'ultimo (o non c'è un ultimo) per essere aggiunto a un tratto? */
+const farFrom = (last: Point | undefined, p: Point, minDist: number) => last === undefined || Math.hypot(p.x - last.x, p.y - last.y) >= minDist;
+
 /** Aggiunge il punto al tratto a mano libera solo se dista almeno `minDist` dall'ultimo (stessa lista altrimenti). */
 export function appendPoint(points: number[], p: Point, minDist: number): number[] {
-  const [lastX, lastY] = points.slice(-2);
-  if (lastX !== undefined && lastY !== undefined && Math.hypot(p.x - lastX, p.y - lastY) < minDist) return points;
-  return [...points, p.x, p.y];
+  const [x, y] = points.slice(-2);
+  const last = x !== undefined && y !== undefined ? { x, y } : undefined;
+  return farFrom(last, p, minDist) ? [...points, p.x, p.y] : points;
+}
+
+/** Come `appendPoint`, per una lista di vertici, fermandosi a `max` vertici. */
+export function appendVertex(points: Point[], p: Point, minDist: number, max: number): Point[] {
+  return points.length < max && farFrom(points[points.length - 1], p, minDist) ? [...points, p] : points;
+}
+
+/** Un clic in `p` chiuderebbe la forma in tracciamento? (almeno 3 vertici e vicino al primo, in px sullo schermo) */
+export function closesTrace(trace: Point[], p: Point | null, viewScale: number): boolean {
+  const first = trace[0];
+  return trace.length >= 3 && p !== null && first !== undefined && Math.hypot(p.x - first.x, p.y - first.y) <= CLOSE_TRACE_SCREEN_PX / viewScale;
 }
 
 /** Arrotonda al multiplo di `step` più vicino. */
@@ -155,4 +174,57 @@ export function withBackgroundGeometry(scene: Scene, next: Pick<Background, "ima
   if (!bg || bg.imageUrl !== next.imageUrl) return scene;
   const { x, y, widthPx, heightPx, rotation } = next;
   return { ...scene, background: { ...bg, x, y, widthPx, heightPx, rotation } };
+}
+
+/** Metri per piede secondo la convenzione di D&D: 5 ft = 1,5 m. */
+export const METERS_PER_FOOT = 0.3;
+
+export type DistanceUnit = "cells" | "m" | "ft";
+
+export const DISTANCE_UNITS: { value: DistanceUnit; label: string }[] = [
+  { value: "m", label: "metri" },
+  { value: "ft", label: "piedi" },
+  { value: "cells", label: "caselle" },
+];
+
+/** Lunghezza di una cella nell'unità scelta (la griglia la definisce in piedi: `feetPerCell`). */
+export function cellLengthIn(unit: DistanceUnit, feetPerCell: number): number {
+  if (unit === "cells") return 1;
+  return unit === "ft" ? feetPerCell : feetPerCell * METERS_PER_FOOT;
+}
+
+const MIN_BACKGROUND_SIDE_PX = 1;
+const MAX_BACKGROUND_SIDE_PX = 40000;
+const round2 = (v: number) => Math.round(v * 100) / 100;
+
+/**
+ * Calibra l'immagine: `p1` e `p2` (pixel del mondo, sull'immagine) distano `cells` caselle.
+ * L'immagine viene scalata attorno a `p1` (che resta fermo), senza cambiare la rotazione.
+ * Con `alignToGrid` l'immagine viene poi spostata perché `p1` cada sull'incrocio di griglia più vicino.
+ * Restituisce null se i punti coincidono, la distanza non è valida o l'immagine uscirebbe dai limiti.
+ */
+export function calibrateBackground(
+  bg: Background,
+  p1: Point,
+  p2: Point,
+  cells: number,
+  grid: Pick<Grid, "cellPx" | "offsetX" | "offsetY">,
+  alignToGrid = false,
+): Background | null {
+  const pixelDistance = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+  if (!(pixelDistance > 0) || !(cells > 0) || !Number.isFinite(cells)) return null;
+  const k = (cells * grid.cellPx) / pixelDistance;
+  const widthPx = round2(bg.widthPx * k);
+  const heightPx = round2(bg.heightPx * k);
+  if ([widthPx, heightPx].some((side) => side < MIN_BACKGROUND_SIDE_PX || side > MAX_BACKGROUND_SIDE_PX)) return null;
+
+  // il centro (attorno a cui ruota l'immagine) si sposta insieme alla scala, rispetto a p1
+  let cx = p1.x + k * (bg.x + bg.widthPx / 2 - p1.x);
+  let cy = p1.y + k * (bg.y + bg.heightPx / 2 - p1.y);
+  if (alignToGrid) {
+    const corner = cellToPx(snapPxToCell(p1, grid), grid);
+    cx += corner.x - p1.x;
+    cy += corner.y - p1.y;
+  }
+  return { ...bg, widthPx, heightPx, x: round2(cx - widthPx / 2), y: round2(cy - heightPx / 2) };
 }

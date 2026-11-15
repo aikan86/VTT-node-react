@@ -9,6 +9,10 @@ import { withBackgroundGeometry } from "../geometry";
 interface Props {
   scene: Scene;
   onUpdate: (fn: (scene: Scene) => Scene) => void;
+  /** Punti già scelti nella calibrazione (0 o 1); null se non è in corso. */
+  calibrationStep: number | null;
+  onStartCalibration: () => void;
+  onCancelCalibration: () => void;
 }
 
 function loadImageSize(url: string): Promise<{ width: number; height: number }> {
@@ -20,7 +24,7 @@ function loadImageSize(url: string): Promise<{ width: number; height: number }> 
   });
 }
 
-export function BackgroundPanel({ scene, onUpdate }: Props) {
+export function BackgroundPanel({ scene, onUpdate, calibrationStep, onStartCalibration, onCancelCalibration }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const g = scene.grid;
@@ -126,6 +130,26 @@ export function BackgroundPanel({ scene, onUpdate }: Props) {
             <button onClick={() => setBg({ rotation: (bg.rotation + 90) % 360 })}>↻ Ruota 90°</button>
             <button onClick={() => void resetBg()}>Ripristina originale</button>
           </div>
+        </section>
+      )}
+
+      {bg && (
+        <section className={styles.section} aria-label="Calibrazione scala">
+          <h3>Calibra sulla griglia</h3>
+          <p className="muted" style={{ fontSize: "0.8rem", margin: 0 }}>
+            Scegli due punti dell'immagine a distanza nota (per esempio i lati di una casella stampata sulla mappa, o due estremi di un corridoio) e
+            indica quanto distano: l'immagine viene scalata perché la distanza corrisponda alla griglia.
+          </p>
+          {calibrationStep !== null ? (
+            <>
+              <p className={styles.callout}>Clicca il punto {calibrationStep + 1} di 2 sull'immagine.</p>
+              <button onClick={onCancelCalibration}>Annulla</button>
+            </>
+          ) : (
+            <button disabled={scene.layers.background.locked} onClick={onStartCalibration}>
+              📏 Calibra scala…
+            </button>
+          )}
         </section>
       )}
 
