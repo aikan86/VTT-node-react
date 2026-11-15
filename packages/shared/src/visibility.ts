@@ -1,4 +1,4 @@
-import { feetToPx, type Point } from "./grid";
+import { cellToPx, feetToPx, type Point } from "./grid";
 import type { Scene } from "./schemas/scene";
 
 export interface Segment {
@@ -26,14 +26,13 @@ export function visionRadiusPx(vision: { radiusFt: number }, grid: { feetPerCell
 export function sightPolygons(scene: Pick<Scene, "elements" | "sightBlockers" | "grid">): Point[][] {
   const g = scene.grid;
   const polygons: Point[][] = [];
-  const addPolygon = (corners: Point[]) => polygons.push(corners);
 
   for (const blocker of scene.sightBlockers) {
     const corners: Point[] = [];
     for (let i = 0; i + 1 < blocker.points.length; i += 2) {
-      corners.push({ x: g.offsetX + blocker.points[i]! * g.cellPx, y: g.offsetY + blocker.points[i + 1]! * g.cellPx });
+      corners.push(cellToPx({ x: blocker.points[i]!, y: blocker.points[i + 1]! }, g));
     }
-    if (corners.length >= 3) addPolygon(corners);
+    if (corners.length >= 3) polygons.push(corners);
   }
 
   for (const el of scene.elements) {
@@ -41,10 +40,10 @@ export function sightPolygons(scene: Pick<Scene, "elements" | "sightBlockers" | 
     const rad = (el.rotation * Math.PI) / 180;
     const cos = Math.cos(rad);
     const sin = Math.sin(rad);
-    const origin = { x: g.offsetX + el.x * g.cellPx, y: g.offsetY + el.y * g.cellPx };
+    const origin = cellToPx(el, g);
     const u = { x: cos * el.w * g.cellPx, y: sin * el.w * g.cellPx };
     const v = { x: -sin * el.h * g.cellPx, y: cos * el.h * g.cellPx };
-    addPolygon([origin, { x: origin.x + u.x, y: origin.y + u.y }, { x: origin.x + u.x + v.x, y: origin.y + u.y + v.y }, { x: origin.x + v.x, y: origin.y + v.y }]);
+    polygons.push([origin, { x: origin.x + u.x, y: origin.y + u.y }, { x: origin.x + u.x + v.x, y: origin.y + u.y + v.y }, { x: origin.x + v.x, y: origin.y + v.y }]);
   }
   return polygons;
 }

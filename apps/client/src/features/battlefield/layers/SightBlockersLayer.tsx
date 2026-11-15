@@ -1,8 +1,8 @@
 import { Fragment, useSyncExternalStore } from "react";
 import { Circle, Layer, Line } from "react-konva";
 import type { Point, Scene, SightBlocker } from "@vtt/shared";
-import { cellPointsToPx, roundCell, translatePoints } from "../geometry";
-import { CLOSE_TRACE_SCREEN_PX, SIGHT_COLOR } from "../types";
+import { cellPointsToPx, closesTrace, roundCell, translatePoints } from "../geometry";
+import { SIGHT_COLOR } from "../types";
 
 interface Props {
   scene: Scene;
@@ -109,8 +109,7 @@ export function SightBlockersLayer({ scene, listening, editable, selectedId, tra
 /** Forma in tracciamento: vertici cliccati e lato verso il mouse; il primo vertice si ingrandisce quando un click chiuderebbe la forma. */
 function TracePreview({ trace, hover: hoverStore, viewScale }: { trace: Point[]; hover: HoverStore; viewScale: number }) {
   const hover = useSyncExternalStore(hoverStore.subscribe, hoverStore.get);
-  const first = trace[0];
-  const nearFirst = trace.length >= 3 && hover !== null && first !== undefined && Math.hypot(hover.x - first.x, hover.y - first.y) <= CLOSE_TRACE_SCREEN_PX / viewScale;
+  const nearFirst = closesTrace(trace, hover, viewScale);
   return (
     <>
       <Line

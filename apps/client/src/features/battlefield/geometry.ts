@@ -1,4 +1,5 @@
 import { cellToPx, pxToCell, snapPxToCell, type Background, type Grid, type Point, type Ref, type Scene } from "@vtt/shared";
+import { CLOSE_TRACE_SCREEN_PX } from "./types";
 
 export interface Bounds {
   minX: number;
@@ -141,11 +142,25 @@ export function snapAngle(from: Point, to: Point, stepDeg = 45): Point {
   return { x: from.x + length * Math.cos(angle), y: from.y + length * Math.sin(angle) };
 }
 
+/** Il punto è abbastanza lontano dall'ultimo (o non c'è un ultimo) per essere aggiunto a un tratto? */
+const farFrom = (last: Point | undefined, p: Point, minDist: number) => last === undefined || Math.hypot(p.x - last.x, p.y - last.y) >= minDist;
+
 /** Aggiunge il punto al tratto a mano libera solo se dista almeno `minDist` dall'ultimo (stessa lista altrimenti). */
 export function appendPoint(points: number[], p: Point, minDist: number): number[] {
-  const [lastX, lastY] = points.slice(-2);
-  if (lastX !== undefined && lastY !== undefined && Math.hypot(p.x - lastX, p.y - lastY) < minDist) return points;
-  return [...points, p.x, p.y];
+  const [x, y] = points.slice(-2);
+  const last = x !== undefined && y !== undefined ? { x, y } : undefined;
+  return farFrom(last, p, minDist) ? [...points, p.x, p.y] : points;
+}
+
+/** Come `appendPoint`, per una lista di vertici, fermandosi a `max` vertici. */
+export function appendVertex(points: Point[], p: Point, minDist: number, max: number): Point[] {
+  return points.length < max && farFrom(points[points.length - 1], p, minDist) ? [...points, p] : points;
+}
+
+/** Un clic in `p` chiuderebbe la forma in tracciamento? (almeno 3 vertici e vicino al primo, in px sullo schermo) */
+export function closesTrace(trace: Point[], p: Point | null, viewScale: number): boolean {
+  const first = trace[0];
+  return trace.length >= 3 && p !== null && first !== undefined && Math.hypot(p.x - first.x, p.y - first.y) <= CLOSE_TRACE_SCREEN_PX / viewScale;
 }
 
 /** Arrotonda al multiplo di `step` più vicino. */
