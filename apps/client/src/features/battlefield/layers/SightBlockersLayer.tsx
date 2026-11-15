@@ -1,4 +1,4 @@
-import { Fragment } from "react";
+import { Fragment, useSyncExternalStore } from "react";
 import { Circle, Layer, Line } from "react-konva";
 import type { Point, Scene, SightBlocker } from "@vtt/shared";
 import { cellPointsToPx, roundCell, translatePoints } from "../geometry";
@@ -12,7 +12,7 @@ interface Props {
   /** Tracciamento di una nuova forma: vertici già cliccati e posizione del mouse, in pixel del mondo. */
   tracing: boolean;
   trace: Point[];
-  hover: Point | null;
+  hover: HoverStore;
   viewScale: number;
   onSelect: (id: string) => void;
   onChange: (blocker: SightBlocker) => void;
@@ -21,11 +21,35 @@ interface Props {
 const FILL = "rgba(168, 85, 247, 0.25)";
 const TRACE_COLOR = "#e0a526";
 
+/**
+ * Posizione del mouse durante il tracciamento, fuori dallo stato React di BattleStage: a ogni movimento
+ * si ridisegna solo l'anteprima della forma, non tutto lo Stage.
+ */
+export interface HoverStore {
+  get: () => Point | null;
+  set: (p: Point | null) => void;
+  subscribe: (listener: () => void) => () => void;
+}
+
+export function createHoverStore(): HoverStore {
+  let current: Point | null = null;
+  const listeners = new Set<() => void>();
+  return {
+    get: () => current,
+    set: (p) => {
+      current = p;
+      listeners.forEach((l) => l());
+    },
+    subscribe: (listener) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+  };
+}
+
 /** Ostacoli alla vista tracciati a mano: spostabili, con maniglie sui vertici quando sono selezionati. */
 export function SightBlockersLayer({ scene, listening, editable, selectedId, tracing, trace, hover, viewScale, onSelect, onChange }: Props) {
   const g = scene.grid;
-  const first = trace[0];
-  const nearFirst = tracing && trace.length >= 3 && hover !== null && first !== undefined && Math.hypot(hover.x - first.x, hover.y - first.y) <= CLOSE_TRACE_SCREEN_PX / viewScale;
 
   return (
     <Layer listening={listening} visible={scene.layers.elements.visible}>
@@ -77,31 +101,39 @@ export function SightBlockersLayer({ scene, listening, editable, selectedId, tra
         );
       })}
 
-      {tracing && trace.length > 0 && (
-        <>
-          <Line
-            points={[...trace.flatMap((p) => [p.x, p.y]), ...(hover ? [hover.x, hover.y] : [])]}
-            stroke={TRACE_COLOR}
-            strokeWidth={2}
-            strokeScaleEnabled={false}
-            dash={[6, 4]}
-            listening={false}
-          />
-          {trace.map((p, i) => (
-            <Circle
-              key={i}
-              x={p.x}
-              y={p.y}
-              radius={(i === 0 && nearFirst ? 9 : 5) / viewScale}
-              fill={i === 0 ? TRACE_COLOR : "#ffffff"}
-              stroke="#000000"
-              strokeWidth={1}
-              strokeScaleEnabled={false}
-              listening={false}
-            />
-          ))}
-        </>
-      )}
+      {tracing && trace.length > 0 && <TracePreview trace={trace} hover={hover} viewScale={viewScale} />}
     </Layer>
+  );
+}
+
+/** Forma in tracciamento: vertici cliccati e lato verso il mouse; il primo vertice si ingrandisce quando un click chiuderebbe la forma. */
+function TracePreview({ trace, hover: hoverStore, viewScale }: { trace: Point[]; hover: HoverStore; viewScale: number }) {
+  const hover = useSyncExternalStore(hoverStore.subscribe, hoverStore.get);
+  const first = trace[0];
+  const nearFirst = trace.length >= 3 && hover !== null && first !== undefined && Math.hypot(hover.x - first.x, hover.y - first.y) <= CLOSE_TRACE_SCREEN_PX / viewScale;
+  return (
+    <>
+      <Line
+        points={[...trace.flatMap((p) => [p.x, p.y]), ...(hover ? [hover.x, hover.y] : [])]}
+        stroke={TRACE_COLOR}
+        strokeWidth={2}
+        strokeScaleEnabled={false}
+        dash={[6, 4]}
+        listening={false}
+      />
+      {trace.map((p, i) => (
+        <Circle
+          key={i}
+          x={p.x}
+          y={p.y}
+          radius={(i === 0 && nearFirst ? 9 : 5) / viewScale}
+          fill={i === 0 ? TRACE_COLOR : "#ffffff"}
+          stroke="#000000"
+          strokeWidth={1}
+          strokeScaleEnabled={false}
+          listening={false}
+        />
+      ))}
+    </>
   );
 }

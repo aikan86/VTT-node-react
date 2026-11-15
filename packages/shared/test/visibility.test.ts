@@ -60,6 +60,66 @@ describe("visibilityPolygon", () => {
   });
 });
 
+describe("visibilityPolygon with many segments", () => {
+  // generatore deterministico, per test riproducibili
+  const random = (seed: number) => () => {
+    seed = (seed * 1664525 + 1013904223) % 2 ** 32;
+    return seed / 2 ** 32;
+  };
+
+  /** Distanza a cui il raggio incontra il primo segmento, controllandoli tutti (riferimento). */
+  const bruteReach = (o: { x: number; y: number }, angle: number, segments: Segment[], radius: number) => {
+    const dx = Math.cos(angle);
+    const dy = Math.sin(angle);
+    let reach = radius;
+    for (const s of segments) {
+      const sx = s.b.x - s.a.x;
+      const sy = s.b.y - s.a.y;
+      const denom = dx * sy - dy * sx;
+      if (Math.abs(denom) < 1e-12) continue;
+      const ax = s.a.x - o.x;
+      const ay = s.a.y - o.y;
+      const t = (ax * sy - ay * sx) / denom;
+      const u = (ax * dy - ay * dx) / denom;
+      if (t > 1e-6 && u >= -1e-9 && u <= 1 + 1e-9 && t < reach) reach = t;
+    }
+    return reach;
+  };
+
+  it("matches a brute-force check of every segment on every ray", () => {
+    const rnd = random(42);
+    for (let scene = 0; scene < 5; scene++) {
+      const segments: Segment[] = Array.from({ length: 150 }, () => {
+        const a = { x: rnd() * 2000 - 1000, y: rnd() * 2000 - 1000 };
+        return { a, b: { x: a.x + rnd() * 200 - 100, y: a.y + rnd() * 200 - 100 } };
+      });
+      const o = { x: rnd() * 400 - 200, y: rnd() * 400 - 200 };
+      for (const radius of [300, 20_000]) {
+        const poly = visibilityPolygon(o, segments, radius);
+        for (let i = 0; i < poly.length; i += 2) {
+          const dx = poly[i]! - o.x;
+          const dy = poly[i + 1]! - o.y;
+          expect(Math.hypot(dx, dy)).toBeCloseTo(bruteReach(o, Math.atan2(dy, dx), segments, radius), 3);
+        }
+      }
+    }
+  });
+
+  it("stays fast with hundreds of segments and unlimited range", () => {
+    const rnd = random(7);
+    const segments: Segment[] = [];
+    for (let i = 0; i < 150; i++) {
+      const x = rnd() * 4000 - 2000;
+      const y = rnd() * 4000 - 2000;
+      const c = [{ x, y }, { x: x + 50, y }, { x: x + 50, y: y + 50 }, { x, y: y + 50 }];
+      c.forEach((a, k) => segments.push({ a, b: c[(k + 1) % 4]! }));
+    }
+    const start = performance.now();
+    for (let pc = 0; pc < 4; pc++) visibilityPolygon({ x: pc * 30, y: 0 }, segments, 20_000);
+    expect(performance.now() - start).toBeLessThan(500);
+  });
+});
+
 describe("sightSegments", () => {
   const scene = () => {
     const s = newScene();

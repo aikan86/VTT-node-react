@@ -9,7 +9,7 @@ import { BACKGROUND_ID, BackgroundLayer, GridLayer } from "./layers/BackgroundLa
 import { EffectsLayer } from "./layers/EffectsLayer";
 import { ElementsLayer } from "./layers/ElementsLayer";
 import { CalibrationLayer } from "./layers/CalibrationLayer";
-import { SightBlockersLayer } from "./layers/SightBlockersLayer";
+import { createHoverStore, SightBlockersLayer } from "./layers/SightBlockersLayer";
 import { VisionLayer } from "./layers/VisionLayer";
 import { TokensLayer } from "./layers/TokensLayer";
 import { CLOSE_TRACE_SCREEN_PX, type DrawTool, type ElementTool, type Selection, type SketchDraft, type View } from "./types";
@@ -61,7 +61,7 @@ export function BattleStage(props: Props) {
   const [panning, setPanning] = useState(false);
   const [draw, setDraw] = useState<{ start: Point; end: Point } | null>(null);
   const [sketch, setSketch] = useState<SketchDraft | null>(null);
-  const [hover, setHover] = useState<Point | null>(null);
+  const [hover] = useState(createHoverStore);
   const fittedScene = useRef<string | null>(null);
 
   const fit = () => {
@@ -140,7 +140,7 @@ export function BattleStage(props: Props) {
     }
     if (tracing) {
       const world = worldPointer(stage);
-      if (world) setHover(world);
+      if (world) hover.set(world);
     }
     if (draw) {
       const world = worldPointer(stage);
@@ -280,6 +280,7 @@ export function BattleStage(props: Props) {
             onSelect={select("tokens")}
             onMove={props.onTokenMove}
           />
+          {/* la visione si ricalcola solo quando la scena cambia, cioè al rilascio di un trascinamento */}
           <VisionLayer scene={scene} resolve={props.resolve} view={view} size={size} />
           <EffectsLayer
             scene={scene}
