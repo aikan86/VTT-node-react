@@ -15,6 +15,9 @@ import { flushScenes, sceneSync, useSceneStore } from "./store/sceneStore";
 import { reportError, useStatusStore } from "./store/statusStore";
 import styles from "./App.module.css";
 
+/** Commit della release, iniettato da scripts/release.sh al momento della build. */
+const RELEASE = `rel_${import.meta.env.VITE_RELEASE ?? "dev"}`;
+
 // Caricamento iniziale condiviso: la StrictMode esegue gli effetti due volte e due `load()` concorrenti
 // creerebbero ciascuno una scena di default.
 let bootPromise: Promise<unknown> | null = null;
@@ -95,7 +98,10 @@ export function App() {
   return (
     <div className={styles.shell}>
       <header className={styles.header}>
-        <span className={styles.brand}>🎲 VTT</span>
+        <div className={styles.brand}>
+          <span>🎲 VTT</span>
+          <small className={styles.release}>{RELEASE}</small>
+        </div>
         <nav className={styles.nav}>
           <NavLink to="/mappa">Campo di battaglia</NavLink>
           <NavLink to="/party">Party</NavLink>

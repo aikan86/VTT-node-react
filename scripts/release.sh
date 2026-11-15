@@ -29,7 +29,7 @@ echo "→ Typecheck e test"
 pnpm -s typecheck >/dev/null
 pnpm -s test >/dev/null
 echo "→ Build del client"
-pnpm -s build >/dev/null
+VITE_RELEASE="$COMMIT" pnpm -s build >/dev/null
 
 echo "→ Sostituisco la release"
 "$REPO/scripts/vtt.sh" stop

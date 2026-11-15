@@ -66,34 +66,36 @@ export function InitiativePage() {
       {rows.length === 0 ? (
         <p className="empty">Nessun combattente. Aggiungi il party o dei PNG.</p>
       ) : (
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th title="Ha agito">✓</th>
-              <th>Nome</th>
-              <th>d20</th>
-              <th style={{ textAlign: "center" }}>Mod</th>
-              <th style={{ textAlign: "center" }}>Totale</th>
-              <th style={{ textAlign: "center" }}>CA</th>
-              <th>PF</th>
-              <th>Note</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <CombatantRow
-                key={row.combatant.id}
-                row={row}
-                active={combat.active}
-                onSetRoll={actions.setRoll}
-                onSetNotes={actions.setNotes}
-                onToggleActed={actions.toggleActed}
-                onMove={actions.move}
-              />
-            ))}
-          </tbody>
-        </table>
+        <div className={styles.tableScroll}>
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th title="Ha agito">✓</th>
+                <th>Nome</th>
+                <th>d20</th>
+                <th style={{ textAlign: "center" }}>Mod</th>
+                <th style={{ textAlign: "center" }}>Totale</th>
+                <th style={{ textAlign: "center" }}>CA</th>
+                <th>PF</th>
+                <th>Note</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <CombatantRow
+                  key={row.combatant.id}
+                  row={row}
+                  active={combat.active}
+                  onSetRoll={actions.setRoll}
+                  onSetNotes={actions.setNotes}
+                  onToggleActed={actions.toggleActed}
+                  onMove={actions.move}
+                />
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
       {npcDialog && (
