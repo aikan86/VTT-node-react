@@ -68,6 +68,8 @@ export const MapElementSchema = z.object({
   rotation: z.number(),
   color: ColorSchema,
   label: z.string().max(80).optional(),
+  /** Solo per le porte: aperta non blocca la vista. Assente = chiusa. */
+  open: z.boolean().optional(),
 });
 export type MapElement = z.infer<typeof MapElementSchema>;
 

@@ -79,6 +79,25 @@ describe("sightSegments", () => {
     expect(sightSegments(s)).toHaveLength(12);
   });
 
+  it("lets the view through open doors", () => {
+    const s = scene();
+    s.elements = [{ id: "d", type: "door", x: 0, y: 0, w: 1, h: 1, rotation: 0, color: "#000000", open: true }];
+    expect(sightSegments(s)).toHaveLength(0);
+  });
+
+  it("skips the shapes that contain the viewer", () => {
+    const s = scene();
+    const base = { rotation: 0, color: "#000000" };
+    s.elements = [
+      { id: "d", type: "door", x: 0, y: 0, w: 1, h: 1, ...base },
+      { id: "w", type: "wall", x: 3, y: 0, w: 1, h: 1, ...base },
+    ];
+    expect(sightSegments(s, { x: 25, y: 25 })).toHaveLength(4); // solo il muro
+    const poly = visibilityPolygon({ x: 25, y: 25 }, sightSegments(s, { x: 25, y: 25 }), 500);
+    expect(pointInPolygon({ x: 25, y: 120 }, poly)).toBe(true); // fuori dalla porta
+    expect(pointInPolygon({ x: 300, y: 25 }, poly)).toBe(false); // dietro al muro
+  });
+
   it("rotates rectangles around their top-left corner", () => {
     const s = scene();
     s.elements = [{ id: "w", type: "wall", x: 2, y: 2, w: 2, h: 1, rotation: 90, color: "#000000" }];

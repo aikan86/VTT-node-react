@@ -6,8 +6,10 @@ export interface Segment {
   b: Point;
 }
 
-/** Elementi rettangolari che bloccano la vista (le porte sono considerate chiuse). */
+/** Elementi rettangolari che bloccano la vista (le porte solo se chiuse). */
 const SIGHT_BLOCKING_ELEMENTS: ReadonlySet<string> = new Set(["wall", "door", "obstacle"]);
+
+const blocksSight = (el: Scene["elements"][number]) => SIGHT_BLOCKING_ELEMENTS.has(el.type) && !(el.type === "door" && el.open);
 
 /** Raggio di calcolo quando la visione non ha limite, in pixel del mondo. */
 export const UNLIMITED_VISION_PX = 20_000;
@@ -18,15 +20,13 @@ export function visionRadiusPx(vision: { radiusFt: number }, grid: { feetPerCell
 }
 
 /**
- * Segmenti che bloccano la vista, in pixel del mondo: i lati degli elementi rettangolari (muri, porte, ostacoli,
- * ruotati attorno al loro angolo in alto a sinistra come sulla mappa) e i poligoni tracciati a mano.
+ * Forme che bloccano la vista, come vertici in pixel del mondo: gli elementi rettangolari (muri, porte chiuse,
+ * ostacoli, ruotati attorno al loro angolo in alto a sinistra come sulla mappa) e i poligoni tracciati a mano.
  */
-export function sightSegments(scene: Pick<Scene, "elements" | "sightBlockers" | "grid">): Segment[] {
+export function sightPolygons(scene: Pick<Scene, "elements" | "sightBlockers" | "grid">): Point[][] {
   const g = scene.grid;
-  const segments: Segment[] = [];
-  const addPolygon = (corners: Point[]) => {
-    corners.forEach((a, i) => segments.push({ a, b: corners[(i + 1) % corners.length]! }));
-  };
+  const polygons: Point[][] = [];
+  const addPolygon = (corners: Point[]) => polygons.push(corners);
 
   for (const blocker of scene.sightBlockers) {
     const corners: Point[] = [];
@@ -37,7 +37,7 @@ export function sightSegments(scene: Pick<Scene, "elements" | "sightBlockers" | 
   }
 
   for (const el of scene.elements) {
-    if (!SIGHT_BLOCKING_ELEMENTS.has(el.type)) continue;
+    if (!blocksSight(el)) continue;
     const rad = (el.rotation * Math.PI) / 180;
     const cos = Math.cos(rad);
     const sin = Math.sin(rad);
@@ -46,7 +46,25 @@ export function sightSegments(scene: Pick<Scene, "elements" | "sightBlockers" | 
     const v = { x: -sin * el.h * g.cellPx, y: cos * el.h * g.cellPx };
     addPolygon([origin, { x: origin.x + u.x, y: origin.y + u.y }, { x: origin.x + u.x + v.x, y: origin.y + u.y + v.y }, { x: origin.x + v.x, y: origin.y + v.y }]);
   }
+  return polygons;
+}
+
+/**
+ * Lati delle forme come segmenti. Con `viewer`, le forme che lo contengono vengono saltate: un personaggio
+ * fermo su una porta o dentro un ostacolo vede intorno a sé invece di restare chiuso nel rettangolo.
+ */
+export function polygonSegments(polygons: Point[][], viewer?: Point): Segment[] {
+  const segments: Segment[] = [];
+  for (const corners of polygons) {
+    if (viewer && pointInPolygon(viewer, corners.flatMap((c) => [c.x, c.y]))) continue;
+    corners.forEach((a, i) => segments.push({ a, b: corners[(i + 1) % corners.length]! }));
+  }
   return segments;
+}
+
+/** Segmenti che bloccano la vista (vedi `sightPolygons` e `polygonSegments`). */
+export function sightSegments(scene: Pick<Scene, "elements" | "sightBlockers" | "grid">, viewer?: Point): Segment[] {
+  return polygonSegments(sightPolygons(scene), viewer);
 }
 
 /** Sotto questa distanza (pixel del mondo) un incontro col segmento si considera alla partenza del raggio e si ignora. */
