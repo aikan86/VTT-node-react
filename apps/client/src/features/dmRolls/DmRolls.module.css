@@ -35,6 +35,7 @@
 .padActions { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; margin-top: 0.75rem; color: var(--muted); font-size: 0.85rem; }
 
 .tableWrap { max-height: 60vh; overflow: auto; }
+@media (max-width: 900px) { .tableWrap { max-height: none; } }
 .table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
 .table th { text-align: left; font-weight: 500; font-size: 0.8rem; color: var(--muted); padding: 0.3rem 0.5rem; position: sticky; top: 0; background: var(--panel); }
 .table td { padding: 0.3rem 0.5rem; border-top: 1px solid var(--border); }

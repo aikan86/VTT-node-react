@@ -3,6 +3,8 @@
 .round span { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
 .round strong { font-size: 2rem; line-height: 1; font-variant-numeric: tabular-nums; }
 .turnInfo { flex: 1; min-width: 12rem; }
+/* Su schermi stretti scorre in orizzontale solo la tabella, non il resto della pagina */
+.tableScroll { overflow-x: auto; overflow-y: hidden; }
 .table { width: 100%; border-collapse: separate; border-spacing: 0 0.35rem; }
 .table th { text-align: left; font-weight: 500; font-size: 0.8rem; color: var(--muted); padding: 0 0.6rem; }
 .table td { padding: 0.45rem 0.6rem; background: var(--panel); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }

@@ -1,6 +1,7 @@
 .shell { display: grid; grid-template-rows: auto auto 1fr; height: 100%; }
 .header { display: flex; align-items: center; gap: 1.5rem; padding: 0 1rem; height: 3rem; background: var(--panel); border-bottom: 1px solid var(--border); }
-.brand { font-weight: 700; letter-spacing: 0.04em; }
+.brand { display: flex; flex-direction: column; line-height: 1.1; font-weight: 700; letter-spacing: 0.04em; }
+.release { font-size: 0.65rem; font-weight: 400; letter-spacing: 0; color: var(--muted); font-family: ui-monospace, monospace; }
 .nav { display: flex; gap: 0.25rem; height: 100%; }
 .nav a { display: flex; align-items: center; padding: 0 0.9rem; color: var(--muted); text-decoration: none; border-bottom: 2px solid transparent; }
 .nav a:hover { color: var(--text); }
@@ -8,5 +9,15 @@
 .status { margin-left: auto; display: flex; gap: 1rem; align-items: center; font-size: 0.85rem; color: var(--muted); }
 .error { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 0.5rem 1rem; background: #4c1414; color: #fecaca; }
 .main { min-height: 0; overflow: hidden; }
+@media (max-width: 900px) {
+  .shell { height: auto; min-height: 100dvh; }
+  /* L'header non deve imporre la propria larghezza: altrimenti il browser mobile rimpicciolisce tutta la pagina */
+  .header { flex-wrap: wrap; height: auto; min-height: 3rem; row-gap: 0.4rem; padding: 0.4rem 0.75rem; }
+  .nav { height: auto; min-width: 0; max-width: 100%; overflow-x: auto; }
+  .nav a { padding: 0.5rem 0.6rem; white-space: nowrap; }
+  .status { flex-wrap: wrap; gap: 0.5rem 1rem; }
+  /* grid: la pagina si estende fino in fondo anche con poco contenuto; minmax(0) evita che le tabelle allarghino il body */
+  .main { overflow: visible; display: grid; grid-template-columns: minmax(0, 1fr); }
+}
 .center { display: grid; place-items: center; height: 100%; color: var(--muted); }
 .offline { color: var(--danger); font-weight: 600; }
