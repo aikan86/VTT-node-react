@@ -1,4 +1,4 @@
-import { ELEMENT_COLORS, ELEMENT_LABELS, ELEMENT_TYPES, type MapElement, type SightBlocker, type Vision } from "@vtt/shared";
+import { ELEMENT_COLORS, ELEMENT_LABELS, ELEMENT_TYPES, MAX_SIGHT_BLOCKER_VERTICES, type MapElement, type SightBlocker, type Vision } from "@vtt/shared";
 import { NumberInput } from "../../../components/NumberInput";
 import { SIGHT_COLOR, type ElementTool } from "../types";
 import styles from "../Battlefield.module.css";
@@ -52,6 +52,9 @@ export function ElementsPanel({ tool, onTool, selected, onChange, onDelete, sele
                 <button onClick={onCancelTrace}>Annulla forma</button>
               </div>
             )}
+            {tracePoints >= MAX_SIGHT_BLOCKER_VERTICES && (
+              <p className={styles.callout}>Raggiunto il massimo di {MAX_SIGHT_BLOCKER_VERTICES} punti: chiudi la forma.</p>
+            )}
           </>
         ) : (
           tool !== "select" && <p className={styles.callout}>Trascina sulla mappa per disegnare: {ELEMENT_LABELS[tool].toLowerCase()}.</p>
@@ -68,7 +71,7 @@ export function ElementsPanel({ tool, onTool, selected, onChange, onDelete, sele
                 value={selected.type}
                 onChange={(e) => {
                   const type = e.target.value as MapElement["type"];
-                  onChange({ ...selected, type, color: ELEMENT_COLORS[type] });
+                  onChange({ ...selected, type, color: ELEMENT_COLORS[type], open: type === "door" ? selected.open : undefined });
                 }}
               >
                 {ELEMENT_TYPES.map((t) => (
@@ -87,6 +90,12 @@ export function ElementsPanel({ tool, onTool, selected, onChange, onDelete, sele
             Etichetta
             <input value={selected.label ?? ""} maxLength={80} onChange={(e) => onChange({ ...selected, label: e.target.value || undefined })} />
           </label>
+          {selected.type === "door" && (
+            <label className="row" style={{ flexWrap: "nowrap" }}>
+              <input type="checkbox" checked={selected.open ?? false} onChange={(e) => onChange({ ...selected, open: e.target.checked || undefined })} />
+              Aperta (non blocca la vista)
+            </label>
+          )}
           <span className="muted" style={{ fontSize: "0.8rem" }}>
             {selected.w} × {selected.h} celle · trascina le maniglie per ridimensionare o ruotare
           </span>
@@ -115,7 +124,7 @@ export function ElementsPanel({ tool, onTool, selected, onChange, onDelete, sele
           Mostra cosa vede il party
         </label>
         <p className="muted" style={{ fontSize: "0.8rem", margin: 0 }}>
-          I personaggi sulla mappa vedono a 360°. Muri, porte, ostacoli e le forme tracciate qui bloccano la vista; il resto resta visibile.
+          I personaggi sulla mappa vedono a 360°. Muri, porte chiuse, ostacoli e le forme tracciate qui bloccano la vista; il resto resta visibile.
         </p>
         <div className={styles.grid2}>
           <label className="field">

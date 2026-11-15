@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { Layer, Line, Rect } from "react-konva";
-import { cellToPx, sightSegments, visibilityPolygon, visionRadiusPx, type Point, type Scene } from "@vtt/shared";
+import { cellToPx, polygonSegments, sightPolygons, visibilityPolygon, visionRadiusPx, type Point, type Scene } from "@vtt/shared";
 import type { EntityResolver } from "../../../store/entities";
 import type { View } from "../types";
 
@@ -34,16 +34,16 @@ export function VisionLayer({ scene, resolve, view, size }: Props) {
   }
   const originsKey = origins.map((o) => `${o.x},${o.y}`).join("|");
 
-  const segments = useMemo(
-    () => sightSegments(scene),
+  const blockers = useMemo(
+    () => sightPolygons(scene),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [scene.elements, scene.sightBlockers, g.cellPx, g.offsetX, g.offsetY],
   );
   const radius = visionRadiusPx(vision, g);
   const polygons = useMemo(
-    () => origins.map((o) => visibilityPolygon(o, segments, radius)),
+    () => origins.map((o) => visibilityPolygon(o, polygonSegments(blockers, o), radius)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [originsKey, segments, radius],
+    [originsKey, blockers, radius],
   );
 
   if (!vision.enabled || origins.length === 0) return null;

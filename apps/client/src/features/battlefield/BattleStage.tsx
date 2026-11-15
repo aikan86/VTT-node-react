@@ -3,16 +3,16 @@ import { Stage } from "react-konva";
 import type Konva from "konva";
 import { ELEMENT_COLORS, pxToCell, type Background, type Drawing, type Effect, type LayerKey, type MapElement, type Point, type Ref, type Scene, type SightBlocker, type Token } from "@vtt/shared";
 import type { EntityResolver } from "../../store/entities";
-import { appendPoint, clamp, contentBounds, snapAngle } from "./geometry";
+import { appendPoint, clamp, closesTrace, contentBounds, snapAngle } from "./geometry";
 import { useElementSize, useKeyHeld } from "./hooks";
 import { BACKGROUND_ID, BackgroundLayer, GridLayer } from "./layers/BackgroundLayer";
 import { EffectsLayer } from "./layers/EffectsLayer";
 import { ElementsLayer } from "./layers/ElementsLayer";
 import { CalibrationLayer } from "./layers/CalibrationLayer";
-import { SightBlockersLayer } from "./layers/SightBlockersLayer";
+import { createHoverStore, SightBlockersLayer } from "./layers/SightBlockersLayer";
 import { VisionLayer } from "./layers/VisionLayer";
 import { TokensLayer } from "./layers/TokensLayer";
-import { CLOSE_TRACE_SCREEN_PX, type DrawTool, type ElementTool, type Selection, type SketchDraft, type View } from "./types";
+import { type DrawTool, type ElementTool, type Selection, type SketchDraft, type View } from "./types";
 import styles from "./Battlefield.module.css";
 
 interface Props {
@@ -61,7 +61,7 @@ export function BattleStage(props: Props) {
   const [panning, setPanning] = useState(false);
   const [draw, setDraw] = useState<{ start: Point; end: Point } | null>(null);
   const [sketch, setSketch] = useState<SketchDraft | null>(null);
-  const [hover, setHover] = useState<Point | null>(null);
+  const [hover] = useState(createHoverStore);
   const fittedScene = useRef<string | null>(null);
 
   const fit = () => {
@@ -140,7 +140,7 @@ export function BattleStage(props: Props) {
     }
     if (tracing) {
       const world = worldPointer(stage);
-      if (world) setHover(world);
+      if (world) hover.set(world);
     }
     if (draw) {
       const world = worldPointer(stage);
@@ -198,9 +198,7 @@ export function BattleStage(props: Props) {
     if (tracing) {
       const world = worldPointer(stage);
       if (!world) return;
-      const first = props.tracePoints[0];
-      const closing = first !== undefined && props.tracePoints.length >= 3 && Math.hypot(world.x - first.x, world.y - first.y) <= CLOSE_TRACE_SCREEN_PX / view.scale;
-      if (closing) props.onTraceClose();
+      if (closesTrace(props.tracePoints, world, view.scale)) props.onTraceClose();
       else props.onTracePoint(world);
       return;
     }
@@ -280,6 +278,7 @@ export function BattleStage(props: Props) {
             onSelect={select("tokens")}
             onMove={props.onTokenMove}
           />
+          {/* la visione si ricalcola solo quando la scena cambia, cioè al rilascio di un trascinamento */}
           <VisionLayer scene={scene} resolve={props.resolve} view={view} size={size} />
           <EffectsLayer
             scene={scene}

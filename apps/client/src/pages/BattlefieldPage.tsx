@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
-import { addCombatant, createId, ELEMENT_COLORS, sameRef, type Drawing, type LayerKey, type Point, type Ref, type Scene } from "@vtt/shared";
+import { addCombatant, createId, ELEMENT_COLORS, MAX_SIGHT_BLOCKER_VERTICES, sameRef, type Drawing, type LayerKey, type Point, type Ref, type Scene } from "@vtt/shared";
 import { BattleStage } from "../features/battlefield/BattleStage";
 import { isTyping } from "../features/battlefield/hooks";
-import { calibrateBackground, pxPointsToCells, snapTo, withBackgroundGeometry } from "../features/battlefield/geometry";
+import { appendVertex, calibrateBackground, pxPointsToCells, snapTo, withBackgroundGeometry } from "../features/battlefield/geometry";
 import { BackgroundPanel } from "../features/battlefield/panels/BackgroundPanel";
 import { CalibrationDialog } from "../features/battlefield/panels/CalibrationDialog";
 import { EffectsPanel } from "../features/battlefield/panels/EffectsPanel";
@@ -55,6 +55,21 @@ function Battlefield({ scene }: { scene: Scene }) {
     setCalibration(null);
   }, [scene.id, activeLayer]);
 
+  // Cambia l'immagine di sfondo o il livello viene bloccato (anche da un'altra scheda): i punti scelti non valgono più
+  const backgroundLocked = scene.layers.background.locked;
+  useEffect(() => {
+    setCalibration(null);
+  }, [scene.background?.imageUrl]);
+  useEffect(() => {
+    if (backgroundLocked) setCalibration(null);
+  }, [backgroundLocked]);
+
+  // Livello elementi bloccato: la forma in tracciamento si scarta
+  const elementsLocked = scene.layers.elements.locked;
+  useEffect(() => {
+    if (elementsLocked) setTrace([]);
+  }, [elementsLocked]);
+
   const deleteSelection = useCallback(() => {
     if (!selection) return;
     const keys = ({ elements: ["elements", "sightBlockers"], tokens: ["tokens"], effects: ["effects", "drawings"], background: [] } as const)[selection.layer];
@@ -70,14 +85,16 @@ function Battlefield({ scene }: { scene: Scene }) {
   }, [elementTool]);
 
   const closeTrace = useCallback(() => {
-    if (trace.length < 3) return;
+    if (trace.length < 3 || elementsLocked) return;
     const points = pxPointsToCells(
       trace.flatMap((p) => [p.x, p.y]),
       scene.grid,
     );
-    update((s) => ({ ...s, sightBlockers: [...s.sightBlockers, { id: createId(), points }] }));
+    // id generato fuori dall'operazione: l'update può essere rieseguito e deve produrre sempre lo stesso ostacolo
+    const blocker = { id: createId(), points };
+    update((s) => ({ ...s, sightBlockers: [...s.sightBlockers, blocker] }));
     setTrace([]);
-  }, [trace, scene.grid, update]);
+  }, [trace, elementsLocked, scene.grid, update]);
 
   const removeFromMap = useCallback(
     (ref: Ref) => {
@@ -167,6 +184,10 @@ function Battlefield({ scene }: { scene: Scene }) {
   };
 
   const applyCalibration = (cells: number, alignToGrid: boolean) => {
+    if (backgroundLocked) {
+      setCalibration(null);
+      return;
+    }
     const [p1, p2] = calibration ?? [];
     const next = p1 && p2 && scene.background ? calibrateBackground(scene.background, p1, p2, cells, scene.grid, alignToGrid) : null;
     if (!next) {
@@ -278,7 +299,7 @@ function Battlefield({ scene }: { scene: Scene }) {
           }}
           onElementChange={(el) => replace("elements", el)}
           tracePoints={trace}
-          onTracePoint={(p) => setTrace((t) => (t.length > 0 && Math.hypot(p.x - t[t.length - 1]!.x, p.y - t[t.length - 1]!.y) < 1 ? t : [...t, p]))}
+          onTracePoint={(p) => setTrace((t) => appendVertex(t, p, 1, MAX_SIGHT_BLOCKER_VERTICES))}
           onTraceClose={closeTrace}
           onBlockerChange={(b) => replace("sightBlockers", b)}
           onBackgroundChange={(bg) => update((s) => withBackgroundGeometry(s, bg))}

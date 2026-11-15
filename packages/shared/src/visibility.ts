@@ -1,4 +1,4 @@
-import { feetToPx, type Point } from "./grid";
+import { cellToPx, feetToPx, type Point } from "./grid";
 import type { Scene } from "./schemas/scene";
 
 export interface Segment {
@@ -6,8 +6,10 @@ export interface Segment {
   b: Point;
 }
 
-/** Elementi rettangolari che bloccano la vista (le porte sono considerate chiuse). */
+/** Elementi rettangolari che bloccano la vista (le porte solo se chiuse). */
 const SIGHT_BLOCKING_ELEMENTS: ReadonlySet<string> = new Set(["wall", "door", "obstacle"]);
+
+const blocksSight = (el: Scene["elements"][number]) => SIGHT_BLOCKING_ELEMENTS.has(el.type) && !(el.type === "door" && el.open);
 
 /** Raggio di calcolo quando la visione non ha limite, in pixel del mondo. */
 export const UNLIMITED_VISION_PX = 20_000;
@@ -18,36 +20,54 @@ export function visionRadiusPx(vision: { radiusFt: number }, grid: { feetPerCell
 }
 
 /**
- * Segmenti che bloccano la vista, in pixel del mondo: i lati degli elementi rettangolari (muri, porte, ostacoli,
- * ruotati attorno al loro angolo in alto a sinistra come sulla mappa) e i poligoni tracciati a mano.
+ * Forme che bloccano la vista, come vertici in pixel del mondo: gli elementi rettangolari (muri, porte chiuse,
+ * ostacoli, ruotati attorno al loro angolo in alto a sinistra come sulla mappa) e i poligoni tracciati a mano.
  */
-export function sightSegments(scene: Pick<Scene, "elements" | "sightBlockers" | "grid">): Segment[] {
+export function sightPolygons(scene: Pick<Scene, "elements" | "sightBlockers" | "grid">): Point[][] {
   const g = scene.grid;
-  const segments: Segment[] = [];
-  const addPolygon = (corners: Point[]) => {
-    corners.forEach((a, i) => segments.push({ a, b: corners[(i + 1) % corners.length]! }));
-  };
+  const polygons: Point[][] = [];
 
   for (const blocker of scene.sightBlockers) {
     const corners: Point[] = [];
     for (let i = 0; i + 1 < blocker.points.length; i += 2) {
-      corners.push({ x: g.offsetX + blocker.points[i]! * g.cellPx, y: g.offsetY + blocker.points[i + 1]! * g.cellPx });
+      corners.push(cellToPx({ x: blocker.points[i]!, y: blocker.points[i + 1]! }, g));
     }
-    if (corners.length >= 3) addPolygon(corners);
+    if (corners.length >= 3) polygons.push(corners);
   }
 
   for (const el of scene.elements) {
-    if (!SIGHT_BLOCKING_ELEMENTS.has(el.type)) continue;
+    if (!blocksSight(el)) continue;
     const rad = (el.rotation * Math.PI) / 180;
     const cos = Math.cos(rad);
     const sin = Math.sin(rad);
-    const origin = { x: g.offsetX + el.x * g.cellPx, y: g.offsetY + el.y * g.cellPx };
+    const origin = cellToPx(el, g);
     const u = { x: cos * el.w * g.cellPx, y: sin * el.w * g.cellPx };
     const v = { x: -sin * el.h * g.cellPx, y: cos * el.h * g.cellPx };
-    addPolygon([origin, { x: origin.x + u.x, y: origin.y + u.y }, { x: origin.x + u.x + v.x, y: origin.y + u.y + v.y }, { x: origin.x + v.x, y: origin.y + v.y }]);
+    polygons.push([origin, { x: origin.x + u.x, y: origin.y + u.y }, { x: origin.x + u.x + v.x, y: origin.y + u.y + v.y }, { x: origin.x + v.x, y: origin.y + v.y }]);
+  }
+  return polygons;
+}
+
+/**
+ * Lati delle forme come segmenti. Con `viewer`, le forme che lo contengono vengono saltate: un personaggio
+ * fermo su una porta o dentro un ostacolo vede intorno a sé invece di restare chiuso nel rettangolo.
+ */
+export function polygonSegments(polygons: Point[][], viewer?: Point): Segment[] {
+  const segments: Segment[] = [];
+  for (const corners of polygons) {
+    if (viewer && pointInPolygon(viewer, corners.flatMap((c) => [c.x, c.y]))) continue;
+    corners.forEach((a, i) => segments.push({ a, b: corners[(i + 1) % corners.length]! }));
   }
   return segments;
 }
+
+/** Segmenti che bloccano la vista (vedi `sightPolygons` e `polygonSegments`). */
+export function sightSegments(scene: Pick<Scene, "elements" | "sightBlockers" | "grid">, viewer?: Point): Segment[] {
+  return polygonSegments(sightPolygons(scene), viewer);
+}
+
+/** Sotto questa distanza (pixel del mondo) un incontro col segmento si considera alla partenza del raggio e si ignora. */
+const MIN_HIT_DISTANCE = 1e-6;
 
 /** Distanza lungo il raggio (origine `o`, direzione `dx, dy`) a cui incontra il segmento; null se non lo incontra. */
 function rayHit(o: Point, dx: number, dy: number, s: Segment): number | null {
@@ -59,7 +79,8 @@ function rayHit(o: Point, dx: number, dy: number, s: Segment): number | null {
   const ay = s.a.y - o.y;
   const t = (ax * sy - ay * sx) / denom;
   const u = (ax * dy - ay * dx) / denom;
-  if (t < 0 || u < -1e-9 || u > 1 + 1e-9) return null;
+  // t ≈ 0: l'origine sta sul segmento (es. un token centrato sul bordo di un muro); non deve accecare il raggio
+  if (t <= MIN_HIT_DISTANCE || u < -1e-9 || u > 1 + 1e-9) return null;
   return t;
 }
 
@@ -82,18 +103,63 @@ const wrapAngle = (a: number) => {
   return r;
 };
 
+/** Spicchi angolari in cui si indicizzano i segmenti: ogni raggio controlla solo quelli del suo spicchio. */
+const ANGLE_BINS = 360;
+const BIN_WIDTH = (2 * Math.PI) / ANGLE_BINS;
+const binOf = (angle: number) => Math.min(ANGLE_BINS - 1, Math.max(0, Math.floor((angle + Math.PI) / BIN_WIDTH)));
+
+interface IndexedSegment {
+  segment: Segment;
+  /** Distanza minima dall'origine: nessun raggio può incontrarlo più vicino di così. */
+  distance: number;
+}
+
+/**
+ * Indice angolare dei segmenti visti da `origin`: per ogni spicchio, i segmenti che lo attraversano in ordine
+ * di distanza. Un segmento che non contiene l'origine la vede sotto un angolo minore di 180°, quindi
+ * occupa solo gli spicchi dell'arco più corto tra i suoi estremi (più uno di margine per lato).
+ */
+function angularIndex(origin: Point, near: IndexedSegment[]): IndexedSegment[][] {
+  const bins: IndexedSegment[][] = Array.from({ length: ANGLE_BINS }, () => []);
+  for (const item of near) {
+    const { a, b } = item.segment;
+    const a1 = Math.atan2(a.y - origin.y, a.x - origin.x);
+    const span = wrapAngle(Math.atan2(b.y - origin.y, b.x - origin.x) - a1);
+    const from = wrapAngle(span >= 0 ? a1 : a1 + span);
+    const first = binOf(from) - 1;
+    const count = Math.ceil(Math.abs(span) / BIN_WIDTH) + 3;
+    for (let k = 0; k < Math.min(count, ANGLE_BINS); k++) bins[(((first + k) % ANGLE_BINS) + ANGLE_BINS) % ANGLE_BINS]!.push(item);
+  }
+  return bins;
+}
+
 /**
  * Poligono visibile da `origin` a 360°, entro `radius`, ostacolato dai segmenti.
  * Si lanciano raggi verso gli estremi di ogni segmento (e poco prima/dopo, per vedere "oltre lo spigolo")
  * e a passo regolare; ogni raggio si ferma sul primo segmento o al raggio massimo.
+ * Per restare veloce con molti ostacoli, ogni raggio controlla solo i segmenti del suo spicchio angolare,
+ * dal più vicino, e si ferma appena i successivi non possono essere più vicini del punto già trovato.
  * Restituisce [x1, y1, x2, y2, ...] in ordine d'angolo.
  */
 export function visibilityPolygon(origin: Point, segments: Segment[], radius: number): number[] {
-  const near = segments.filter((s) => distanceToSegment(origin, s) <= radius);
+  const near: IndexedSegment[] = [];
+  for (const segment of segments) {
+    const distance = distanceToSegment(origin, segment);
+    // sul segmento (distanza ≈ 0) nessun raggio lo incontra a t > 0: si salta
+    if (distance <= radius && distance > MIN_HIT_DISTANCE) near.push({ segment, distance });
+  }
+  near.sort((x, y) => x.distance - y.distance);
+  const bins = angularIndex(origin, near);
+
   const angles: number[] = [];
   for (let i = 0; i < ARC_RAYS; i++) angles.push(wrapAngle((i / ARC_RAYS) * 2 * Math.PI));
-  for (const s of near) {
-    for (const p of [s.a, s.b]) {
+  // i vertici condivisi da più segmenti (gli spigoli delle forme) generano raggi una sola volta
+  const corners = new Set<string>();
+  for (const { segment } of near) {
+    for (const p of [segment.a, segment.b]) {
+      const key = `${p.x},${p.y}`;
+      if (corners.has(key)) continue;
+      corners.add(key);
       const angle = Math.atan2(p.y - origin.y, p.x - origin.x);
       angles.push(wrapAngle(angle - EPSILON_RAD), angle, wrapAngle(angle + EPSILON_RAD));
     }
@@ -105,8 +171,9 @@ export function visibilityPolygon(origin: Point, segments: Segment[], radius: nu
     const dx = Math.cos(angle);
     const dy = Math.sin(angle);
     let reach = radius;
-    for (const s of near) {
-      const hit = rayHit(origin, dx, dy, s);
+    for (const { segment, distance } of bins[binOf(angle)]!) {
+      if (distance >= reach) break;
+      const hit = rayHit(origin, dx, dy, segment);
       if (hit !== null && hit < reach) reach = hit;
     }
     points.push(origin.x + dx * reach, origin.y + dy * reach);
