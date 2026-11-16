@@ -39,7 +39,7 @@ export function VisionLayer({ scene, resolve, view, size, darkness }: Props) {
   const segments = useMemo(
     () => sightSegments(scene),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [scene.elements, scene.sightBlockers, g.cellPx, g.offsetX, g.offsetY],
+    [scene.elements, scene.sightBlockers, scene.objects, g.cellPx, g.offsetX, g.offsetY],
   );
   const radius = visionRadiusPx(vision, g);
   const polygons = useMemo(

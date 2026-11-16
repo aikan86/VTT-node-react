@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { addCombatant, createId, ELEMENT_COLORS, sameRef, type Drawing, type LayerKey, type Point, type Ref, type Scene } from "@vtt/shared";
+import { addCombatant, createId, ELEMENT_COLORS, OBJECT_DEFAULTS, sameRef, type Drawing, type LayerKey, type MapObject, type Point, type Ref, type Scene } from "@vtt/shared";
 import { BattleStage } from "../features/battlefield/BattleStage";
 import { isTyping } from "../features/battlefield/hooks";
 import { calibrateBackground, pxPointsToCells, snapTo, withBackgroundGeometry } from "../features/battlefield/geometry";
@@ -10,7 +10,8 @@ import { ElementsPanel } from "../features/battlefield/panels/ElementsPanel";
 import { LayerPanel } from "../features/battlefield/panels/LayerPanel";
 import { TokensPanel } from "../features/battlefield/panels/TokensPanel";
 import { SceneBar } from "../features/battlefield/SceneBar";
-import type { DrawTool, EffectTool, ElementTool, PendingPlacement, Selection, SketchDraft } from "../features/battlefield/types";
+import { BACKGROUND_ID } from "../features/battlefield/layers/BackgroundLayer";
+import type { DrawTool, EffectTool, ElementTool, ObjectTool, PendingPlacement, Selection, SketchDraft } from "../features/battlefield/types";
 import styles from "../features/battlefield/Battlefield.module.css";
 import { AddNpcDialog } from "../features/initiative/AddNpcDialog";
 import { useInitiative } from "../features/initiative/useInitiative";
@@ -37,6 +38,10 @@ function Battlefield({ scene }: { scene: Scene }) {
   /** Testo appena piazzato: il pannello mette il focus sul campo per scriverlo. */
   const [newTextId, setNewTextId] = useState<string | null>(null);
   const [pending, setPending] = useState<PendingPlacement>(null);
+  /** Oggetto dello sfondo in attesa di essere piazzato con un click. */
+  const [objectTool, setObjectTool] = useState<ObjectTool | null>(null);
+  /** I token che si piazzano nascono nascosti ai giocatori. */
+  const [placeHidden, setPlaceHidden] = useState(false);
   const [npcDialog, setNpcDialog] = useState(false);
   /** Calibrazione della scala in corso: punti (0-2) scelti sull'immagine, in pixel del mondo. */
   const [calibration, setCalibration] = useState<Point[] | null>(null);
@@ -53,12 +58,12 @@ function Battlefield({ scene }: { scene: Scene }) {
     setEffectTool((t) => ({ ...t, placing: false }));
     setDrawTool((t) => ({ ...t, mode: null }));
     setCalibration(null);
+    setObjectTool(null);
   }, [scene.id, activeLayer]);
 
   const deleteSelection = useCallback(() => {
-    if (!selection) return;
-    const keys = ({ elements: ["elements", "sightBlockers"], tokens: ["tokens"], effects: ["effects", "drawings"], background: [] } as const)[selection.layer];
-    if (keys.length === 0) return;
+    if (!selection || (selection.layer === "background" && selection.id === BACKGROUND_ID)) return; // l'immagine di sfondo si rimuove dal pannello
+    const keys = ({ elements: ["elements", "sightBlockers"], tokens: ["tokens"], effects: ["effects", "drawings"], background: ["objects"] } as const)[selection.layer];
     update((s) => ({ ...s, ...Object.fromEntries(keys.map((key) => [key, (s[key] as { id: string }[]).filter((x) => x.id !== selection.id)])) }));
     setSelection(null);
   }, [selection, update]);
@@ -68,6 +73,12 @@ function Battlefield({ scene }: { scene: Scene }) {
     setTrace([]);
     if (elementTool === "sight") setSelection(null);
   }, [elementTool]);
+
+  /** Scorciatoia H: nasconde/mostra ai giocatori il token selezionato. */
+  const toggleHiddenSelected = useCallback(() => {
+    if (selection?.layer !== "tokens") return;
+    update((s) => ({ ...s, tokens: s.tokens.map((t) => (t.id === selection.id ? { ...t, hidden: !t.hidden } : t)) }));
+  }, [selection, update]);
 
   const closeTrace = useCallback(() => {
     if (trace.length < 3) return;
@@ -98,6 +109,10 @@ function Battlefield({ scene }: { scene: Scene }) {
         setEffectTool((t) => ({ ...t, placing: false }));
         setDrawTool((t) => ({ ...t, mode: null }));
         setCalibration(null);
+        setObjectTool(null);
+      } else if ((e.key === "h" || e.key === "H") && !e.ctrlKey && !e.metaKey && !e.altKey && selection?.layer === "tokens" && !scene.layers.tokens.locked) {
+        e.preventDefault();
+        toggleHiddenSelected();
       } else if (e.key === "Enter" && elementTool === "sight" && trace.length >= 3) {
         e.preventDefault();
         closeTrace();
@@ -111,10 +126,12 @@ function Battlefield({ scene }: { scene: Scene }) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [closeTrace, deleteSelection, elementTool, selection, scene.layers, trace.length]);
+  }, [closeTrace, deleteSelection, elementTool, selection, scene.layers, toggleHiddenSelected, trace.length]);
 
   const placing =
-    (activeLayer === "tokens" && pending !== null) || (activeLayer === "effects" && (effectTool.placing || drawTool.mode === "text"));
+    (activeLayer === "tokens" && pending !== null) ||
+    (activeLayer === "effects" && (effectTool.placing || drawTool.mode === "text")) ||
+    (activeLayer === "background" && objectTool !== null);
 
   const addDrawing = (drawing: Drawing) => update((s) => ({ ...s, drawings: [...s.drawings, drawing] }));
 
@@ -139,7 +156,30 @@ function Battlefield({ scene }: { scene: Scene }) {
     if (scene.layers[activeLayer].locked) return;
     if (activeLayer === "tokens" && pending) {
       placeTokens(scene.id, pending, cell, sizeOfRef);
+      if (placeHidden) update((s) => ({ ...s, tokens: s.tokens.map((t) => (pending.some((r) => sameRef(r, t.ref)) ? { ...t, hidden: true } : t)) }));
       setPending(null);
+    } else if (activeLayer === "background" && objectTool) {
+      const g = scene.grid;
+      const base =
+        objectTool.kind === "image"
+          ? { w: 4, h: Math.max(0.25, snapTo(4 / (objectTool.aspect || 1), 0.25)), color: "#ffffff", blocksSight: false }
+          : OBJECT_DEFAULTS[objectTool.kind];
+      const object: MapObject = {
+        id: createId(),
+        kind: objectTool.kind,
+        // centrato sul punto cliccato, agganciato a mezza cella
+        x: snapTo((world.x - g.offsetX) / g.cellPx - base.w / 2, 0.5),
+        y: snapTo((world.y - g.offsetY) / g.cellPx - base.h / 2, 0.5),
+        w: base.w,
+        h: base.h,
+        rotation: 0,
+        color: base.color,
+        blocksSight: base.blocksSight,
+        imageUrl: objectTool.imageUrl,
+      };
+      update((s) => ({ ...s, objects: [...s.objects, object] }));
+      setSelection({ layer: "background", id: object.id });
+      setObjectTool(null);
     } else if (activeLayer === "effects" && drawTool.mode === "text") {
       const [x = 0, y = 0] = toCells([world.x, world.y]);
       const text: Drawing = { id: createId(), kind: "text", x, y, text: "", fontSize: drawTool.fontSize, rotation: 0, color: drawTool.color };
@@ -166,6 +206,17 @@ function Battlefield({ scene }: { scene: Scene }) {
     }
   };
 
+  const setHiddenForRef = (ref: Ref, hidden: boolean) =>
+    update((s) => ({ ...s, tokens: s.tokens.map((t) => (sameRef(t.ref, ref) ? { ...t, hidden } : t)) }));
+
+  const setNpcsHidden = (hidden: boolean) => update((s) => ({ ...s, tokens: s.tokens.map((t) => (t.ref.kind === "npc" ? { ...t, hidden } : t)) }));
+
+  const duplicateObject = (object: MapObject) => {
+    const copy: MapObject = { ...object, id: createId(), x: object.x + 1, y: object.y + 1 };
+    update((s) => ({ ...s, objects: [...s.objects, copy] }));
+    setSelection({ layer: "background", id: copy.id });
+  };
+
   const applyCalibration = (cells: number, alignToGrid: boolean) => {
     const [p1, p2] = calibration ?? [];
     const next = p1 && p2 && scene.background ? calibrateBackground(scene.background, p1, p2, cells, scene.grid, alignToGrid) : null;
@@ -180,7 +231,7 @@ function Battlefield({ scene }: { scene: Scene }) {
   const selectedOf = <T extends { id: string }>(layer: LayerKey, list: T[]) =>
     selection?.layer === layer ? list.find((x) => x.id === selection.id) : undefined;
 
-  const replace = <K extends "elements" | "tokens" | "effects" | "drawings" | "sightBlockers">(key: K, item: Scene[K][number]) =>
+  const replace = <K extends "elements" | "tokens" | "effects" | "drawings" | "sightBlockers" | "objects">(key: K, item: Scene[K][number]) =>
     update((s) => ({ ...s, [key]: (s[key] as { id: string }[]).map((x) => (x.id === item.id ? item : x)) }));
 
   return (
@@ -201,6 +252,12 @@ function Battlefield({ scene }: { scene: Scene }) {
             calibrationStep={calibration && calibration.length < 2 ? calibration.length : null}
             onStartCalibration={() => setCalibration([])}
             onCancelCalibration={() => setCalibration(null)}
+            selectedObject={selectedOf("background", scene.objects)}
+            objectTool={objectTool}
+            onObjectTool={setObjectTool}
+            onChangeObject={(o) => replace("objects", o)}
+            onDeleteObject={deleteSelection}
+            onDuplicateObject={duplicateObject}
           />
         )}
         {activeLayer === "elements" && (
@@ -227,6 +284,10 @@ function Battlefield({ scene }: { scene: Scene }) {
             onAddNpc={() => setNpcDialog(true)}
             selected={selectedOf("tokens", scene.tokens)}
             onChangeToken={(token) => replace("tokens", token)}
+            onSetHidden={setHiddenForRef}
+            onSetNpcsHidden={setNpcsHidden}
+            placeHidden={placeHidden}
+            onPlaceHidden={setPlaceHidden}
             onRemoveToken={deleteSelection}
             onRemoveFromMap={removeFromMap}
             onAddToInitiative={(ref: Ref) => useCombatStore.getState().apply((c, _getMod, ctx) => addCombatant(c, ref, ctx.id))}
@@ -278,6 +339,7 @@ function Battlefield({ scene }: { scene: Scene }) {
             setSelection({ layer: "elements", id: element.id });
           }}
           onElementChange={(el) => replace("elements", el)}
+          onObjectChange={(o) => replace("objects", o)}
           tracePoints={trace}
           onTracePoint={(p) => setTrace((t) => (t.length > 0 && Math.hypot(p.x - t[t.length - 1]!.x, p.y - t[t.length - 1]!.y) < 1 ? t : [...t, p]))}
           onTraceClose={closeTrace}

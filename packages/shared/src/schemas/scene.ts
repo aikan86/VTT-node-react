@@ -171,6 +171,57 @@ export type Vision = z.infer<typeof VisionSchema>;
 
 export const DEFAULT_VISION: Vision = { enabled: false, radiusFt: 60, darkness: 0.7 };
 
+/** Oggetti che il master aggiunge allo sfondo (disegnati dall'app, vista dall'alto) o immagini sue. */
+export const MAP_OBJECT_KINDS = ["fountain", "house", "tent", "wall", "tree", "rock", "well", "table", "crate", "campfire", "image"] as const;
+export type ObjectKind = (typeof MAP_OBJECT_KINDS)[number];
+
+export const OBJECT_LABELS: Record<ObjectKind, string> = {
+  fountain: "Fontana",
+  house: "Casa",
+  tent: "Tenda",
+  wall: "Muro",
+  tree: "Albero",
+  rock: "Roccia",
+  well: "Pozzo",
+  table: "Tavolo",
+  crate: "Cassa",
+  campfire: "Falò",
+  image: "Immagine",
+};
+
+/** Misure in celle, colore principale e se di norma blocca la vista. */
+export const OBJECT_DEFAULTS: Record<Exclude<ObjectKind, "image">, { w: number; h: number; color: string; blocksSight: boolean }> = {
+  fountain: { w: 3, h: 3, color: "#3d7ea6", blocksSight: false },
+  house: { w: 6, h: 5, color: "#9b3b2e", blocksSight: true },
+  tent: { w: 3, h: 3, color: "#c9b27c", blocksSight: true },
+  wall: { w: 4, h: 1, color: "#7b7d82", blocksSight: true },
+  tree: { w: 3, h: 3, color: "#3f7d3a", blocksSight: true },
+  rock: { w: 2, h: 2, color: "#8a8d93", blocksSight: true },
+  well: { w: 2, h: 2, color: "#8d9096", blocksSight: false },
+  table: { w: 2, h: 1, color: "#8a5a2b", blocksSight: false },
+  crate: { w: 1, h: 1, color: "#a0702f", blocksSight: false },
+  campfire: { w: 1, h: 1, color: "#f97316", blocksSight: false },
+};
+
+/** Coordinate e dimensioni in celle; ruota attorno all'angolo in alto a sinistra, come gli elementi. */
+export const MapObjectSchema = z.object({
+  id: IdSchema,
+  kind: z.enum(MAP_OBJECT_KINDS),
+  x: z.number(),
+  y: z.number(),
+  w: z.number().positive(),
+  h: z.number().positive(),
+  rotation: z.number(),
+  /** Colore principale (tetto, tela, pietra, chioma…); ignorato dalle immagini. */
+  color: ColorSchema,
+  /** Solo per `kind: "image"`. */
+  imageUrl: z.string().min(1).optional(),
+  /** Ostacola la vista dei personaggi (approssimato al suo rettangolo). */
+  blocksSight: z.boolean(),
+  label: z.string().max(80).optional(),
+});
+export type MapObject = z.infer<typeof MapObjectSchema>;
+
 export const SceneSchema = z.object({
   id: IdSchema,
   name: z.string().trim().min(1).max(80),
@@ -192,6 +243,8 @@ export const SceneSchema = z.object({
   vision: VisionSchema.default(DEFAULT_VISION),
   /** La vista giocatori mostra questa scena (al massimo una alla volta). */
   shownToPlayers: z.boolean().default(false),
+  /** Oggetti dello sfondo: seguono il livello Sfondo (visibilità e blocco). */
+  objects: z.array(MapObjectSchema).default([]),
 });
 export type Scene = z.infer<typeof SceneSchema>;
 
@@ -218,6 +271,7 @@ export function newScene(name = "Nuova scena"): Scene {
     sightBlockers: [],
     vision: { ...DEFAULT_VISION },
     shownToPlayers: false,
+    objects: [],
   };
 }
 

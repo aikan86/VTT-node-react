@@ -1,4 +1,4 @@
-import type { EffectShape, ElementType, LayerKey, Ref } from "@vtt/shared";
+import type { EffectShape, ElementType, LayerKey, ObjectKind, Ref } from "@vtt/shared";
 
 export interface Selection {
   layer: LayerKey;
@@ -45,3 +45,25 @@ export interface View {
 
 /** Token in attesa di essere piazzati con un click sulla mappa. */
 export type PendingPlacement = Ref[] | null;
+
+/** Oggetto dello sfondo in attesa di essere piazzato con un click sulla mappa. */
+export interface ObjectTool {
+  kind: ObjectKind;
+  /** Per le immagini caricate: indirizzo e proporzioni (larghezza / altezza). */
+  imageUrl?: string;
+  aspect?: number;
+}
+
+export const OBJECT_ICONS: Record<ObjectKind, string> = {
+  fountain: "⛲",
+  house: "🏠",
+  tent: "⛺",
+  wall: "🧱",
+  tree: "🌳",
+  rock: "🪨",
+  well: "🪣",
+  table: "🍽️",
+  crate: "📦",
+  campfire: "🔥",
+  image: "🖼️",
+};

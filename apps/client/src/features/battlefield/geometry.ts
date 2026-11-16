@@ -37,6 +37,7 @@ export function contentBounds(scene: Scene, sizeOf: (ref: Ref) => number = () =>
     boxes.push(cellBox(t.x, t.y, size, size));
   }
   for (const el of scene.elements) boxes.push(cellBox(el.x, el.y, el.w, el.h));
+  for (const o of scene.objects) boxes.push(cellBox(o.x, o.y, o.w, o.h));
   for (const fx of scene.effects) {
     const reach = fx.sizeFt / g.feetPerCell; // raggio, lato o lunghezza: approssimato per eccesso
     boxes.push(cellBox(fx.x - reach, fx.y - reach, reach * 2, reach * 2));

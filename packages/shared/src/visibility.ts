@@ -18,10 +18,11 @@ export function visionRadiusPx(vision: { radiusFt: number }, grid: { feetPerCell
 }
 
 /**
- * Segmenti che bloccano la vista, in pixel del mondo: i lati degli elementi rettangolari (muri, porte, ostacoli,
- * ruotati attorno al loro angolo in alto a sinistra come sulla mappa) e i poligoni tracciati a mano.
+ * Segmenti che bloccano la vista, in pixel del mondo: i lati degli elementi rettangolari (muri, porte, ostacoli),
+ * degli oggetti dello sfondo che la bloccano (ruotati attorno al loro angolo in alto a sinistra come sulla mappa)
+ * e i poligoni tracciati a mano.
  */
-export function sightSegments(scene: Pick<Scene, "elements" | "sightBlockers" | "grid">): Segment[] {
+export function sightSegments(scene: Pick<Scene, "elements" | "sightBlockers" | "objects" | "grid">): Segment[] {
   const g = scene.grid;
   const segments: Segment[] = [];
   const addPolygon = (corners: Point[]) => {
@@ -36,15 +37,20 @@ export function sightSegments(scene: Pick<Scene, "elements" | "sightBlockers" | 
     if (corners.length >= 3) addPolygon(corners);
   }
 
-  for (const el of scene.elements) {
-    if (!SIGHT_BLOCKING_ELEMENTS.has(el.type)) continue;
-    const rad = (el.rotation * Math.PI) / 180;
+  const addRect = (x: number, y: number, w: number, h: number, rotation: number) => {
+    const rad = (rotation * Math.PI) / 180;
     const cos = Math.cos(rad);
     const sin = Math.sin(rad);
-    const origin = { x: g.offsetX + el.x * g.cellPx, y: g.offsetY + el.y * g.cellPx };
-    const u = { x: cos * el.w * g.cellPx, y: sin * el.w * g.cellPx };
-    const v = { x: -sin * el.h * g.cellPx, y: cos * el.h * g.cellPx };
+    const origin = { x: g.offsetX + x * g.cellPx, y: g.offsetY + y * g.cellPx };
+    const u = { x: cos * w * g.cellPx, y: sin * w * g.cellPx };
+    const v = { x: -sin * h * g.cellPx, y: cos * h * g.cellPx };
     addPolygon([origin, { x: origin.x + u.x, y: origin.y + u.y }, { x: origin.x + u.x + v.x, y: origin.y + u.y + v.y }, { x: origin.x + v.x, y: origin.y + v.y }]);
+  };
+  for (const el of scene.elements) {
+    if (SIGHT_BLOCKING_ELEMENTS.has(el.type)) addRect(el.x, el.y, el.w, el.h, el.rotation);
+  }
+  for (const o of scene.objects) {
+    if (o.blocksSight) addRect(o.x, o.y, o.w, o.h, o.rotation);
   }
   return segments;
 }

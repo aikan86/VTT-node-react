@@ -1,4 +1,4 @@
-import { Circle, Group, Layer, Line, Rect, Text } from "react-konva";
+import { Circle, Group, Layer, Line, Path, Rect, Text } from "react-konva";
 import { cellToPx, sameRef, snapPxToCell, type Ref, type Scene, type Token } from "@vtt/shared";
 import type { EntityResolver } from "../../../store/entities";
 import { clamp } from "../geometry";
@@ -28,6 +28,27 @@ function hpFill(ratio: number) {
   return ratio > 0.5 ? "#22c55e" : ratio > 0.25 ? "#eab308" : "#ef4444";
 }
 
+/** Occhio barrato in un angolo del token: avvisa il master che i giocatori non lo vedono. */
+function HiddenMark({ size }: { size: number }) {
+  const k = Math.max(16, size * 0.3) / 24;
+  return (
+    <Group x={3} y={3} scaleX={k} scaleY={k} listening={false}>
+      {(
+        [
+          ["#000000", 5.5],
+          ["#ffffff", 2.5],
+        ] as const
+      ).map(([stroke, width]) => (
+        <Group key={stroke}>
+          <Path data="M2 12Q12 4 22 12Q12 20 2 12Z" stroke={stroke} strokeWidth={width} lineJoin="round" />
+          <Circle x={12} y={12} radius={3} stroke={stroke} strokeWidth={width} />
+          <Line points={[4, 4, 20, 20]} stroke={stroke} strokeWidth={width} lineCap="round" />
+        </Group>
+      ))}
+    </Group>
+  );
+}
+
 export function TokensLayer({ scene, resolve, listening, editable, selectedId, currentRef, onSelect, onMove, hideHp = false }: Props) {
   const g = scene.grid;
 
@@ -50,7 +71,6 @@ export function TokensLayer({ scene, resolve, listening, editable, selectedId, c
             key={token.id}
             x={pos.x}
             y={pos.y}
-            opacity={token.hidden ? 0.4 : 1}
             draggable={editable}
             onMouseDown={() => onSelect(token.id)}
             onTap={() => onSelect(token.id)}
@@ -61,6 +81,7 @@ export function TokensLayer({ scene, resolve, listening, editable, selectedId, c
               onMove({ ...token, ...next });
             }}
           >
+            <Group opacity={token.hidden ? 0.4 : 1}>
             {isCurrent && (
               <Circle x={r} y={r} radius={r + 2} stroke="#e0a526" strokeWidth={5} shadowColor="#e0a526" shadowBlur={14} />
             )}
@@ -111,6 +132,8 @@ export function TokensLayer({ scene, resolve, listening, editable, selectedId, c
               shadowOpacity={1}
               listening={false}
             />
+            </Group>
+            {token.hidden && <HiddenMark size={s} />}
           </Group>
         );
       })}

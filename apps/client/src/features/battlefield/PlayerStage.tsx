@@ -7,6 +7,7 @@ import { useElementSize } from "./hooks";
 import { BackgroundLayer, GridLayer } from "./layers/BackgroundLayer";
 import { EffectsLayer } from "./layers/EffectsLayer";
 import { ElementsLayer } from "./layers/ElementsLayer";
+import { ObjectsLayer } from "./layers/ObjectsLayer";
 import { TokensLayer } from "./layers/TokensLayer";
 import { VisionLayer } from "./layers/VisionLayer";
 import type { View } from "./types";
@@ -81,6 +82,7 @@ export function PlayerStage({ scene, resolve, currentRef }: Props) {
           onDblClick={fit}
         >
           <BackgroundLayer scene={shown} listening={false} editable={false} selected={false} onSelect={noop} onChange={noop} />
+          <ObjectsLayer scene={shown} listening={false} editable={false} selectedId={null} onSelect={noop} onChange={noop} />
           <GridLayer scene={shown} view={view} size={size} />
           <ElementsLayer scene={shown} listening={false} editable={false} selectedId={null} draft={null} onSelect={noop} onChange={noop} />
           <TokensLayer scene={shown} resolve={resolve} listening={false} editable={false} selectedId={null} currentRef={currentRef} onSelect={noop} onMove={noop} hideHp />

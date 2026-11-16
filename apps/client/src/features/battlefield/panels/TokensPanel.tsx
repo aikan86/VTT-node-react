@@ -1,4 +1,5 @@
 import { modLookupFrom, sameRef, sortCombatants, type Ref, type Scene, type Token } from "@vtt/shared";
+import { EyeIcon } from "../../../components/EyeIcon";
 import { HpEditor } from "../../../components/HpEditor";
 import { useCombatStore } from "../../../store/combatStore";
 import type { EntityResolver } from "../../../store/entities";
@@ -19,9 +20,16 @@ interface Props {
   /** Toglie i token dell'entità dalla scena attiva (l'entità resta in party/iniziativa). */
   onRemoveFromMap: (ref: Ref) => void;
   onAddToInitiative: (ref: Ref) => void;
+  /** Nasconde/mostra ai giocatori tutti i token dell'entità sulla scena. */
+  onSetHidden: (ref: Ref, hidden: boolean) => void;
+  /** Nasconde/mostra ai giocatori tutti i PNG sulla scena. */
+  onSetNpcsHidden: (hidden: boolean) => void;
+  /** I token che si stanno per piazzare nascono nascosti ai giocatori. */
+  placeHidden: boolean;
+  onPlaceHidden: (hidden: boolean) => void;
 }
 
-export function TokensPanel({ scene, resolve, pending, onPending, onAddNpc, selected, onChangeToken, onRemoveToken, onRemoveFromMap, onAddToInitiative }: Props) {
+export function TokensPanel({ scene, resolve, pending, onPending, onAddNpc, selected, onChangeToken, onRemoveToken, onRemoveFromMap, onAddToInitiative, onSetHidden, onSetNpcsHidden, placeHidden, onPlaceHidden }: Props) {
   const characters = usePartyStore((s) => s.characters);
   const combat = useCombatStore((s) => s.combat);
   const locked = scene.layers.tokens.locked;
@@ -40,6 +48,9 @@ export function TokensPanel({ scene, resolve, pending, onPending, onAddNpc, sele
   const currentRef = combat.active ? combat.combatants.find((c) => c.id === combat.currentId)?.ref : undefined;
   const missingPcs = pcRefs.filter((r) => !onMap(r));
   const missingNpcs = npcRefs.filter((r) => !onMap(r));
+  const placedNpcs = npcRefs.filter(onMap);
+  const anyNpcVisible = placedNpcs.some((r) => !hiddenOnMap(r));
+  const anyNpcHidden = placedNpcs.some((r) => hiddenOnMap(r));
   const entity = selected && resolve(selected.ref);
   const inInitiative = selected && combat.combatants.some((c) => sameRef(c.ref, selected.ref));
 
@@ -68,22 +79,35 @@ export function TokensPanel({ scene, resolve, pending, onPending, onAddNpc, sele
                 )}
                 {current && <span className={styles.turn}>◀ turno</span>}
               </span>
-              {placed ? (
-                <button
-                  className={styles.onMap}
-                  onClick={() => onRemoveFromMap(ref)}
-                  disabled={locked}
-                  title={locked ? "Livello bloccato" : "Rimuovi dalla mappa"}
-                  aria-label={`Rimuovi ${e.name} dalla mappa`}
-                >
-                  <span className={styles.onMapLabel}>sulla mappa</span>
-                  <span className={styles.onMapAction} aria-hidden="true">
-                    ✕ Rimuovi
-                  </span>
-                </button>
-              ) : (
-                <button onClick={() => onPending([ref])}>Piazza</button>
-              )}
+              <span className="row" style={{ flexWrap: "nowrap", gap: "0.3rem" }}>
+                {placed && (
+                  <button
+                    aria-pressed={hiddenOnMap(ref)}
+                    aria-label={hiddenOnMap(ref) ? `Mostra ${e.name} ai giocatori` : `Nascondi ${e.name} ai giocatori`}
+                    title={hiddenOnMap(ref) ? "Nascosto ai giocatori: clicca per mostrarlo" : "Visibile ai giocatori: clicca per nasconderlo"}
+                    disabled={locked}
+                    onClick={() => onSetHidden(ref, !hiddenOnMap(ref))}
+                  >
+                    <EyeIcon off={hiddenOnMap(ref)} />
+                  </button>
+                )}
+                {placed ? (
+                  <button
+                    className={styles.onMap}
+                    onClick={() => onRemoveFromMap(ref)}
+                    disabled={locked}
+                    title={locked ? "Livello bloccato" : "Rimuovi dalla mappa"}
+                    aria-label={`Rimuovi ${e.name} dalla mappa`}
+                  >
+                    <span className={styles.onMapLabel}>sulla mappa</span>
+                    <span className={styles.onMapAction} aria-hidden="true">
+                      ✕ Rimuovi
+                    </span>
+                  </button>
+                ) : (
+                  <button onClick={() => onPending([ref])}>Piazza</button>
+                )}
+              </span>
             </li>
           );
         })}
@@ -97,6 +121,12 @@ export function TokensPanel({ scene, resolve, pending, onPending, onAddNpc, sele
           Clicca sulla mappa per piazzare {pending.length === 1 ? "il token" : `${pending.length} token`}. <kbd>Esc</kbd> per annullare.
         </p>
       )}
+      {pending && (
+        <label className="row" style={{ flexWrap: "nowrap" }}>
+          <input type="checkbox" checked={placeHidden} onChange={(e) => onPlaceHidden(e.target.checked)} />
+          Piazza nascosti ai giocatori
+        </label>
+      )}
 
       <section className={styles.section}>
         <h3>Personaggi</h3>
@@ -106,6 +136,16 @@ export function TokensPanel({ scene, resolve, pending, onPending, onAddNpc, sele
         {list(allRefs, "Nessun personaggio: crea i PG nella pagina Party o aggiungi un PNG.")}
         {missingPcs.length > 1 && <button onClick={() => onPending(missingPcs)}>Piazza tutto il party</button>}
         {missingNpcs.length > 1 && <button onClick={() => onPending(missingNpcs)}>Piazza tutti i PNG</button>}
+        {anyNpcVisible && (
+          <button disabled={locked} onClick={() => onSetNpcsHidden(true)}>
+            Nascondi tutti i PNG ai giocatori
+          </button>
+        )}
+        {anyNpcHidden && (
+          <button disabled={locked} onClick={() => onSetNpcsHidden(false)}>
+            Mostra tutti i PNG ai giocatori
+          </button>
+        )}
       </section>
 
       {selected && entity && (
@@ -121,7 +161,7 @@ export function TokensPanel({ scene, resolve, pending, onPending, onAddNpc, sele
           <HpEditor hp={entity.hp} label={entity.name} onChange={(hp) => setEntityHp(entity.ref, hp)} />
           <label className="row" style={{ flexWrap: "nowrap" }}>
             <input type="checkbox" checked={!selected.hidden} disabled={locked} onChange={(e) => onChangeToken({ ...selected, hidden: !e.target.checked })} />
-            Visibile ai giocatori
+            Visibile ai giocatori (H)
           </label>
           {!inInitiative && <button onClick={() => onAddToInitiative(entity.ref)}>Aggiungi all'iniziativa</button>}
           <button className="danger" onClick={() => onRemoveToken(selected.id)}>

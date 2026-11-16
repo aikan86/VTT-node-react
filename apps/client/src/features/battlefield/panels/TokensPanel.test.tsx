@@ -27,12 +27,22 @@ function sceneWithAria(locked = false): Scene {
   };
 }
 
-function renderPanel(scene: Scene, onRemoveFromMap = vi.fn(), options: { selected?: Token; onChangeToken?: (token: Token) => void } = {}) {
+interface PanelOptions {
+  selected?: Token;
+  onChangeToken?: (token: Token) => void;
+  pending?: Ref[] | null;
+  onSetHidden?: (ref: Ref, hidden: boolean) => void;
+  onSetNpcsHidden?: (hidden: boolean) => void;
+  placeHidden?: boolean;
+  onPlaceHidden?: (hidden: boolean) => void;
+}
+
+function renderPanel(scene: Scene, onRemoveFromMap = vi.fn(), options: PanelOptions = {}) {
   render(
     <TokensPanel
       scene={scene}
       resolve={resolve}
-      pending={null}
+      pending={options.pending ?? null}
       onPending={vi.fn()}
       onAddNpc={vi.fn()}
       selected={options.selected}
@@ -40,6 +50,10 @@ function renderPanel(scene: Scene, onRemoveFromMap = vi.fn(), options: { selecte
       onRemoveToken={vi.fn()}
       onRemoveFromMap={onRemoveFromMap}
       onAddToInitiative={vi.fn()}
+      onSetHidden={options.onSetHidden ?? vi.fn()}
+      onSetNpcsHidden={options.onSetNpcsHidden ?? vi.fn()}
+      placeHidden={options.placeHidden ?? false}
+      onPlaceHidden={options.onPlaceHidden ?? vi.fn()}
     />,
   );
   return onRemoveFromMap;
@@ -123,7 +137,7 @@ describe("TokensPanel: visibility to players", () => {
     const onChangeToken = vi.fn();
     const t = token();
     renderPanel(sceneWith(t), vi.fn(), { selected: t, onChangeToken });
-    const checkbox = screen.getByRole("checkbox", { name: "Visibile ai giocatori" });
+    const checkbox = screen.getByRole("checkbox", { name: "Visibile ai giocatori (H)" });
     expect(checkbox).toBeChecked();
     await userEvent.click(checkbox);
     expect(onChangeToken).toHaveBeenCalledWith({ ...t, hidden: true });
@@ -135,7 +149,7 @@ describe("TokensPanel: visibility to players", () => {
     renderPanel(sceneWith(t), vi.fn(), { selected: t, onChangeToken });
     const list = screen.getByRole("list", { name: "Personaggi" });
     expect(within(list).getByText("nascosto")).toBeInTheDocument();
-    const checkbox = screen.getByRole("checkbox", { name: "Visibile ai giocatori" });
+    const checkbox = screen.getByRole("checkbox", { name: "Visibile ai giocatori (H)" });
     expect(checkbox).not.toBeChecked();
     await userEvent.click(checkbox);
     expect(onChangeToken).toHaveBeenCalledWith({ ...t, hidden: false });
@@ -145,6 +159,98 @@ describe("TokensPanel: visibility to players", () => {
     const t = token();
     renderPanel(sceneWith(t, true), vi.fn(), { selected: t });
     expect(screen.queryByText("nascosto")).not.toBeInTheDocument();
-    expect(screen.getByRole("checkbox", { name: "Visibile ai giocatori" })).toBeDisabled();
+    expect(screen.getByRole("checkbox", { name: "Visibile ai giocatori (H)" })).toBeDisabled();
+  });
+});
+
+describe("TokensPanel: quick hide from the list", () => {
+  const goblin = { id: "n1", name: "Goblin", color: "#ff0000", hp: { current: 7, max: 7, temp: 0 }, ac: 15, initiativeMod: 0, size: 1 };
+  const goblinRef: Ref = { kind: "npc", id: "n1" };
+  const ariaRef: Ref = { kind: "pc", id: "pc-a" };
+  const withGoblin = (hidden?: boolean): Scene => {
+    useCombatStore.getState().hydrate({ rev: 0, data: { ...emptyCombat(), npcs: [goblin] } });
+    const scene = sceneWithAria();
+    return { ...scene, tokens: [...scene.tokens, { id: "t2", ref: goblinRef, x: 1, y: 0, ...(hidden === undefined ? {} : { hidden }) }] };
+  };
+
+  it("hides and shows a character without selecting its token", async () => {
+    const onSetHidden = vi.fn();
+    renderPanel(sceneWithAria(), vi.fn(), { onSetHidden });
+    await userEvent.click(screen.getByRole("button", { name: "Nascondi Aria ai giocatori" }));
+    expect(onSetHidden).toHaveBeenCalledWith(ariaRef, true);
+  });
+
+  it("offers to show a hidden character again", async () => {
+    const onSetHidden = vi.fn();
+    const scene = { ...sceneWithAria(), tokens: [{ id: "t1", ref: ariaRef, x: 0, y: 0, hidden: true }] };
+    renderPanel(scene, vi.fn(), { onSetHidden });
+    const eye = screen.getByRole("button", { name: "Mostra Aria ai giocatori" });
+    expect(eye).toHaveAttribute("aria-pressed", "true");
+    await userEvent.click(eye);
+    expect(onSetHidden).toHaveBeenCalledWith(ariaRef, false);
+  });
+
+  it("has no eye for characters that are not on the map", () => {
+    renderPanel(sceneWithAria());
+    expect(screen.queryByRole("button", { name: /Borin ai giocatori/ })).not.toBeInTheDocument();
+  });
+
+  it("hides every NPC at once, and shows them again", async () => {
+    const onSetNpcsHidden = vi.fn();
+    renderPanel(withGoblin(), vi.fn(), { onSetNpcsHidden });
+    expect(screen.queryByRole("button", { name: "Mostra tutti i PNG ai giocatori" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Nascondi tutti i PNG ai giocatori" }));
+    expect(onSetNpcsHidden).toHaveBeenCalledWith(true);
+  });
+
+  it("offers to show all NPCs when they are hidden", async () => {
+    const onSetNpcsHidden = vi.fn();
+    renderPanel(withGoblin(true), vi.fn(), { onSetNpcsHidden });
+    expect(screen.queryByRole("button", { name: "Nascondi tutti i PNG ai giocatori" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Mostra tutti i PNG ai giocatori" }));
+    expect(onSetNpcsHidden).toHaveBeenCalledWith(false);
+  });
+
+  it("shows no bulk buttons when no NPC is on the map", () => {
+    useCombatStore.getState().hydrate({ rev: 0, data: { ...emptyCombat(), npcs: [goblin] } });
+    renderPanel(sceneWithAria());
+    expect(screen.queryByRole("button", { name: /tutti i PNG ai giocatori/ })).not.toBeInTheDocument();
+  });
+
+  it("lets the master place tokens already hidden", async () => {
+    const onPlaceHidden = vi.fn();
+    renderPanel(sceneWithAria(), vi.fn(), { pending: [{ kind: "pc", id: "pc-b" }], onPlaceHidden });
+    const checkbox = screen.getByRole("checkbox", { name: "Piazza nascosti ai giocatori" });
+    expect(checkbox).not.toBeChecked();
+    await userEvent.click(checkbox);
+    expect(onPlaceHidden).toHaveBeenCalledWith(true);
+  });
+
+  it("only asks about hidden placement while placing", () => {
+    renderPanel(sceneWithAria());
+    expect(screen.queryByRole("checkbox", { name: "Piazza nascosti ai giocatori" })).not.toBeInTheDocument();
+  });
+
+  it("disables the eye and the bulk buttons when the layer is locked", () => {
+    const scene = { ...withGoblin(), layers: { ...sceneWithAria().layers, tokens: { ...sceneWithAria().layers.tokens, locked: true } } };
+    renderPanel(scene);
+    expect(screen.getByRole("button", { name: "Nascondi Aria ai giocatori" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Nascondi tutti i PNG ai giocatori" })).toBeDisabled();
+  });
+});
+
+describe("TokensPanel: eye icon", () => {
+  const slash = 'svg path[d="M4 4L20 20"]';
+
+  it("shows an open eye for a visible character and a slashed eye for a hidden one", () => {
+    renderPanel(sceneWithAria());
+    expect(screen.getByRole("button", { name: "Nascondi Aria ai giocatori" }).querySelector(slash)).toBeNull();
+    expect(screen.getByRole("button", { name: "Nascondi Aria ai giocatori" }).querySelector("svg")).not.toBeNull();
+  });
+
+  it("draws the slash when the character is hidden", () => {
+    const scene = { ...sceneWithAria(), tokens: [{ id: "t1", ref: { kind: "pc", id: "pc-a" } as Ref, x: 0, y: 0, hidden: true }] };
+    renderPanel(scene);
+    expect(screen.getByRole("button", { name: "Mostra Aria ai giocatori" }).querySelector(slash)).not.toBeNull();
   });
 });
