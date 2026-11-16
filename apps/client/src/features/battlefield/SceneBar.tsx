@@ -5,7 +5,7 @@ import styles from "./Battlefield.module.css";
 
 export function SceneBar({ scene }: { scene: Scene }) {
   const scenes = useSceneStore((s) => s.scenes);
-  const { select, create, remove, update } = useSceneStore.getState();
+  const { select, create, remove, update, showToPlayers } = useSceneStore.getState();
 
   return (
     <div className={styles.sceneBar}>
@@ -44,6 +44,19 @@ export function SceneBar({ scene }: { scene: Scene }) {
       >
         Elimina
       </button>
+      <span className="row" style={{ marginLeft: "auto", gap: "0.4rem" }}>
+        <button
+          className={scene.shownToPlayers ? "active" : ""}
+          aria-pressed={scene.shownToPlayers}
+          title={scene.shownToPlayers ? "Smetti di mostrarla: i giocatori tornano in attesa" : "I giocatori vedranno questa scena"}
+          onClick={() => showToPlayers(scene.shownToPlayers ? null : scene.id)}
+        >
+          {scene.shownToPlayers ? "📺 In onda ai giocatori" : "📺 Mostra ai giocatori"}
+        </button>
+        <button title="Apre la vista a schermo intero per i giocatori (da trascinare sul secondo schermo)" onClick={() => window.open("/giocatori", "vtt-giocatori")}>
+          Apri vista giocatori ↗
+        </button>
+      </span>
     </div>
   );
 }

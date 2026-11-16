@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { COLLECTIONS, type Character, type DmRoll, type Scene } from "@vtt/shared";
 import { connectLive } from "./api/live";
-import { Navigate, NavLink, Route, Routes } from "react-router";
+import { Navigate, NavLink, Route, Routes, useMatch } from "react-router";
 import { BattlefieldPage } from "./pages/BattlefieldPage";
 import { DmRollsPage } from "./pages/DmRollsPage";
 import { InitiativePage } from "./pages/InitiativePage";
 import { PartyPage } from "./pages/PartyPage";
+import { PlayerViewPage } from "./pages/PlayerViewPage";
 import { CombatStatus } from "./features/initiative/CombatStatus";
 import { TransferButtons } from "./features/transfer/TransferButtons";
 import { flushCombat, receiveCombat, resyncCombat, useCombatStore } from "./store/combatStore";
@@ -14,9 +15,6 @@ import { flushParty, partySync, usePartyStore } from "./store/partyStore";
 import { flushScenes, sceneSync, useSceneStore } from "./store/sceneStore";
 import { reportError, useStatusStore } from "./store/statusStore";
 import styles from "./App.module.css";
-
-/** Commit della release, iniettato da scripts/release.sh al momento della build. */
-const RELEASE = `rel_${import.meta.env.VITE_RELEASE ?? "dev"}`;
 
 // Caricamento iniziale condiviso: la StrictMode esegue gli effetti due volte e due `load()` concorrenti
 // creerebbero ciascuno una scena di default.
@@ -95,13 +93,19 @@ export function App() {
     };
   }, []);
 
+  // Vista giocatori: a schermo intero, senza intestazione né controlli del master (i dati arrivano dagli stessi aggiornamenti in tempo reale)
+  const playerRoute = useMatch("/giocatori");
+  if (playerRoute) {
+    if (state !== "ready") {
+      return <div style={{ height: "100%", display: "grid", placeItems: "center" }}>{state === "failed" ? "Impossibile contattare il server. È avviato?" : "Caricamento…"}</div>;
+    }
+    return <PlayerViewPage />;
+  }
+
   return (
     <div className={styles.shell}>
       <header className={styles.header}>
-        <div className={styles.brand}>
-          <span>🎲 VTT</span>
-          <small className={styles.release}>{RELEASE}</small>
-        </div>
+        <span className={styles.brand}>🎲 VTT</span>
         <nav className={styles.nav}>
           <NavLink to="/mappa">Campo di battaglia</NavLink>
           <NavLink to="/party">Party</NavLink>

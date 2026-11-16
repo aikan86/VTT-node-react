@@ -68,8 +68,6 @@ export const MapElementSchema = z.object({
   rotation: z.number(),
   color: ColorSchema,
   label: z.string().max(80).optional(),
-  /** Solo per le porte: aperta non blocca la vista. Assente = chiusa. */
-  open: z.boolean().optional(),
 });
 export type MapElement = z.infer<typeof MapElementSchema>;
 
@@ -79,6 +77,8 @@ export const TokenSchema = z.object({
   ref: RefSchema,
   x: z.number().int(),
   y: z.number().int(),
+  /** Nascosto ai giocatori: il master lo vede (attenuato), la vista giocatori no. */
+  hidden: z.boolean().optional(),
 });
 export type Token = z.infer<typeof TokenSchema>;
 
@@ -148,16 +148,14 @@ export type FreehandDrawing = z.infer<typeof FreehandDrawingSchema>;
 
 /**
  * Poligono tracciato a mano che blocca la vista (un edificio, un gruppo di alberi, una roccia…).
- * Coordinate in celle (frazionarie) a coppie [x1, y1, x2, y2, ...]: seguono la griglia. Da 3 a MAX_SIGHT_BLOCKER_VERTICES vertici.
+ * Coordinate in celle (frazionarie) a coppie [x1, y1, x2, y2, ...]: seguono la griglia. Almeno 3 vertici.
  */
-export const MAX_SIGHT_BLOCKER_VERTICES = 200;
-
 export const SightBlockerSchema = z.object({
   id: IdSchema,
   points: z
     .array(CellCoord)
     .min(6)
-    .max(MAX_SIGHT_BLOCKER_VERTICES * 2)
+    .max(400)
     .refine((p) => p.length % 2 === 0, "Coordinate a coppie"),
 });
 export type SightBlocker = z.infer<typeof SightBlockerSchema>;
@@ -192,6 +190,8 @@ export const SceneSchema = z.object({
   /** Assenti nelle scene salvate prima della visione del party. */
   sightBlockers: z.array(SightBlockerSchema).default([]),
   vision: VisionSchema.default(DEFAULT_VISION),
+  /** La vista giocatori mostra questa scena (al massimo una alla volta). */
+  shownToPlayers: z.boolean().default(false),
 });
 export type Scene = z.infer<typeof SceneSchema>;
 
@@ -217,6 +217,7 @@ export function newScene(name = "Nuova scena"): Scene {
     drawings: [],
     sightBlockers: [],
     vision: { ...DEFAULT_VISION },
+    shownToPlayers: false,
   };
 }
 

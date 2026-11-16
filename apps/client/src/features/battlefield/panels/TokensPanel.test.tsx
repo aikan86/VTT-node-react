@@ -1,7 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { emptyCombat, newCharacter, newScene, type Ref, type Scene } from "@vtt/shared";
+import { emptyCombat, newCharacter, newScene, type Ref, type Scene, type Token } from "@vtt/shared";
 import { useCombatStore } from "../../../store/combatStore";
 import { usePartyStore } from "../../../store/partyStore";
 import type { EntityView } from "../../../store/entities";
@@ -27,7 +27,7 @@ function sceneWithAria(locked = false): Scene {
   };
 }
 
-function renderPanel(scene: Scene, onRemoveFromMap = vi.fn()) {
+function renderPanel(scene: Scene, onRemoveFromMap = vi.fn(), options: { selected?: Token; onChangeToken?: (token: Token) => void } = {}) {
   render(
     <TokensPanel
       scene={scene}
@@ -35,7 +35,8 @@ function renderPanel(scene: Scene, onRemoveFromMap = vi.fn()) {
       pending={null}
       onPending={vi.fn()}
       onAddNpc={vi.fn()}
-      selected={undefined}
+      selected={options.selected}
+      onChangeToken={options.onChangeToken ?? vi.fn()}
       onRemoveToken={vi.fn()}
       onRemoveFromMap={onRemoveFromMap}
       onAddToInitiative={vi.fn()}
@@ -111,5 +112,39 @@ describe("TokensPanel", () => {
   it("disables the button when the tokens layer is locked", () => {
     renderPanel(sceneWithAria(true));
     expect(screen.getByRole("button", { name: "Rimuovi Aria dalla mappa" })).toBeDisabled();
+  });
+});
+
+describe("TokensPanel: visibility to players", () => {
+  const token = (hidden?: boolean): Token => ({ id: "t1", ref: { kind: "pc", id: "pc-a" }, x: 0, y: 0, ...(hidden === undefined ? {} : { hidden }) });
+  const sceneWith = (t: Token, locked = false): Scene => ({ ...sceneWithAria(locked), tokens: [t] });
+
+  it("lets the master hide the selected token from the players", async () => {
+    const onChangeToken = vi.fn();
+    const t = token();
+    renderPanel(sceneWith(t), vi.fn(), { selected: t, onChangeToken });
+    const checkbox = screen.getByRole("checkbox", { name: "Visibile ai giocatori" });
+    expect(checkbox).toBeChecked();
+    await userEvent.click(checkbox);
+    expect(onChangeToken).toHaveBeenCalledWith({ ...t, hidden: true });
+  });
+
+  it("shows a hidden token as such, and can make it visible again", async () => {
+    const onChangeToken = vi.fn();
+    const t = token(true);
+    renderPanel(sceneWith(t), vi.fn(), { selected: t, onChangeToken });
+    const list = screen.getByRole("list", { name: "Personaggi" });
+    expect(within(list).getByText("nascosto")).toBeInTheDocument();
+    const checkbox = screen.getByRole("checkbox", { name: "Visibile ai giocatori" });
+    expect(checkbox).not.toBeChecked();
+    await userEvent.click(checkbox);
+    expect(onChangeToken).toHaveBeenCalledWith({ ...t, hidden: false });
+  });
+
+  it("does not flag visible tokens, and disables the toggle when the layer is locked", () => {
+    const t = token();
+    renderPanel(sceneWith(t, true), vi.fn(), { selected: t });
+    expect(screen.queryByText("nascosto")).not.toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Visibile ai giocatori" })).toBeDisabled();
   });
 });

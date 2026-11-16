@@ -12,6 +12,8 @@ interface Props {
   currentRef: Ref | null;
   onSelect: (id: string) => void;
   onMove: (token: Token) => void;
+  /** Non mostra le barre dei PF (vista giocatori). */
+  hideHp?: boolean;
 }
 
 const initials = (name: string) =>
@@ -26,7 +28,7 @@ function hpFill(ratio: number) {
   return ratio > 0.5 ? "#22c55e" : ratio > 0.25 ? "#eab308" : "#ef4444";
 }
 
-export function TokensLayer({ scene, resolve, listening, editable, selectedId, currentRef, onSelect, onMove }: Props) {
+export function TokensLayer({ scene, resolve, listening, editable, selectedId, currentRef, onSelect, onMove, hideHp = false }: Props) {
   const g = scene.grid;
 
   return (
@@ -48,6 +50,7 @@ export function TokensLayer({ scene, resolve, listening, editable, selectedId, c
             key={token.id}
             x={pos.x}
             y={pos.y}
+            opacity={token.hidden ? 0.4 : 1}
             draggable={editable}
             onMouseDown={() => onSelect(token.id)}
             onTap={() => onSelect(token.id)}
@@ -87,8 +90,12 @@ export function TokensLayer({ scene, resolve, listening, editable, selectedId, c
             {down && (
               <Line points={[s * 0.25, s * 0.25, s * 0.75, s * 0.75, s * 0.5, s * 0.5, s * 0.75, s * 0.25, s * 0.25, s * 0.75]} stroke="#ef4444" strokeWidth={4} listening={false} />
             )}
-            <Rect x={4} y={s - 9} width={barW} height={5} fill="#111827" cornerRadius={2} listening={false} />
-            <Rect x={4} y={s - 9} width={barW * ratio} height={5} fill={hpFill(ratio)} cornerRadius={2} listening={false} />
+            {!hideHp && (
+              <>
+                <Rect x={4} y={s - 9} width={barW} height={5} fill="#111827" cornerRadius={2} listening={false} />
+                <Rect x={4} y={s - 9} width={barW * ratio} height={5} fill={hpFill(ratio)} cornerRadius={2} listening={false} />
+              </>
+            )}
             <Text
               text={entity.name}
               x={-g.cellPx * 0.2}

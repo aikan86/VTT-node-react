@@ -14,17 +14,20 @@ interface Props {
   onPending: (refs: PendingPlacement) => void;
   onAddNpc: () => void;
   selected: Token | undefined;
+  onChangeToken: (token: Token) => void;
   onRemoveToken: (id: string) => void;
   /** Toglie i token dell'entità dalla scena attiva (l'entità resta in party/iniziativa). */
   onRemoveFromMap: (ref: Ref) => void;
   onAddToInitiative: (ref: Ref) => void;
 }
 
-export function TokensPanel({ scene, resolve, pending, onPending, onAddNpc, selected, onRemoveToken, onRemoveFromMap, onAddToInitiative }: Props) {
+export function TokensPanel({ scene, resolve, pending, onPending, onAddNpc, selected, onChangeToken, onRemoveToken, onRemoveFromMap, onAddToInitiative }: Props) {
   const characters = usePartyStore((s) => s.characters);
   const combat = useCombatStore((s) => s.combat);
   const locked = scene.layers.tokens.locked;
   const onMap = (ref: Ref) => scene.tokens.some((t) => sameRef(t.ref, ref));
+  /** Sulla mappa ma nascosto ai giocatori (tutti i suoi token lo sono). */
+  const hiddenOnMap = (ref: Ref) => scene.tokens.filter((t) => sameRef(t.ref, ref)).every((t) => t.hidden);
 
   const pcRefs: Ref[] = characters.map((c) => ({ kind: "pc", id: c.id }));
   const npcRefs: Ref[] = combat.npcs.map((n) => ({ kind: "npc", id: n.id }));
@@ -58,6 +61,11 @@ export function TokensPanel({ scene, resolve, pending, onPending, onAddNpc, sele
                 <span className="swatch" style={{ background: e.color }} />
                 <span data-testid="entity-name">{e.name}</span>
                 {ref.kind === "npc" && <span className="badge">PNG</span>}
+                {placed && hiddenOnMap(ref) && (
+                  <span className="badge" title="Nascosto ai giocatori">
+                    nascosto
+                  </span>
+                )}
                 {current && <span className={styles.turn}>◀ turno</span>}
               </span>
               {placed ? (
@@ -111,6 +119,10 @@ export function TokensPanel({ scene, resolve, pending, onPending, onAddNpc, sele
             </span>
           </div>
           <HpEditor hp={entity.hp} label={entity.name} onChange={(hp) => setEntityHp(entity.ref, hp)} />
+          <label className="row" style={{ flexWrap: "nowrap" }}>
+            <input type="checkbox" checked={!selected.hidden} disabled={locked} onChange={(e) => onChangeToken({ ...selected, hidden: !e.target.checked })} />
+            Visibile ai giocatori
+          </label>
           {!inInitiative && <button onClick={() => onAddToInitiative(entity.ref)}>Aggiungi all'iniziativa</button>}
           <button className="danger" onClick={() => onRemoveToken(selected.id)}>
             Rimuovi dalla mappa

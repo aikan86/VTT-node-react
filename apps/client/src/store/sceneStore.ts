@@ -14,6 +14,8 @@ interface SceneState {
   load: () => Promise<void>;
   hydrate: (list: Versioned<Scene>[]) => void;
   select: (id: string) => void;
+  /** Mostra questa scena ai giocatori (null = nessuna: la vista giocatori resta in attesa). */
+  showToPlayers: (id: string | null) => void;
   create: (name: string) => Promise<void>;
   remove: (id: string) => Promise<void>;
   /** Trasformazione pura della scena (rieseguibile su versioni più recenti: id nuovi da `ctx.id()`). */
@@ -60,6 +62,13 @@ export const useSceneStore = create<SceneState>((set, get) => ({
   select: (id) => {
     localStorage.setItem(ACTIVE_KEY, id);
     set({ activeId: id });
+  },
+
+  showToPlayers: (id) => {
+    for (const scene of get().scenes) {
+      const shown = scene.id === id;
+      if (scene.shownToPlayers !== shown) get().update(scene.id, (s) => (s.shownToPlayers === shown ? s : { ...s, shownToPlayers: shown }));
+    }
   },
 
   create: async (name) => {
