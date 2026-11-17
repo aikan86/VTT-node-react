@@ -1,61 +1,64 @@
 import type { NpcTemplate } from "./initiative";
 import { MonsterStatsSchema, type Handout, type MonsterStats, type NpcGroup } from "./schemas/library";
 
-/** Nome inglese nell'SRD 5e online dei mostri preimpostati (per l'illustrazione). */
+/** Nome inglese dei mostri preimpostati nell'archivio online delle illustrazioni (stessi mostri, archivio della 5e). */
 const PRESET_SRD: Record<string, string> = {
   Coboldo: "kobold",
-  Bandito: "bandit",
-  Cultista: "cultist",
-  Guardia: "guard",
   Goblin: "goblin",
+  "Ratto crudele": "giant-rat",
   Scheletro: "skeleton",
-  Zombi: "zombie",
-  Lupo: "wolf",
-  Hobgoblin: "hobgoblin",
   Orco: "orc",
+  Hobgoblin: "hobgoblin",
+  Zombi: "zombie",
   Gnoll: "gnoll",
   Ghoul: "ghoul",
+  Lupo: "wolf",
+  Lucertoloide: "lizardfolk",
   Bugbear: "bugbear",
-  "Ragno gigante": "giant-spider",
+  "Ragno mostruoso grande": "giant-spider",
+  Worg: "worg",
   "Lupo crudele": "dire-wolf",
-  "Orso bruno": "brown-bear",
-  "Capo dei banditi": "bandit-captain",
   Ogre: "ogre",
-  Mimic: "mimic",
+  Wight: "wight",
   "Cubo gelatinoso": "gelatinous-cube",
+  "Orso bruno": "brown-bear",
   "Gufo-orso": "owlbear",
+  Mimic: "mimic",
+  Manticora: "manticore",
   Troll: "troll",
-  "Giovane drago rosso": "young-red-dragon",
 };
 
 /** Da dove vengono le illustrazioni cercate online (da citare dove si mostrano). */
 export const SRD_IMAGE_CREDIT = "dnd5eapi.co (SRD 5e)";
 
-/** Mostri preimpostati (statistiche base del SRD 5e, nomi in italiano). */
+/**
+ * Mostri preimpostati di D&D 3.5e, con PF medi, CA, iniziativa, taglia (1 = Piccola/Media, 2 = Grande) e GS
+ * presi dall'SRD 3.5 (d20srd.org). Per i PNG con classe (coboldo, goblin, orco, hobgoblin) è la versione "guerriero di 1° livello".
+ */
 export const PRESET_MONSTERS: readonly MonsterStats[] = ([
-  { name: "Coboldo", hp: 5, ac: 12, initiativeMod: 2, size: 1, color: "#b45309", cr: "1/8" },
-  { name: "Bandito", hp: 11, ac: 12, initiativeMod: 1, size: 1, color: "#78716c", cr: "1/8" },
-  { name: "Cultista", hp: 9, ac: 12, initiativeMod: 1, size: 1, color: "#7f1d1d", cr: "1/8" },
-  { name: "Guardia", hp: 11, ac: 16, initiativeMod: 1, size: 1, color: "#1d4ed8", cr: "1/8" },
-  { name: "Goblin", hp: 7, ac: 15, initiativeMod: 2, size: 1, color: "#dc2626", cr: "1/4" },
-  { name: "Scheletro", hp: 13, ac: 13, initiativeMod: 2, size: 1, color: "#d6d3d1", cr: "1/4" },
-  { name: "Zombi", hp: 22, ac: 8, initiativeMod: -2, size: 1, color: "#4d7c0f", cr: "1/4" },
-  { name: "Lupo", hp: 11, ac: 13, initiativeMod: 2, size: 1, color: "#6b7280", cr: "1/4" },
-  { name: "Hobgoblin", hp: 11, ac: 18, initiativeMod: 1, size: 1, color: "#ea580c", cr: "1/2" },
-  { name: "Orco", hp: 15, ac: 13, initiativeMod: 1, size: 1, color: "#15803d", cr: "1/2" },
-  { name: "Gnoll", hp: 22, ac: 15, initiativeMod: 1, size: 1, color: "#a16207", cr: "1/2" },
-  { name: "Ghoul", hp: 22, ac: 12, initiativeMod: 2, size: 1, color: "#57534e", cr: "1" },
-  { name: "Bugbear", hp: 27, ac: 16, initiativeMod: 2, size: 1, color: "#92400e", cr: "1" },
-  { name: "Ragno gigante", hp: 26, ac: 14, initiativeMod: 3, size: 2, color: "#1f2937", cr: "1" },
-  { name: "Lupo crudele", hp: 37, ac: 14, initiativeMod: 2, size: 2, color: "#374151", cr: "1" },
-  { name: "Orso bruno", hp: 34, ac: 11, initiativeMod: 0, size: 2, color: "#78350f", cr: "1" },
-  { name: "Capo dei banditi", hp: 65, ac: 15, initiativeMod: 2, size: 1, color: "#44403c", cr: "2" },
-  { name: "Ogre", hp: 59, ac: 11, initiativeMod: -1, size: 2, color: "#a855f7", cr: "2" },
-  { name: "Mimic", hp: 58, ac: 12, initiativeMod: 1, size: 1, color: "#854d0e", cr: "2" },
-  { name: "Cubo gelatinoso", hp: 84, ac: 6, initiativeMod: -4, size: 2, color: "#22d3ee", cr: "2" },
-  { name: "Gufo-orso", hp: 59, ac: 13, initiativeMod: 1, size: 2, color: "#a3a3a3", cr: "3" },
-  { name: "Troll", hp: 84, ac: 15, initiativeMod: 1, size: 2, color: "#166534", cr: "5" },
-  { name: "Giovane drago rosso", hp: 178, ac: 18, initiativeMod: 0, size: 2, color: "#b91c1c", cr: "10" },
+  { name: "Coboldo", hp: 4, ac: 15, initiativeMod: 1, size: 1, color: "#b45309", cr: "1/4" },
+  { name: "Goblin", hp: 5, ac: 15, initiativeMod: 1, size: 1, color: "#dc2626", cr: "1/3" },
+  { name: "Ratto crudele", hp: 5, ac: 15, initiativeMod: 3, size: 1, color: "#78716c", cr: "1/3" },
+  { name: "Scheletro", hp: 6, ac: 15, initiativeMod: 5, size: 1, color: "#d6d3d1", cr: "1/3" },
+  { name: "Orco", hp: 5, ac: 13, initiativeMod: 0, size: 1, color: "#15803d", cr: "1/2" },
+  { name: "Hobgoblin", hp: 6, ac: 15, initiativeMod: 1, size: 1, color: "#ea580c", cr: "1/2" },
+  { name: "Zombi", hp: 16, ac: 11, initiativeMod: -1, size: 1, color: "#4d7c0f", cr: "1/2" },
+  { name: "Gnoll", hp: 11, ac: 15, initiativeMod: 0, size: 1, color: "#a16207", cr: "1" },
+  { name: "Ghoul", hp: 13, ac: 14, initiativeMod: 2, size: 1, color: "#57534e", cr: "1" },
+  { name: "Lupo", hp: 13, ac: 14, initiativeMod: 2, size: 1, color: "#6b7280", cr: "1" },
+  { name: "Lucertoloide", hp: 11, ac: 15, initiativeMod: 0, size: 1, color: "#3f6212", cr: "1" },
+  { name: "Bugbear", hp: 16, ac: 17, initiativeMod: 1, size: 1, color: "#92400e", cr: "2" },
+  { name: "Ragno mostruoso grande", hp: 22, ac: 14, initiativeMod: 3, size: 2, color: "#1f2937", cr: "2" },
+  { name: "Worg", hp: 30, ac: 14, initiativeMod: 2, size: 1, color: "#44403c", cr: "2" },
+  { name: "Lupo crudele", hp: 45, ac: 14, initiativeMod: 2, size: 2, color: "#374151", cr: "3" },
+  { name: "Ogre", hp: 29, ac: 16, initiativeMod: -1, size: 2, color: "#a855f7", cr: "3" },
+  { name: "Wight", hp: 26, ac: 15, initiativeMod: 1, size: 1, color: "#1e3a8a", cr: "3" },
+  { name: "Cubo gelatinoso", hp: 54, ac: 4, initiativeMod: -5, size: 2, color: "#22d3ee", cr: "3" },
+  { name: "Orso bruno", hp: 51, ac: 15, initiativeMod: 1, size: 2, color: "#78350f", cr: "4" },
+  { name: "Gufo-orso", hp: 52, ac: 15, initiativeMod: 1, size: 2, color: "#a3a3a3", cr: "4" },
+  { name: "Mimic", hp: 52, ac: 15, initiativeMod: 1, size: 2, color: "#854d0e", cr: "4" },
+  { name: "Manticora", hp: 57, ac: 17, initiativeMod: 2, size: 2, color: "#b91c1c", cr: "5" },
+  { name: "Troll", hp: 63, ac: 16, initiativeMod: 2, size: 2, color: "#166534", cr: "5" },
 ] as MonsterStats[]).map((m) => ({ ...m, srd: PRESET_SRD[m.name] }));
 
 /** Modello da cui il tracker crea i PNG. */

@@ -21,6 +21,16 @@ interface Props {
 }
 
 /** Aree degli effetti e, sopra, i disegni (testo, linee, mano libera). */
+/** Cono della 3.5e: settore di 90° con vertice nell'origine, simmetrico attorno all'asse x (poi ruotato con l'effetto). */
+export function conePoints(radius: number, steps = 24): number[] {
+  const points = [0, 0];
+  for (let i = 0; i <= steps; i++) {
+    const a = -Math.PI / 4 + (i / steps) * (Math.PI / 2);
+    points.push(radius * Math.cos(a), radius * Math.sin(a));
+  }
+  return points;
+}
+
 export function EffectsLayer({ scene, listening, editable, selectedId, erasing, onSelect, onChange, ...drawing }: Props) {
   const g = scene.grid;
   const selected = scene.effects.find((e) => e.id === selectedId);
@@ -62,8 +72,8 @@ export function EffectsLayer({ scene, listening, editable, selectedId, erasing, 
           case "square":
             return <Rect key={effect.id} {...common} width={size} height={size} offsetX={size / 2} offsetY={size / 2} />;
           case "cone":
-            // D&D 5e: la larghezza del cono in ogni punto è pari alla distanza dall'origine
-            return <Line key={effect.id} {...common} points={[0, 0, size, -size / 2, size, size / 2]} closed />;
+            // D&D 3.5e: il cono è un quarto di cerchio (90°) centrato sulla direzione scelta
+            return <Line key={effect.id} {...common} points={conePoints(size)} closed />;
           case "line": {
             const width = feetToPx(effect.widthFt ?? 5, g);
             return <Rect key={effect.id} {...common} width={size} height={width} offsetY={width / 2} />;

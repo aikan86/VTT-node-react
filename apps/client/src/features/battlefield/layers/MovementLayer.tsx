@@ -15,7 +15,7 @@ interface Props {
 const MOVE_FILL = "rgba(56, 189, 248, 0.32)";
 const DASH_FILL = "rgba(56, 189, 248, 0.12)";
 
-/** Raggio di movimento del token selezionato: caselle raggiungibili con la sua velocità e, più chiare, con uno scatto. */
+/** Raggio di movimento del token selezionato: caselle raggiungibili con la sua velocità e, più chiare, con un movimento doppio. */
 export function MovementLayer({ grid: g, area }: Props) {
   return (
     <Layer listening={false}>

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { cellKey } from "../src/fog";
-import { coveredCells, DEFAULT_SPEED_FT, movementRange, type Reachable } from "../src/movement";
+import { gridDistance } from "../src/measure";
+import { coveredCells, DEFAULT_SPEED_FT, movementRange, stepCost, type Reachable } from "../src/movement";
 import { newScene, TokenSchema, type MapElement, type Scene } from "../src/schemas/scene";
 
 function scene(elements: MapElement[] = []): Scene {
@@ -24,14 +25,35 @@ const at = (range: Reachable[], x: number, y: number) => range.find((r) => r.x =
 const origin = { x: 0, y: 0 };
 
 describe("movementRange", () => {
-  it("in the open reaches every cell within speed in 8 directions, diagonals counting one square", () => {
+  it("in the open reaches every cell within speed, diagonals costing 5 and 10 ft in turn (3.5e)", () => {
     const range = movementRange(scene(), origin, 1, 30);
-    expect(range).toHaveLength(13 * 13);
+    // esattamente le caselle a distanza di griglia 3.5e ≤ 6
+    const expected: string[] = [];
+    for (let x = -6; x <= 6; x++) for (let y = -6; y <= 6; y++) if (gridDistance(x, y) <= 6) expected.push(cellKey(x, y));
+    expect(range.map((r) => cellKey(r.x, r.y)).sort()).toEqual(expected.sort());
     expect(at(range, 0, 0)?.costFt).toBe(0);
-    expect(at(range, 6, 6)?.costFt).toBe(30);
-    expect(at(range, -6, 3)?.costFt).toBe(30);
+    expect(at(range, 1, 1)?.costFt).toBe(5);
+    expect(at(range, 2, 2)?.costFt).toBe(15);
+    expect(at(range, 3, 3)?.costFt).toBe(20);
+    expect(at(range, 4, 4)?.costFt).toBe(30);
+    expect(at(range, 5, 5)).toBeUndefined(); // 35 ft
+    expect(at(range, -6, 1)?.costFt).toBe(30);
     expect(at(range, 2, 1)?.costFt).toBe(10);
     expect(at(range, 7, 0)).toBeUndefined();
+  });
+
+  it("a diagonal into difficult terrain costs 15 ft", () => {
+    const mud = el("difficult", 1, 1, 1, 1);
+    expect(at(movementRange(scene([mud]), origin, 1, 15), 1, 1)?.costFt).toBe(15);
+    expect(at(movementRange(scene([mud]), origin, 1, 10), 1, 1)).toBeUndefined();
+  });
+
+  it("counts each step's cost exactly as the 3.5e rules", () => {
+    expect(stepCost(false, 0, false)).toBe(1);
+    expect(stepCost(false, 1, true)).toBe(2);
+    expect(stepCost(true, 0, false)).toBe(1);
+    expect(stepCost(true, 1, false)).toBe(2);
+    expect(stepCost(true, 0, true)).toBe(3);
   });
 
   it("only keeps the start with no speed", () => {

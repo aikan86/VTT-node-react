@@ -312,7 +312,7 @@ describe("TokensPanel: speed and movement range", () => {
     renderPanel({ ...sceneWithAria(), tokens: [goblin] }, vi.fn(), { selected: goblin });
     expect(screen.getByRole("textbox", { name: "Velocità (ft)" })).toHaveValue("40");
     expect(screen.getByTestId("speed-summary")).toHaveTextContent("12 m · 40 ft · 8 caselle");
-    expect(screen.getByText(/raggiungibili con 12 m · 40 ft · 8 caselle; più chiaro: con uno scatto \(24 m · 80 ft · 16 caselle\)/)).toBeInTheDocument();
+    expect(screen.getByText(/raggiungibili con 12 m · 40 ft · 8 caselle; più chiaro: con un movimento doppio \(24 m · 80 ft · 16 caselle\)/)).toBeInTheDocument();
   });
 
   it("toggles the movement range", async () => {
@@ -342,11 +342,11 @@ describe("TokensPanel: conditions", () => {
   });
 
   it("shows condition icons next to the name in the list", () => {
-    conditionsOf = { "pc-a": ["stunned", "poisoned"] };
+    conditionsOf = { "pc-a": ["stunned", "sickened"] };
     renderPanel(sceneWithAria());
     const list = screen.getByRole("list", { name: "Personaggi" });
     expect(within(list).getByRole("img", { name: "Stordito" })).toHaveTextContent("💫");
-    expect(within(list).getByRole("img", { name: "Avvelenato" })).toBeInTheDocument();
+    expect(within(list).getByRole("img", { name: "Infermo" })).toBeInTheDocument();
     expect(within(list).getAllByTestId("condition-icons")).toHaveLength(1);
   });
 });

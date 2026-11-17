@@ -37,11 +37,11 @@ describe("AddNpcDialog: bestiary", () => {
     expect(screen.getByLabelText("Nome")).toHaveValue("Goblin");
     await userEvent.selectOptions(monsterSelect(), screen.getByRole("option", { name: "Orco (GS 1/2)" }));
     expect(screen.getByLabelText("Nome")).toHaveValue("Orco");
-    expect(screen.getByRole("textbox", { name: "PF" })).toHaveValue("15");
+    expect(screen.getByRole("textbox", { name: "PF" })).toHaveValue("5");
     expect(screen.getByRole("textbox", { name: "CA" })).toHaveValue("13");
     await userEvent.click(screen.getByRole("button", { name: "Aggiungi PNG" }));
     expect(onSubmit).toHaveBeenCalledWith({
-      entries: [{ template: expect.objectContaining({ name: "Orco", hp: { current: 15, max: 15, temp: 0 }, ac: 13, initiativeMod: 1 }), quantity: 1 }],
+      entries: [{ template: expect.objectContaining({ name: "Orco", hp: { current: 5, max: 5, temp: 0 }, ac: 13, initiativeMod: 0 }), quantity: 1 }],
       placeOnMap: false,
     });
   });
@@ -153,7 +153,7 @@ describe("AddNpcDialog: NPC groups", () => {
     expect(onSubmit).toHaveBeenCalledWith({
       entries: [
         { template: expect.objectContaining({ name: "Goblin", ac: 15 }), quantity: 4 },
-        { template: expect.objectContaining({ name: "Hobgoblin", ac: 18 }), quantity: 1 },
+        { template: expect.objectContaining({ name: "Hobgoblin", ac: 15 }), quantity: 1 },
       ],
       placeOnMap: false,
     });

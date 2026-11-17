@@ -46,12 +46,12 @@ describe("InitiativePage", () => {
     await user.click(within(dialog).getByRole("button", { name: "Aggiungi PNG" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 
-    // Tiri manuali: Aria 10+3=13, Borin 18+0=18, Orco (mod +2) 5+2=7
+    // Tiri manuali: Aria 10+3=13, Borin 18+0=18, Orco (mod +1 del goblin di partenza) 5+1=6
     await user.type(screen.getByLabelText("d20 di Aria"), "10");
     await user.type(screen.getByLabelText("d20 di Borin"), "18");
     await user.type(screen.getByLabelText("d20 di Orco"), "5");
     expect(rowNames()).toEqual(["Borin", "Aria", "Orco"]);
-    expect(screen.getAllByTestId("total").map((t) => t.textContent)).toEqual(["18", "13", "7"]);
+    expect(screen.getAllByTestId("total").map((t) => t.textContent)).toEqual(["18", "13", "6"]);
     expect(screen.getByRole("button", { name: "🎲 Tira tutti" })).toBeDisabled();
 
     await user.click(screen.getByRole("button", { name: "⚔ Inizia combattimento" }));

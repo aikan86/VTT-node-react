@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { CharacterSchema, newCharacter } from "../src/schemas/character";
 import { NpcSchema } from "../src/schemas/combat";
 import { CONDITION_INFO, CONDITIONS, toggleCondition } from "../src/conditions";
-import { cellCenter, formatCells, formatDistance, formatMove, formatNumber, measure } from "../src/measure";
+import { cellCenter, formatCells, formatDistance, formatMove, formatNumber, gridDistance, measure } from "../src/measure";
 
 const grid = { cellPx: 50, offsetX: 0, offsetY: 0, feetPerCell: 5 };
 
@@ -12,12 +12,23 @@ describe("measure", () => {
     expect(m.feet).toBe(30);
     expect(m.meters).toBeCloseTo(9);
     expect(m.cells).toBe(6);
+    expect(m.straightFeet).toBe(30);
   });
 
-  it("measures diagonals in a straight line, but counts grid moves as in 5e", () => {
-    const m = measure({ x: 0, y: 0 }, { x: 150, y: 150 }, grid);
-    expect(m.feet).toBeCloseTo(15 * Math.SQRT2);
-    expect(m.cells).toBe(3);
+  it("counts diagonals as in 3.5e (5-10-5 ft), with the straight line for reference", () => {
+    const m = measure({ x: 0, y: 0 }, { x: 150, y: 150 }, grid); // 3 diagonali
+    expect(m.cells).toBe(4);
+    expect(m.feet).toBe(20);
+    expect(m.meters).toBeCloseTo(6);
+    expect(m.straightFeet).toBeCloseTo(15 * Math.SQRT2);
+  });
+
+  it("grid distance: every second diagonal counts double", () => {
+    expect(gridDistance(1, 1)).toBe(1);
+    expect(gridDistance(2, 2)).toBe(3);
+    expect(gridDistance(4, 4)).toBe(6);
+    expect(gridDistance(-5, 2)).toBe(6);
+    expect(gridDistance(0, 7)).toBe(7);
   });
 
   it("follows the feet per cell of the grid", () => {
@@ -57,10 +68,21 @@ describe("conditions", () => {
     }
   });
 
-  it("are optional on characters and NPCs, and validated", () => {
+  it("are the 3.5e ones, with their Italian names", () => {
+    expect(CONDITIONS).toHaveLength(29);
+    expect(CONDITION_INFO.flatFooted.label).toBe("Impreparato");
+    expect(CONDITION_INFO.sickened.label).toBe("Infermo");
+    expect(new Set(CONDITIONS.map((c) => CONDITION_INFO[c].icon)).size).toBe(CONDITIONS.length);
+  });
+
+  it("convert the 5e ones saved before, and drop unknown ones, so old documents stay valid", () => {
+    const parsed = CharacterSchema.parse({ ...newCharacter(), conditions: ["poisoned", "prone", "restrained", "grappled", "charmed", "incapacitated", "sleepy", "prone"] });
+    expect(parsed.conditions).toEqual(["entangled", "fascinated", "grappling", "helpless", "prone", "sickened"]);
+  });
+
+  it("are optional on characters and NPCs", () => {
     expect(CharacterSchema.parse(newCharacter()).conditions).toBeUndefined();
     expect(CharacterSchema.safeParse(newCharacter({ conditions: ["stunned"] })).success).toBe(true);
-    expect(CharacterSchema.safeParse({ ...newCharacter(), conditions: ["sleepy"] }).success).toBe(false);
     const npc = { id: "n", name: "Goblin", color: "#ff0000", hp: { current: 7, max: 7, temp: 0 }, ac: 15, initiativeMod: 2 };
     expect(NpcSchema.parse({ ...npc, conditions: ["prone"] }).conditions).toEqual(["prone"]);
   });

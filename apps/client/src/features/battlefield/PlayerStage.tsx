@@ -54,7 +54,7 @@ interface Props {
 interface PendingMove {
   token: Token;
   to: Point;
-  /** Piedi spesi per arrivarci; null se non è raggiungibile nemmeno con uno scatto. */
+  /** Piedi spesi per arrivarci; null se non è raggiungibile nemmeno con un movimento doppio. */
   costFt: number | null;
   speedFt: number;
 }
@@ -92,7 +92,7 @@ export function PlayerStage({ scene, resolve, currentRef, onMoveToken, mover = "
   const [ruler, setRuler] = useState<{ start: Point; end: Point; dragging: boolean } | null>(null);
   /** Raggio di movimento del PG che si sta trascinando. */
   const [moveArea, setMoveArea] = useState<MovementArea | null>(null);
-  /** Posizioni raggiungibili (con scatto) del PG trascinato, per dire quanto costa la destinazione. */
+  /** Posizioni raggiungibili (con movimento doppio) del PG trascinato, per dire quanto costa la destinazione. */
   const reach = useRef<Map<string, number>>(new Map());
   const [pending, setPending] = useState<PendingMove | null>(null);
 
@@ -184,7 +184,7 @@ export function PlayerStage({ scene, resolve, currentRef, onMoveToken, mover = "
     setPending(null);
     const sizeOf = resolve(token.ref)?.size ?? 1;
     const speedFt = token.speedFt ?? DEFAULT_SPEED_FT;
-    // stesso calcolo del master: velocità e, più chiaro, scatto
+    // stesso calcolo del master: velocità e, più chiaro, movimento doppio
     const range = movementRange(shown, token, sizeOf, speedFt * 2);
     reach.current = new Map(range.map((r) => [`${r.x},${r.y}`, r.costFt]));
     setMoveArea(speedFt > 0 ? { cells: coveredCells(range, sizeOf), speedFt } : null);
@@ -318,10 +318,10 @@ export function PlayerStage({ scene, resolve, currentRef, onMoveToken, mover = "
             Spostare <strong>{pendingEntity.name}</strong> qui?{" "}
             <span className="muted">
               {pending.costFt === null
-                ? `Oltre la portata, anche con uno scatto (velocità ${formatMove(pending.speedFt, shown.grid.feetPerCell)}).`
+                ? `Oltre la portata, anche con un movimento doppio (velocità ${formatMove(pending.speedFt, shown.grid.feetPerCell)}).`
                 : pending.costFt <= pending.speedFt
                   ? `${formatMove(pending.costFt, shown.grid.feetPerCell)}, su ${formatMove(pending.speedFt, shown.grid.feetPerCell)}.`
-                  : `${formatMove(pending.costFt, shown.grid.feetPerCell)}: serve uno scatto.`}
+                  : `${formatMove(pending.costFt, shown.grid.feetPerCell)}: serve un movimento doppio.`}
             </span>
           </span>
           <button className="primary" onClick={confirmMove}>

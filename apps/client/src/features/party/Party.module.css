@@ -4,7 +4,7 @@
 .name { flex: 1; font-size: 1.1rem; font-weight: 600; }
 .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.6rem; }
 .stats input, .stats select { width: 100% !important; }
-.saves { display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.4rem; border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem 0.6rem 0.6rem; margin: 0; }
+.saves { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.4rem; border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem 0.6rem 0.6rem; margin: 0; }
 .saves legend { font-size: 0.8rem; color: var(--muted); padding: 0 0.3rem; }
 .saves input { text-align: center; padding: 0.3rem 0.2rem; }
 textarea { resize: vertical; }

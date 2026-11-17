@@ -213,7 +213,7 @@ function Battlefield({ scene }: { scene: Scene }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [closeTrace, deleteSelection, elementTool, measuring, selection, scene.layers, scene.elements, toggleDoorById, toggleHiddenSelected, trace.length]);
 
-  // Raggio di movimento del token selezionato: con la sua velocità e, più chiaro, con uno scatto (il doppio)
+  // Raggio di movimento del token selezionato: con la sua velocità e, più chiaro, con un movimento doppio
   const selectedToken = selection?.layer === "tokens" ? scene.tokens.find((t) => t.id === selection.id) : undefined;
   const movingSize = selectedToken ? (resolve(selectedToken.ref)?.size ?? 1) : 1;
   const speedFt = selectedToken?.speedFt ?? DEFAULT_SPEED_FT;

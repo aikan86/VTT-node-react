@@ -3,6 +3,16 @@ import { currentHandout, groupSummary, monsterTemplate, normalizeMonster, parseM
 import { StateExportSchema } from "../src/schemas/export";
 import { HandoutSchema, MonsterStatsSchema, newHandout, NpcGroupSchema, type Handout } from "../src/schemas/library";
 
+describe("preset monsters (3.5e)", () => {
+  it("carry the 3.5e SRD statistics", () => {
+    const by = (name: string) => PRESET_MONSTERS.find((m) => m.name === name)!;
+    expect(by("Coboldo")).toMatchObject({ hp: 4, ac: 15, initiativeMod: 1, cr: "1/4" });
+    expect(by("Ogre")).toMatchObject({ hp: 29, ac: 16, initiativeMod: -1, size: 2, cr: "3" });
+    expect(by("Cubo gelatinoso")).toMatchObject({ hp: 54, ac: 4, initiativeMod: -5, size: 2, cr: "3" });
+    expect(by("Troll")).toMatchObject({ hp: 63, ac: 16, initiativeMod: 2, cr: "5" });
+  });
+});
+
 describe("preset monsters", () => {
   it("are all valid, with unique names", () => {
     for (const m of PRESET_MONSTERS) expect(MonsterStatsSchema.safeParse(m).success, m.name).toBe(true);
@@ -13,8 +23,8 @@ describe("preset monsters", () => {
   it("become NPC templates with full hit points, and back", () => {
     const goblin = PRESET_MONSTERS.find((m) => m.name === "Goblin")!;
     const t = monsterTemplate(goblin);
-    expect(t).toEqual({ name: "Goblin", color: goblin.color, hp: { current: 7, max: 7, temp: 0 }, ac: 15, initiativeMod: 2, size: 1 });
-    expect(statsFromTemplate(t)).toEqual({ name: "Goblin", hp: 7, ac: 15, initiativeMod: 2, size: 1, color: goblin.color });
+    expect(t).toEqual({ name: "Goblin", color: goblin.color, hp: { current: 5, max: 5, temp: 0 }, ac: 15, initiativeMod: 1, size: 1 });
+    expect(statsFromTemplate(t)).toEqual({ name: "Goblin", hp: 5, ac: 15, initiativeMod: 1, size: 1, color: goblin.color });
   });
 });
 
@@ -26,7 +36,7 @@ describe("illustrations from the online SRD", () => {
 
   it("finds the SRD name of numbered NPCs, presets and English names", () => {
     expect(srdIndexFor({ name: "Goblin 3" })).toBe("goblin");
-    expect(srdIndexFor({ name: "Ragno gigante 2" })).toBe("giant-spider");
+    expect(srdIndexFor({ name: "Ragno mostruoso grande 2" })).toBe("giant-spider");
     expect(srdIndexFor({ name: "Giant Spider" })).toBe("giant-spider");
     expect(srdIndexFor({ name: "Sgherro", srd: "thug" })).toBe("thug");
     expect(srdSlug("Élfo  oscuro!")).toBe("elfo-oscuro");

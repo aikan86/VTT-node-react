@@ -50,8 +50,8 @@ const overlaps = (a: Box, b: Box) => a.minX <= b.maxX && b.minX <= a.maxX && a.m
 
 /**
  * Posizioni che il token (angolo in alto a sinistra `from`, `size` celle per lato) raggiunge spendendo al più `budgetFt`.
- * Si muove in 8 direzioni, una casella per passo (anche in diagonale, come in D&D 5e); entrare in una posizione
- * che tocca terreno difficile costa il doppio. Muri, ostacoli e porte chiuse non si attraversano né si occupano,
+ * Si muove in 8 direzioni con le regole di D&D 3.5e: le diagonali costano alternativamente 1 e 2 caselle (5-10-5 ft),
+ * entrare in terreno difficile costa il doppio (3 caselle in diagonale). Muri, ostacoli e porte chiuse non si attraversano né si occupano,
  * e in diagonale non si tagliano gli angoli: servono liberi entrambi i passi ortogonali.
  * Il risultato comprende la partenza (0 ft) ed è ordinato per costo.
  */
@@ -124,33 +124,54 @@ export function movementRange(scene: Pick<Scene, "elements" | "grid">, from: Poi
     );
   };
 
-  // Dijkstra con code per costo (1 o 2 passi per mossa)
-  const best = new Map<string, number>([[cellKey(from.x, from.y), 0]]);
-  const buckets: Point[][] = Array.from({ length: maxSteps + 1 }, () => []);
-  buckets[0]!.push(from);
+  // Dijkstra con code per costo. Lo stato è la posizione più la "parità" delle diagonali già fatte:
+  // con parità 0 la prossima diagonale costa 1 casella, con parità 1 ne costa 2 (5-10-5 ft della 3.5e).
+  type State = { x: number; y: number; odd: 0 | 1 };
+  const stateKey = (s: State) => `${s.x},${s.y},${s.odd}`;
+  const best = new Map<string, number>([[stateKey({ ...from, odd: 0 }), 0]]);
+  const buckets: State[][] = Array.from({ length: maxSteps + 1 }, () => []);
+  buckets[0]!.push({ x: from.x, y: from.y, odd: 0 });
+  const settled = new Set<string>();
   const result: Reachable[] = [];
   for (let cost = 0; cost <= maxSteps; cost++) {
     for (const p of buckets[cost]!) {
-      if (best.get(cellKey(p.x, p.y)) !== cost) continue; // già raggiunta più a buon mercato
-      result.push({ x: p.x, y: p.y, costFt: cost * g.feetPerCell });
+      if (best.get(stateKey(p)) !== cost) continue; // già raggiunto più a buon mercato
+      const pos = cellKey(p.x, p.y);
+      if (!settled.has(pos)) {
+        settled.add(pos);
+        result.push({ x: p.x, y: p.y, costFt: cost * g.feetPerCell });
+      }
       for (let dx = -1; dx <= 1; dx++) {
         for (let dy = -1; dy <= 1; dy++) {
           if (dx === 0 && dy === 0) continue;
           const nx = p.x + dx;
           const ny = p.y + dy;
-          const next = cost + (rough(nx, ny) ? 2 : 1);
+          const diagonal = dx !== 0 && dy !== 0;
+          const step = stepCost(diagonal, p.odd, rough(nx, ny));
+          const next = cost + step;
           if (next > maxSteps) continue;
-          const key = cellKey(nx, ny);
+          const to: State = { x: nx, y: ny, odd: diagonal ? ((1 - p.odd) as 0 | 1) : p.odd };
+          const key = stateKey(to);
           const known = best.get(key);
           if (known !== undefined && known <= next) continue;
           if (!canStep(p.x, p.y, dx, dy)) continue;
           best.set(key, next);
-          buckets[next]!.push({ x: nx, y: ny });
+          buckets[next]!.push(to);
         }
       }
     }
   }
   return result;
+}
+
+/**
+ * Caselle di movimento spese per un passo (D&D 3.5e): in orizzontale/verticale 1 (2 nel terreno difficile);
+ * in diagonale 1 e 2 alternati (5-10-5 ft), e 3 se si entra in terreno difficile.
+ */
+export function stepCost(diagonal: boolean, odd: 0 | 1, rough: boolean): number {
+  if (!diagonal) return rough ? 2 : 1;
+  if (rough) return 3;
+  return odd ? 2 : 1;
 }
 
 /** Caselle coperte dal token nelle posizioni raggiungibili, con il costo minimo per coprirle (chiave `cellKey`). */

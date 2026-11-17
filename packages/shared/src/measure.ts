@@ -5,19 +5,31 @@ import type { Grid } from "./schemas/scene";
 export const METERS_PER_FOOT = 0.3;
 
 export interface Measurement {
-  /** Distanza in linea retta. */
+  /** Caselle di movimento sulla griglia, con le diagonali della 3.5e (1 e 2 alternate: 5-10-5 ft). */
+  cells: number;
+  /** Distanza di gioco: le caselle per i piedi di una casella. */
   feet: number;
   meters: number;
-  /** Passi sulla griglia muovendosi in 8 direzioni (ogni diagonale conta una casella). */
-  cells: number;
+  /** Distanza in linea retta, per riferimento. */
+  straightFeet: number;
+  straightMeters: number;
 }
+
+/** Caselle di movimento per uno spostamento di (dx, dy) caselle in D&D 3.5e: ogni seconda diagonale conta doppio. */
+export const gridDistance = (dx: number, dy: number) => {
+  const a = Math.abs(dx);
+  const b = Math.abs(dy);
+  return Math.max(a, b) + Math.floor(Math.min(a, b) / 2);
+};
 
 /** Distanza tra due punti in pixel del mondo, secondo la scala della griglia (`feetPerCell` per casella di `cellPx`). */
 export function measure(a: Point, b: Point, g: Pick<Grid, "cellPx" | "feetPerCell">): Measurement {
   const dx = Math.abs(b.x - a.x) / g.cellPx;
   const dy = Math.abs(b.y - a.y) / g.cellPx;
-  const feet = Math.hypot(dx, dy) * g.feetPerCell;
-  return { feet, meters: feet * METERS_PER_FOOT, cells: Math.round(Math.max(dx, dy)) };
+  const cells = gridDistance(Math.round(dx), Math.round(dy));
+  const feet = cells * g.feetPerCell;
+  const straightFeet = Math.hypot(dx, dy) * g.feetPerCell;
+  return { cells, feet, meters: feet * METERS_PER_FOOT, straightFeet, straightMeters: straightFeet * METERS_PER_FOOT };
 }
 
 /** Numero con al più un decimale e la virgola italiana: 7.5 → "7,5", 30 → "30". */
