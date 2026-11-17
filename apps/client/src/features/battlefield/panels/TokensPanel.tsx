@@ -1,4 +1,4 @@
-import { DEFAULT_SPEED_FT, groupSummary, modLookupFrom, sameRef, sortCombatants, type NpcGroup, type Ref, type Scene, type Token } from "@vtt/shared";
+import { DEFAULT_SPEED_FT, formatMove, groupSummary, modLookupFrom, sameRef, sortCombatants, type NpcGroup, type Ref, type Scene, type Token } from "@vtt/shared";
 import { useLibraryStore } from "../../../store/libraryStore";
 import { ConditionIcons, ConditionPicker } from "../../../components/Conditions";
 import { EyeIcon } from "../../../components/EyeIcon";
@@ -64,6 +64,7 @@ export function TokensPanel({ scene, resolve, pending, onPending, onAddNpc, sele
   const anyNpcHidden = placedNpcs.some((r) => hiddenOnMap(r));
   const entity = selected && resolve(selected.ref);
   const inInitiative = selected && combat.combatants.some((c) => sameRef(c.ref, selected.ref));
+  const speedFt = selected?.speedFt ?? DEFAULT_SPEED_FT;
 
   const list = (refs: Ref[], empty: string) =>
     refs.length === 0 ? (
@@ -230,13 +231,16 @@ export function TokensPanel({ scene, resolve, pending, onPending, onAddNpc, sele
               onChange={(v) => onChangeToken({ ...selected, speedFt: v === null || v === DEFAULT_SPEED_FT ? undefined : v })}
             />
           </label>
+          <span className="muted" style={{ fontSize: "0.8rem", marginTop: "-0.4rem" }} data-testid="speed-summary">
+            {formatMove(speedFt, scene.grid.feetPerCell)}
+          </span>
           <label className="row" style={{ flexWrap: "nowrap" }}>
             <input type="checkbox" checked={showMovement} onChange={(e) => onShowMovement(e.target.checked)} />
             Mostra raggio di movimento
           </label>
           {showMovement && (
             <p className="muted" style={{ fontSize: "0.8rem", margin: 0 }}>
-              Azzurro: caselle raggiungibili con {selected.speedFt ?? DEFAULT_SPEED_FT} ft; più chiaro: con uno scatto. Il terreno difficile costa il doppio, muri, ostacoli e porte chiuse
+              Azzurro: caselle raggiungibili con {formatMove(speedFt, scene.grid.feetPerCell)}; più chiaro: con uno scatto ({formatMove(speedFt * 2, scene.grid.feetPerCell)}). Il terreno difficile costa il doppio, muri, ostacoli e porte chiuse
               non si attraversano.
             </p>
           )}

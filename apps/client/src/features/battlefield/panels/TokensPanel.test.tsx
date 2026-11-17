@@ -311,7 +311,8 @@ describe("TokensPanel: speed and movement range", () => {
     const goblin: Token = { id: "t2", ref: { kind: "npc", id: "n1" }, x: 1, y: 0, speedFt: 40 };
     renderPanel({ ...sceneWithAria(), tokens: [goblin] }, vi.fn(), { selected: goblin });
     expect(screen.getByRole("textbox", { name: "Velocità (ft)" })).toHaveValue("40");
-    expect(screen.getByText(/raggiungibili con 40 ft/)).toBeInTheDocument();
+    expect(screen.getByTestId("speed-summary")).toHaveTextContent("12 m · 40 ft · 8 caselle");
+    expect(screen.getByText(/raggiungibili con 12 m · 40 ft · 8 caselle; più chiaro: con uno scatto \(24 m · 80 ft · 16 caselle\)/)).toBeInTheDocument();
   });
 
   it("toggles the movement range", async () => {

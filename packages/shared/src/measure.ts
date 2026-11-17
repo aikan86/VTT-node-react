@@ -26,6 +26,13 @@ export const formatNumber = (value: number) => String(Math.round(value * 10) / 1
 /** "7,5 m · 25 ft" */
 export const formatDistance = (m: Pick<Measurement, "feet" | "meters">) => `${formatNumber(m.meters)} m · ${formatNumber(m.feet)} ft`;
 
+/** "4 caselle" / "1 casella" (anche frazionarie: "2,5 caselle"). */
+export const formatCells = (cells: number) => `${formatNumber(cells)} ${cells === 1 ? "casella" : "caselle"}`;
+
+/** Un movimento in piedi, come lo mostra il righello: "6 m · 20 ft · 4 caselle". */
+export const formatMove = (feet: number, feetPerCell: number) =>
+  `${formatDistance({ feet, meters: feet * METERS_PER_FOOT })} · ${formatCells(feet / feetPerCell)}`;
+
 /** Centro della cella che contiene il punto (pixel del mondo). */
 export function cellCenter(p: Point, g: Pick<Grid, "cellPx" | "offsetX" | "offsetY">): Point {
   const corner = cellToPx(pxToCell(p, g), g);

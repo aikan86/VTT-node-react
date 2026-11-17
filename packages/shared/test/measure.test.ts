@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { CharacterSchema, newCharacter } from "../src/schemas/character";
 import { NpcSchema } from "../src/schemas/combat";
 import { CONDITION_INFO, CONDITIONS, toggleCondition } from "../src/conditions";
-import { cellCenter, formatDistance, formatNumber, measure } from "../src/measure";
+import { cellCenter, formatCells, formatDistance, formatMove, formatNumber, measure } from "../src/measure";
 
 const grid = { cellPx: 50, offsetX: 0, offsetY: 0, feetPerCell: 5 };
 
@@ -29,6 +29,13 @@ describe("measure", () => {
     expect(formatNumber(30)).toBe("30");
     expect(formatNumber(21.2132)).toBe("21,2");
     expect(formatDistance({ feet: 25, meters: 7.5 })).toBe("7,5 m · 25 ft");
+  });
+
+  it("writes a movement in metres, feet and squares", () => {
+    expect(formatMove(30, 5)).toBe("9 m · 30 ft · 6 caselle");
+    expect(formatMove(5, 5)).toBe("1,5 m · 5 ft · 1 casella");
+    expect(formatMove(25, 10)).toBe("7,5 m · 25 ft · 2,5 caselle");
+    expect(formatCells(0)).toBe("0 caselle");
   });
 
   it("snaps to the centre of the cell", () => {

@@ -5,6 +5,7 @@ import {
   canPlayerMove,
   cellCenter,
   cellToPx,
+  formatMove,
   type PartyMover,
   coveredCells,
   DEFAULT_SPEED_FT,
@@ -317,10 +318,10 @@ export function PlayerStage({ scene, resolve, currentRef, onMoveToken, mover = "
             Spostare <strong>{pendingEntity.name}</strong> qui?{" "}
             <span className="muted">
               {pending.costFt === null
-                ? "Oltre la portata, anche con uno scatto."
+                ? `Oltre la portata, anche con uno scatto (velocità ${formatMove(pending.speedFt, shown.grid.feetPerCell)}).`
                 : pending.costFt <= pending.speedFt
-                  ? `${pending.costFt} ft su ${pending.speedFt}.`
-                  : `${pending.costFt} ft: serve uno scatto.`}
+                  ? `${formatMove(pending.costFt, shown.grid.feetPerCell)}, su ${formatMove(pending.speedFt, shown.grid.feetPerCell)}.`
+                  : `${formatMove(pending.costFt, shown.grid.feetPerCell)}: serve uno scatto.`}
             </span>
           </span>
           <button className="primary" onClick={confirmMove}>
