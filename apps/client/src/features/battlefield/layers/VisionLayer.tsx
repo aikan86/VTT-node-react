@@ -1,12 +1,12 @@
 import { useMemo } from "react";
-import { Layer, Line, Rect, Shape } from "react-konva";
-import { exploredRuns, type Scene } from "@vtt/shared";
+import { Group, Layer, Line, Rect, Shape } from "react-konva";
+import { exploredRuns, type PartySight, type Scene } from "@vtt/shared";
 import type { View } from "../types";
 
 interface Props {
   scene: Scene;
-  /** Poligoni di ciò che il party vede ora (da `usePartyVision`). */
-  polygons: number[][];
+  /** Ciò che il party vede ora (da `usePartySight`). */
+  sight: PartySight;
   view: View;
   size: { width: number; height: number };
   /** Opacità del velo al posto di quella della scena (la vista giocatori usa 1: ciò che non vedono è nero). */
@@ -16,17 +16,24 @@ interface Props {
 const VIEW_MARGIN_PX = 50;
 /** Quanta parte del velo si toglie sulle zone già esplorate: restano visibili ma in grigio scuro. */
 const EXPLORED_REVEAL = 0.4;
+/** Quanta parte del velo si toglie in penombra e nella scurovisione (si vede, ma meno che in luce piena). */
+const DIM_REVEAL = 0.65;
+
+const holes = (polygons: number[][], opacity: number) =>
+  polygons.map((points, i) => <Line key={i} points={points} closed fill="#000000" opacity={opacity} globalCompositeOperation="destination-out" />);
 
 /**
  * Oscura tutto ciò che il party non vede: velo scuro su tutto il campo, schiarito sulle celle già esplorate
- * (memoria della nebbia) e bucato del tutto dal poligono di visibilità di ogni personaggio (PG) sulla mappa.
- * Il DM vede comunque sotto il velo, attenuato.
+ * (memoria della nebbia) e bucato dove il party vede ora. In una scena normale si vede tutta la linea di vista;
+ * in una scena buia solo le zone illuminate in linea di vista (luce piena del tutto, penombra in parte) e la
+ * scurovisione (in parte). Il DM vede comunque sotto il velo, attenuato.
  */
-export function VisionLayer({ scene, polygons, view, size, darkness }: Props) {
+export function VisionLayer({ scene, sight, view, size, darkness }: Props) {
   const g = scene.grid;
   const runs = useMemo(() => exploredRuns(scene.explored), [scene.explored]);
 
-  if (!scene.vision.enabled || polygons.length === 0) return null;
+  if (!scene.vision.enabled || sight.los.length === 0) return null;
+  const dark = sight.dark;
 
   return (
     <Layer listening={false}>
@@ -51,9 +58,26 @@ export function VisionLayer({ scene, polygons, view, size, darkness }: Props) {
           globalCompositeOperation="destination-out"
         />
       )}
-      {polygons.map((points, i) => (
-        <Line key={i} points={points} closed fill="#000000" globalCompositeOperation="destination-out" />
-      ))}
+      {!dark && holes(sight.los, 1)}
+      {dark && (
+        <>
+          {/* le luci si vedono solo dove arriva la linea di vista di un PG */}
+          <Group
+            clipFunc={(ctx) => {
+              ctx.beginPath();
+              for (const poly of sight.los) {
+                ctx.moveTo(poly[0]!, poly[1]!);
+                for (let i = 2; i + 1 < poly.length; i += 2) ctx.lineTo(poly[i]!, poly[i + 1]!);
+                ctx.closePath();
+              }
+            }}
+          >
+            {holes(dark.lit, DIM_REVEAL)}
+            {holes(dark.bright, 1)}
+          </Group>
+          {holes(dark.darkvision, DIM_REVEAL)}
+        </>
+      )}
     </Layer>
   );
 }

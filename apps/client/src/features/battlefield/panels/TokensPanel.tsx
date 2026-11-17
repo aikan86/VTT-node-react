@@ -1,6 +1,7 @@
 import { modLookupFrom, sameRef, sortCombatants, type Ref, type Scene, type Token } from "@vtt/shared";
 import { EyeIcon } from "../../../components/EyeIcon";
 import { HpEditor } from "../../../components/HpEditor";
+import { NumberInput } from "../../../components/NumberInput";
 import { useCombatStore } from "../../../store/combatStore";
 import type { EntityResolver } from "../../../store/entities";
 import { setEntityHp } from "../../../store/actions";
@@ -163,6 +164,18 @@ export function TokensPanel({ scene, resolve, pending, onPending, onAddNpc, sele
             <input type="checkbox" checked={!selected.hidden} disabled={locked} onChange={(e) => onChangeToken({ ...selected, hidden: !e.target.checked })} />
             Visibile ai giocatori (H)
           </label>
+          {entity.ref.kind === "pc" && (
+            <label className="field">
+              Scurovisione (ft)
+              <NumberInput
+                value={selected.darkvisionFt ?? 0}
+                min={0}
+                max={1000}
+                disabled={locked}
+                onChange={(v) => onChangeToken({ ...selected, darkvisionFt: v ? v : undefined })}
+              />
+            </label>
+          )}
           {!inInitiative && <button onClick={() => onAddToInitiative(entity.ref)}>Aggiungi all'iniziativa</button>}
           <button className="danger" onClick={() => onRemoveToken(selected.id)}>
             Rimuovi dalla mappa

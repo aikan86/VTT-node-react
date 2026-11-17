@@ -81,6 +81,8 @@ export const TokenSchema = z.object({
   y: z.number().int(),
   /** Nascosto ai giocatori: il master lo vede (attenuato), la vista giocatori no. */
   hidden: z.boolean().optional(),
+  /** Scurovisione in piedi: in una scena buia il personaggio vede entro questo raggio anche senza luce. */
+  darkvisionFt: z.number().int().min(0).max(1000).optional(),
 });
 export type Token = z.infer<typeof TokenSchema>;
 
@@ -161,6 +163,22 @@ export const SightBlockerSchema = z.object({
     .refine((p) => p.length % 2 === 0, "Coordinate a coppie"),
 });
 export type SightBlocker = z.infer<typeof SightBlockerSchema>;
+
+/**
+ * Luce posizionata sulla mappa: illumina a 360° fino a `brightFt` (luce piena) e per altri `dimFt` (penombra),
+ * fermata da muri, porte chiuse e ostacoli come la vista. Origine in celle (frazionaria).
+ */
+export const LightSchema = z.object({
+  id: IdSchema,
+  x: CellCoord,
+  y: CellCoord,
+  brightFt: z.number().int().min(0).max(1000),
+  dimFt: z.number().int().min(0).max(1000),
+  color: ColorSchema,
+});
+export type Light = z.infer<typeof LightSchema>;
+
+export const DEFAULT_LIGHT = { brightFt: 20, dimFt: 20, color: "#fbbf24" } as const;
 
 /** Visione del party: i personaggi sulla mappa vedono a 360°, fino a `radiusFt` (0 = senza limite), ostacolati da muri e ostacoli. */
 export const VisionSchema = z.object({
@@ -253,6 +271,10 @@ export const SceneSchema = z.object({
   objects: z.array(MapObjectSchema).default([]),
   /** Nebbia con memoria: celle già viste dal party, come chiavi "x,y" (vedi `cellKey`). */
   explored: z.array(ExploredCellSchema).max(MAX_EXPLORED_CELLS).default([]),
+  /** Luci sulla mappa (livello Elementi). */
+  lights: z.array(LightSchema).max(500).default([]),
+  /** Scena buia (con la visione attiva): il party vede solo dentro le luci o entro la scurovisione dei propri token. */
+  dark: z.boolean().default(false),
 });
 export type Scene = z.infer<typeof SceneSchema>;
 
@@ -281,6 +303,8 @@ export function newScene(name = "Nuova scena"): Scene {
     shownToPlayers: false,
     objects: [],
     explored: [],
+    lights: [],
+    dark: false,
   };
 }
 

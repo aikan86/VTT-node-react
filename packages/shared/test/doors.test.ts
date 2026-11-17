@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { newScene, SceneSchema, type MapElement } from "../src/schemas/scene";
-import { elementBlocksSight, partyOrigins, pointInPolygon, sightSegments, toggleDoor, visibilityPolygon } from "../src/visibility";
+import { elementBlocksSight, pointInPolygon, sightSegments, toggleDoor, visibilityPolygon } from "../src/visibility";
 
 const base = { rotation: 0, color: "#92400e" };
 
@@ -68,19 +68,5 @@ describe("scene schema: doors", () => {
     const s = sceneWithDoor(true);
     expect(SceneSchema.parse(s).elements[0]!.open).toBe(true);
     expect(SceneSchema.parse(sceneWithDoor()).elements[0]!.open).toBeUndefined();
-  });
-});
-
-describe("partyOrigins", () => {
-  it("uses the centre of each player character, ignoring NPCs and unknown characters", () => {
-    const s = newScene();
-    s.grid = { ...s.grid, cellPx: 50, offsetX: 10, offsetY: 0 };
-    s.tokens = [
-      { id: "a", ref: { kind: "pc", id: "big" }, x: 1, y: 1 },
-      { id: "b", ref: { kind: "npc", id: "gob" }, x: 3, y: 3 },
-      { id: "c", ref: { kind: "pc", id: "missing" }, x: 5, y: 5 },
-    ];
-    const sizes: Record<string, number> = { big: 2, gob: 1 };
-    expect(partyOrigins(s, (ref) => sizes[ref.id])).toEqual([{ x: 10 + 50 + 50, y: 50 + 50 }]);
   });
 });

@@ -11,7 +11,8 @@ import { ObjectsLayer } from "./layers/ObjectsLayer";
 import { TokensLayer } from "./layers/TokensLayer";
 import { VisionLayer } from "./layers/VisionLayer";
 import type { View } from "./types";
-import { usePartyVision } from "./vision";
+import { usePartySight } from "./vision";
+import { LightsLayer } from "./layers/LightsLayer";
 
 interface Props {
   scene: Scene;
@@ -33,9 +34,9 @@ export function PlayerStage({ scene, resolve, currentRef }: Props) {
   const [containerRef, size] = useElementSize<HTMLDivElement>();
   const [view, setView] = useState<View>({ x: 0, y: 0, scale: 1 });
   const shown = useMemo(() => playerScene(scene), [scene]);
-  const visionPolygons = usePartyVision(shown, resolve);
-  // nelle zone ricordate (grigie) i nemici non compaiono: solo dove il party vede ora
-  const inSight = useMemo(() => withoutUnseenTokens(shown, visionPolygons, (ref) => resolve(ref)?.size), [shown, visionPolygons, resolve]);
+  const sight = usePartySight(shown, resolve);
+  // nelle zone ricordate (grigie) o al buio i nemici non compaiono: solo dove il party vede ora
+  const inSight = useMemo(() => withoutUnseenTokens(shown, sight, (ref) => resolve(ref)?.size), [shown, sight, resolve]);
   const bg = scene.background;
   const latest = useRef({ shown, resolve, size });
   latest.current = { shown, resolve, size };
@@ -89,8 +90,9 @@ export function PlayerStage({ scene, resolve, currentRef }: Props) {
           <ObjectsLayer scene={shown} listening={false} editable={false} selectedId={null} onSelect={noop} onChange={noop} />
           <GridLayer scene={shown} view={view} size={size} />
           <ElementsLayer scene={shown} listening={false} editable={false} selectedId={null} draft={null} onSelect={noop} onChange={noop} />
+          <LightsLayer scene={shown} />
           <TokensLayer scene={inSight} resolve={resolve} listening={false} editable={false} selectedId={null} currentRef={currentRef} onSelect={noop} onMove={noop} hideHp />
-          <VisionLayer scene={shown} polygons={visionPolygons} view={view} size={size} darkness={1} />
+          <VisionLayer scene={shown} sight={sight} view={view} size={size} darkness={1} />
           <EffectsLayer
             scene={shown}
             listening={false}

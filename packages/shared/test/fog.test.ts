@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addExplored, cellKey, cellsInPolygon, exploredRuns, parseCellKey, resetExplored, visibleCells, withoutUnseenTokens } from "../src/fog";
+import { addExplored, cellKey, cellsInPolygon, exploredRuns, parseCellKey, resetExplored, visibleCells } from "../src/fog";
 import { MAX_EXPLORED_CELLS, newScene, SceneSchema } from "../src/schemas/scene";
 import { visibilityPolygon } from "../src/visibility";
 
@@ -116,28 +116,5 @@ describe("scene schema: explored", () => {
     expect(SceneSchema.safeParse({ ...s, explored: ["3,-4"] }).success).toBe(true);
     expect(SceneSchema.safeParse({ ...s, explored: ["3;4"] }).success).toBe(false);
     expect(SceneSchema.safeParse({ ...s, explored: ["1.5,2"] }).success).toBe(false);
-  });
-});
-
-describe("withoutUnseenTokens", () => {
-  const scene = () => {
-    const s = newScene();
-    s.grid = { ...s.grid, cellPx: 10, offsetX: 0, offsetY: 0 };
-    s.tokens = [
-      { id: "pc", ref: { kind: "pc", id: "aria" }, x: 50, y: 50 },
-      { id: "near", ref: { kind: "npc", id: "gob" }, x: 1, y: 0 },
-      { id: "far", ref: { kind: "npc", id: "ogre" }, x: 10, y: 10 },
-    ];
-    return s;
-  };
-
-  it("keeps player characters and NPCs in sight, drops NPCs only remembered", () => {
-    const s = withoutUnseenTokens(scene(), [rect], () => 1);
-    expect(s.tokens.map((t) => t.id)).toEqual(["pc", "near"]);
-  });
-
-  it("does nothing without vision polygons", () => {
-    const s = scene();
-    expect(withoutUnseenTokens(s, [], () => 1)).toBe(s);
   });
 });

@@ -239,6 +239,42 @@ describe("TokensPanel: quick hide from the list", () => {
   });
 });
 
+describe("TokensPanel: darkvision", () => {
+  const ariaToken: Token = { id: "t1", ref: { kind: "pc", id: "pc-a" }, x: 0, y: 0 };
+
+  it("sets the darkvision of the selected character in feet", async () => {
+    const onChangeToken = vi.fn();
+    renderPanel(sceneWithAria(), vi.fn(), { selected: ariaToken, onChangeToken });
+    const field = screen.getByRole("textbox", { name: "Scurovisione (ft)" });
+    expect(field).toHaveValue("0");
+    await userEvent.clear(field);
+    await userEvent.type(field, "60");
+    expect(onChangeToken).toHaveBeenLastCalledWith({ ...ariaToken, darkvisionFt: 60 });
+  });
+
+  it("removes the field from the token when set back to 0", async () => {
+    const onChangeToken = vi.fn();
+    const t = { ...ariaToken, darkvisionFt: 60 };
+    renderPanel({ ...sceneWithAria(), tokens: [t] }, vi.fn(), { selected: t, onChangeToken });
+    const field = screen.getByRole("textbox", { name: "Scurovisione (ft)" });
+    expect(field).toHaveValue("60");
+    await userEvent.clear(field);
+    await userEvent.type(field, "0");
+    expect(onChangeToken).toHaveBeenLastCalledWith({ ...ariaToken, darkvisionFt: undefined });
+  });
+
+  it("is only offered for player characters, and locked with the layer", () => {
+    const goblin: Token = { id: "t2", ref: { kind: "npc", id: "n1" }, x: 1, y: 0 };
+    renderPanel({ ...sceneWithAria(), tokens: [goblin] }, vi.fn(), { selected: goblin });
+    expect(screen.queryByRole("textbox", { name: "Scurovisione (ft)" })).not.toBeInTheDocument();
+  });
+
+  it("is disabled when the tokens layer is locked", () => {
+    renderPanel(sceneWithAria(true), vi.fn(), { selected: ariaToken });
+    expect(screen.getByRole("textbox", { name: "Scurovisione (ft)" })).toBeDisabled();
+  });
+});
+
 describe("TokensPanel: eye icon", () => {
   const slash = 'svg path[d="M4 4L20 20"]';
 

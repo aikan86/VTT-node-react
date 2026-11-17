@@ -1,6 +1,4 @@
-import { pointInPolygon } from "./visibility";
 import type { Point } from "./grid";
-import type { Ref } from "./schemas/common";
 import { MAX_EXPLORED_CELLS, type Grid, type Scene } from "./schemas/scene";
 
 /** Rettangolo in pixel del mondo. */
@@ -104,20 +102,4 @@ export function exploredRuns(explored: readonly string[]): { x: number; y: numbe
     else if (!(last && last.y === c.y && c.x < last.x + last.w)) runs.push({ x: c.x, y: c.y, w: 1 });
   }
   return runs;
-}
-
-/**
- * Nella vista giocatori, con la visione attiva, i token che non sono personaggi giocanti compaiono solo se il party
- * li vede ora: nelle zone ricordate (in grigio) non devono svelare dove sono i nemici.
- */
-export function withoutUnseenTokens(scene: Scene, polygons: number[][], sizeOf: (ref: Ref) => number | undefined): Scene {
-  if (polygons.length === 0) return scene;
-  const g = scene.grid;
-  const tokens = scene.tokens.filter((t) => {
-    if (t.ref.kind === "pc") return true;
-    const half = ((sizeOf(t.ref) ?? 1) * g.cellPx) / 2;
-    const center = { x: g.offsetX + t.x * g.cellPx + half, y: g.offsetY + t.y * g.cellPx + half };
-    return polygons.some((p) => pointInPolygon(center, p));
-  });
-  return tokens.length === scene.tokens.length ? scene : { ...scene, tokens };
 }

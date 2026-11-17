@@ -5,7 +5,11 @@ export interface Selection {
   id: string;
 }
 
-export type ElementTool = "select" | "sight" | ElementType;
+/** "light" piazza una luce con un click; "sight" traccia un ostacolo alla vista; gli altri disegnano elementi. */
+export type ElementTool = "select" | "sight" | "light" | ElementType;
+
+/** Gli strumenti che disegnano un rettangolo trascinando. */
+export const isRectTool = (tool: ElementTool): tool is ElementType => tool !== "select" && tool !== "sight" && tool !== "light";
 
 /** Colore degli ostacoli alla vista tracciati a mano. */
 export const SIGHT_COLOR = "#a855f7";

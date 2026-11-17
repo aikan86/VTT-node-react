@@ -1,4 +1,4 @@
-import { ELEMENT_COLORS, ELEMENT_LABELS, ELEMENT_TYPES, type MapElement, type SightBlocker, type Vision } from "@vtt/shared";
+import { DEFAULT_LIGHT, ELEMENT_COLORS, ELEMENT_LABELS, ELEMENT_TYPES, type Light, type MapElement, type SightBlocker, type Vision } from "@vtt/shared";
 import { NumberInput } from "../../../components/NumberInput";
 import { SIGHT_COLOR, type ElementTool } from "../types";
 import styles from "../Battlefield.module.css";
@@ -17,6 +17,11 @@ interface Props {
   vision: Vision;
   onVision: (patch: Partial<Vision>) => void;
   onToggleDoor: (id: string) => void;
+  selectedLight: Light | undefined;
+  onLightChange: (light: Light) => void;
+  /** Scena buia (vale solo con la visione attiva; attivarla accende anche la visione). */
+  dark: boolean;
+  onDark: (dark: boolean) => void;
   /** Celle già esplorate dal party (nebbia con memoria). */
   exploredCount: number;
   onResetExplored: () => void;
@@ -35,6 +40,10 @@ export function ElementsPanel({
   vision,
   onVision,
   onToggleDoor,
+  selectedLight,
+  onLightChange,
+  dark,
+  onDark,
   exploredCount,
   onResetExplored,
 }: Props) {
@@ -56,8 +65,14 @@ export function ElementsPanel({
             <span className="swatch" style={{ background: SIGHT_COLOR, borderRadius: 2, marginRight: 6 }} />
             Ostacolo alla vista
           </button>
+          <button className={tool === "light" ? "active" : ""} aria-pressed={tool === "light"} onClick={() => onTool("light")}>
+            <span className="swatch" style={{ background: DEFAULT_LIGHT.color, borderRadius: "50%", marginRight: 6 }} />
+            Luce
+          </button>
         </div>
-        {tool === "sight" ? (
+        {tool === "light" ? (
+          <p className={styles.callout}>Clicca sulla mappa per piazzare una luce al centro della cella. Muri, porte chiuse e ostacoli la fermano.</p>
+        ) : tool === "sight" ? (
           <>
             <p className={styles.callout}>
               Clicca i vertici attorno all'ostacolo (un edificio, un gruppo di alberi…). Chiudi la forma cliccando sul primo punto o con Invio; Backspace toglie
@@ -125,6 +140,32 @@ export function ElementsPanel({
         </section>
       )}
 
+      {selectedLight && (
+        <section className={styles.selected} aria-label="Luce selezionata">
+          <h3 style={{ margin: 0 }}>Luce</h3>
+          <div className={styles.grid2}>
+            <label className="field">
+              Luce piena (ft)
+              <NumberInput value={selectedLight.brightFt} min={0} max={1000} onChange={(v) => onLightChange({ ...selectedLight, brightFt: v ?? 0 })} />
+            </label>
+            <label className="field">
+              Penombra (ft in più)
+              <NumberInput value={selectedLight.dimFt} min={0} max={1000} onChange={(v) => onLightChange({ ...selectedLight, dimFt: v ?? 0 })} />
+            </label>
+          </div>
+          <label className="field">
+            Colore
+            <input type="color" value={selectedLight.color} onChange={(e) => onLightChange({ ...selectedLight, color: e.target.value })} />
+          </label>
+          <span className="muted" style={{ fontSize: "0.8rem" }}>
+            Illumina fino a {selectedLight.brightFt + selectedLight.dimFt} ft · trascina l'indicatore per spostarla
+          </span>
+          <button className="danger" onClick={() => onDelete(selectedLight.id)}>
+            Elimina luce
+          </button>
+        </section>
+      )}
+
       {selectedBlocker && (
         <section className={styles.selected} aria-label="Ostacolo alla vista selezionato">
           <h3 style={{ margin: 0 }}>Ostacolo alla vista</h3>
@@ -143,6 +184,16 @@ export function ElementsPanel({
           <input type="checkbox" checked={vision.enabled} onChange={(e) => onVision({ enabled: e.target.checked })} />
           Mostra cosa vede il party
         </label>
+        <label className="row" style={{ flexWrap: "nowrap" }}>
+          <input type="checkbox" checked={dark && vision.enabled} onChange={(e) => onDark(e.target.checked)} />
+          Scena buia
+        </label>
+        {dark && vision.enabled && (
+          <p className="muted" style={{ fontSize: "0.8rem", margin: 0 }}>
+            Il party vede solo dentro le luci (in linea di vista) o entro la scurovisione dei propri token (si imposta sul token selezionato, livello
+            Personaggi).
+          </p>
+        )}
         <p className="muted" style={{ fontSize: "0.8rem", margin: 0 }}>
           I personaggi sulla mappa vedono a 360°. Muri, porte chiuse, ostacoli e le forme tracciate qui bloccano la vista; il resto resta visibile.
         </p>

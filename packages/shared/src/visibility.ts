@@ -1,5 +1,4 @@
-import { cellToPx, feetToPx, type Point } from "./grid";
-import type { Ref } from "./schemas/common";
+import { feetToPx, type Point } from "./grid";
 import type { MapElement, Scene } from "./schemas/scene";
 
 export interface Segment {
@@ -18,20 +17,6 @@ export function toggleDoor(scene: Scene, id: string): Scene {
   const door = scene.elements.find((el) => el.id === id);
   if (!door || door.type !== "door") return scene;
   return { ...scene, elements: scene.elements.map((el) => (el === door ? { ...el, open: !el.open } : el)) };
-}
-
-/** Centri, in pixel del mondo, dei personaggi giocanti sulla mappa: da qui parte la visione del party. */
-export function partyOrigins(scene: Pick<Scene, "tokens" | "grid">, sizeOf: (ref: Ref) => number | undefined): Point[] {
-  const origins: Point[] = [];
-  for (const token of scene.tokens) {
-    if (token.ref.kind !== "pc") continue;
-    const size = sizeOf(token.ref);
-    if (size === undefined) continue;
-    const pos = cellToPx(token, scene.grid);
-    const half = (size * scene.grid.cellPx) / 2;
-    origins.push({ x: pos.x + half, y: pos.y + half });
-  }
-  return origins;
 }
 
 /** Raggio di calcolo quando la visione non ha limite, in pixel del mondo. */

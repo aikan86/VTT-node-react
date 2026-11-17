@@ -7,9 +7,11 @@ import {
   OBJECT_DEFAULTS,
   resetExplored,
   sameRef,
+  DEFAULT_LIGHT,
+  seenCells,
   toggleDoor,
-  visibleCells,
   type Drawing,
+  type Light,
   type LayerKey,
   type MapObject,
   type Point,
@@ -19,7 +21,7 @@ import {
 import { BattleStage } from "../features/battlefield/BattleStage";
 import { isTyping } from "../features/battlefield/hooks";
 import { calibrateBackground, contentBounds, pxPointsToCells, snapTo, withBackgroundGeometry } from "../features/battlefield/geometry";
-import { usePartyVision } from "../features/battlefield/vision";
+import { usePartySight } from "../features/battlefield/vision";
 import { BackgroundPanel } from "../features/battlefield/panels/BackgroundPanel";
 import { CalibrationDialog } from "../features/battlefield/panels/CalibrationDialog";
 import { EffectsPanel } from "../features/battlefield/panels/EffectsPanel";
@@ -28,7 +30,7 @@ import { LayerPanel } from "../features/battlefield/panels/LayerPanel";
 import { TokensPanel } from "../features/battlefield/panels/TokensPanel";
 import { SceneBar } from "../features/battlefield/SceneBar";
 import { BACKGROUND_ID } from "../features/battlefield/layers/BackgroundLayer";
-import type { DrawTool, EffectTool, ElementTool, ObjectTool, PendingPlacement, Selection, SketchDraft } from "../features/battlefield/types";
+import { isRectTool, type DrawTool, type EffectTool, type ElementTool, type ObjectTool, type PendingPlacement, type Selection, type SketchDraft } from "../features/battlefield/types";
 import styles from "../features/battlefield/Battlefield.module.css";
 import { AddNpcDialog } from "../features/initiative/AddNpcDialog";
 import { useInitiative } from "../features/initiative/useInitiative";
@@ -70,21 +72,21 @@ function Battlefield({ scene }: { scene: Scene }) {
 
   const update = useCallback((fn: (s: Scene) => Scene) => useSceneStore.getState().update(scene.id, fn), [scene.id]);
 
-  const visionPolygons = usePartyVision(scene, resolve);
+  const sight = usePartySight(scene, resolve);
   const latestScene = useRef(scene);
   latestScene.current = scene;
 
-  // Nebbia con memoria: le celle che il party vede ora restano esplorate (salvate nella scena)
+  // Nebbia con memoria: le celle che il party vede ora (al buio: solo quelle illuminate o in scurovisione) restano esplorate
   useEffect(() => {
     const s = latestScene.current;
-    if (!s.vision.enabled || visionPolygons.length === 0) return;
+    if (!s.vision.enabled || sight.los.length === 0) return;
     const b = contentBounds(s, (ref) => resolve(ref)?.size ?? 1);
     const margin = EXPLORE_MARGIN_CELLS * s.grid.cellPx;
     const limit = { minX: b.minX - margin, minY: b.minY - margin, maxX: b.maxX + margin, maxY: b.maxY + margin };
-    const cells = visibleCells(visionPolygons, s.grid, limit);
+    const cells = seenCells(sight, s.grid, limit);
     if (addExplored(s, cells) !== s) update((current) => addExplored(current, cells));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visionPolygons, update, scene.explored.length === 0]); // dopo l'azzeramento si ricorda subito ciò che si vede ora
+  }, [sight, update, scene.explored.length === 0]); // dopo l'azzeramento si ricorda subito ciò che si vede ora
 
   const toggleDoorById = useCallback((id: string) => update((s) => toggleDoor(s, id)), [update]);
 
@@ -101,7 +103,7 @@ function Battlefield({ scene }: { scene: Scene }) {
 
   const deleteSelection = useCallback(() => {
     if (!selection || (selection.layer === "background" && selection.id === BACKGROUND_ID)) return; // l'immagine di sfondo si rimuove dal pannello
-    const keys = ({ elements: ["elements", "sightBlockers"], tokens: ["tokens"], effects: ["effects", "drawings"], background: ["objects"] } as const)[selection.layer];
+    const keys = ({ elements: ["elements", "sightBlockers", "lights"], tokens: ["tokens"], effects: ["effects", "drawings"], background: ["objects"] } as const)[selection.layer];
     update((s) => ({ ...s, ...Object.fromEntries(keys.map((key) => [key, (s[key] as { id: string }[]).filter((x) => x.id !== selection.id)])) }));
     setSelection(null);
   }, [selection, update]);
@@ -175,7 +177,8 @@ function Battlefield({ scene }: { scene: Scene }) {
   const placing =
     (activeLayer === "tokens" && pending !== null) ||
     (activeLayer === "effects" && (effectTool.placing || drawTool.mode === "text")) ||
-    (activeLayer === "background" && objectTool !== null);
+    (activeLayer === "background" && objectTool !== null) ||
+    (activeLayer === "elements" && elementTool === "light");
 
   const addDrawing = (drawing: Drawing) => update((s) => ({ ...s, drawings: [...s.drawings, drawing] }));
 
@@ -202,6 +205,12 @@ function Battlefield({ scene }: { scene: Scene }) {
       placeTokens(scene.id, pending, cell, sizeOfRef);
       if (placeHidden) update((s) => ({ ...s, tokens: s.tokens.map((t) => (pending.some((r) => sameRef(r, t.ref)) ? { ...t, hidden: true } : t)) }));
       setPending(null);
+    } else if (activeLayer === "elements" && elementTool === "light") {
+      // al centro della cella cliccata
+      const light: Light = { id: createId(), x: cell.x + 0.5, y: cell.y + 0.5, ...DEFAULT_LIGHT };
+      update((s) => ({ ...s, lights: [...s.lights, light] }));
+      setSelection({ layer: "elements", id: light.id });
+      setElementTool("select");
     } else if (activeLayer === "background" && objectTool) {
       const g = scene.grid;
       const base =
@@ -275,7 +284,7 @@ function Battlefield({ scene }: { scene: Scene }) {
   const selectedOf = <T extends { id: string }>(layer: LayerKey, list: T[]) =>
     selection?.layer === layer ? list.find((x) => x.id === selection.id) : undefined;
 
-  const replace = <K extends "elements" | "tokens" | "effects" | "drawings" | "sightBlockers" | "objects">(key: K, item: Scene[K][number]) =>
+  const replace = <K extends "elements" | "tokens" | "effects" | "drawings" | "sightBlockers" | "objects" | "lights">(key: K, item: Scene[K][number]) =>
     update((s) => ({ ...s, [key]: (s[key] as { id: string }[]).map((x) => (x.id === item.id ? item : x)) }));
 
   return (
@@ -318,6 +327,10 @@ function Battlefield({ scene }: { scene: Scene }) {
             vision={scene.vision}
             onVision={(patch) => update((s) => ({ ...s, vision: { ...s.vision, ...patch } }))}
             onToggleDoor={toggleDoorById}
+            selectedLight={selectedOf("elements", scene.lights)}
+            onLightChange={(light) => replace("lights", light)}
+            dark={scene.dark}
+            onDark={(dark) => update((s) => ({ ...s, dark, vision: dark ? { ...s.vision, enabled: true } : s.vision }))}
             exploredCount={scene.explored.length}
             onResetExplored={() => {
               if (confirm("Azzerare le zone esplorate? Il party ricorderà solo ciò che vede da adesso.")) update(resetExplored);
@@ -382,7 +395,7 @@ function Battlefield({ scene }: { scene: Scene }) {
           onPlace={onPlace}
           onCalibrationPoint={(p) => setCalibration((pts) => (pts && pts.length < 2 ? [...pts, p] : pts))}
           onDrawElement={(rect) => {
-            if (elementTool === "select" || elementTool === "sight") return;
+            if (!isRectTool(elementTool)) return;
             const element = { id: createId(), type: elementTool, ...rect, rotation: 0, color: ELEMENT_COLORS[elementTool] };
             update((s) => ({ ...s, elements: [...s.elements, element] }));
             setSelection({ layer: "elements", id: element.id });
@@ -399,8 +412,9 @@ function Battlefield({ scene }: { scene: Scene }) {
           onSketch={onSketch}
           onDrawingChange={(drawing) => replace("drawings", drawing)}
           onEraseDrawing={eraseDrawing}
-          visionPolygons={visionPolygons}
+          sight={sight}
           onToggleDoor={toggleDoorById}
+          onLightChange={(light) => replace("lights", light)}
         />
       </div>
 

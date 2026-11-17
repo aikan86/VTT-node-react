@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Stage } from "react-konva";
 import type Konva from "konva";
-import { ELEMENT_COLORS, pxToCell, type Background, type Drawing, type Effect, type LayerKey, type MapElement, type MapObject, type Point, type Ref, type Scene, type SightBlocker, type Token } from "@vtt/shared";
+import { ELEMENT_COLORS, pxToCell, type Light, type PartySight, type Background, type Drawing, type Effect, type LayerKey, type MapElement, type MapObject, type Point, type Ref, type Scene, type SightBlocker, type Token } from "@vtt/shared";
 import type { EntityResolver } from "../../store/entities";
 import { appendPoint, clamp, contentBounds, snapAngle } from "./geometry";
 import { useElementSize, useKeyHeld } from "./hooks";
@@ -13,7 +13,8 @@ import { CalibrationLayer } from "./layers/CalibrationLayer";
 import { SightBlockersLayer } from "./layers/SightBlockersLayer";
 import { VisionLayer } from "./layers/VisionLayer";
 import { TokensLayer } from "./layers/TokensLayer";
-import { CLOSE_TRACE_SCREEN_PX, type DrawTool, type ElementTool, type Selection, type SketchDraft, type View } from "./types";
+import { LightsLayer } from "./layers/LightsLayer";
+import { CLOSE_TRACE_SCREEN_PX, isRectTool, type DrawTool, type ElementTool, type Selection, type SketchDraft, type View } from "./types";
 import styles from "./Battlefield.module.css";
 
 interface Props {
@@ -45,9 +46,10 @@ interface Props {
   onSketch: (sketch: SketchDraft) => void;
   onDrawingChange: (drawing: Drawing) => void;
   onEraseDrawing: (id: string) => void;
-  /** Ciò che il party vede ora (da `usePartyVision`). */
-  visionPolygons: number[][];
+  /** Ciò che il party vede ora (da `usePartySight`). */
+  sight: PartySight;
   onToggleDoor: (id: string) => void;
+  onLightChange: (light: Light) => void;
 }
 
 /** Sotto questa distanza sullo schermo un tratto non viene salvato e i punti a mano libera vengono scartati. */
@@ -97,7 +99,7 @@ export function BattleStage(props: Props) {
   };
 
   const locked = scene.layers[activeLayer].locked;
-  const drawing = activeLayer === "elements" && elementTool !== "select" && elementTool !== "sight" && !locked;
+  const drawing = activeLayer === "elements" && isRectTool(elementTool) && !locked;
   const tracing = activeLayer === "elements" && elementTool === "sight" && !locked;
   const sketchKind = activeLayer === "effects" && !locked && (drawTool.mode === "line" || drawTool.mode === "freehand") ? drawTool.mode : null;
   const erasing = activeLayer === "effects" && !locked && drawTool.mode === "eraser";
@@ -224,7 +226,7 @@ export function BattleStage(props: Props) {
 
   const textMode = activeLayer === "effects" && drawTool.mode === "text";
   const cursor = panning ? "grabbing" : spaceHeld ? "grab" : erasing ? "cell" : textMode && placing ? "text" : drawing || placing || sketchKind || calibrating || tracing ? "crosshair" : "default";
-  const elementColor = elementTool === "select" || elementTool === "sight" ? "#ffffff" : ELEMENT_COLORS[elementTool];
+  const elementColor = isRectTool(elementTool) ? ELEMENT_COLORS[elementTool] : "#ffffff";
 
   return (
     <div ref={containerRef} className={styles.stageWrap} style={{ cursor }} onContextMenu={(e) => e.preventDefault()}>
@@ -287,6 +289,15 @@ export function BattleStage(props: Props) {
             onSelect={select("elements")}
             onChange={props.onBlockerChange}
           />
+          <LightsLayer
+            scene={scene}
+            markers
+            listening={listening("elements")}
+            editable={editable("elements")}
+            selectedId={selectedIn("elements")}
+            onSelect={select("elements")}
+            onChange={props.onLightChange}
+          />
           <TokensLayer
             scene={scene}
             resolve={props.resolve}
@@ -297,7 +308,7 @@ export function BattleStage(props: Props) {
             onSelect={select("tokens")}
             onMove={props.onTokenMove}
           />
-          <VisionLayer scene={scene} polygons={props.visionPolygons} view={view} size={size} />
+          <VisionLayer scene={scene} sight={props.sight} view={view} size={size} />
           <EffectsLayer
             scene={scene}
             listening={listening("effects")}
