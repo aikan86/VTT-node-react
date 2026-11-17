@@ -41,6 +41,15 @@ beforeEach(async () => {
   source = await instance();
 });
 
+describe("/api/server-info", () => {
+  it("tells the client where phones can reach this PC", async () => {
+    const uploadsDir = mkdtempSync(join(tmpdir(), "vtt-uploads-"));
+    const app = await buildApp({ dbPath: ":memory:", uploadsDir, logger: false, listenHost: "127.0.0.1", networkAddresses: () => ["192.168.1.20"] });
+    instances.push({ app, uploadsDir });
+    expect((await app.inject({ method: "GET", url: "/api/server-info" })).json()).toEqual({ listenHost: "127.0.0.1", addresses: ["192.168.1.20"] });
+  });
+});
+
 describe("/api/export + /api/import", () => {
   it("round-trips the whole state, including the images in use, into an empty instance", async () => {
     const { app, uploadsDir } = source;

@@ -3,6 +3,7 @@ import { NumberInput } from "../../components/NumberInput";
 import { usePartyStore } from "../../store/partyStore";
 import { deleteCharacter } from "../../store/actions";
 import { reportError } from "../../store/statusStore";
+import { PlayerLink } from "./PlayerLink";
 import styles from "./Party.module.css";
 
 export const SIZE_OPTIONS = [
@@ -12,7 +13,7 @@ export const SIZE_OPTIONS = [
   { value: 4, label: "Mastod. (4×4)" },
 ];
 
-export function CharacterCard({ character }: { character: Character }) {
+export function CharacterCard({ character, linkBase }: { character: Character; linkBase?: string }) {
   const update = usePartyStore((s) => s.update);
   const set = (patch: Partial<Character>) => update(character.id, patch);
   const setHp = (patch: Partial<Character["hp"]>) => update(character.id, (c) => ({ ...c, hp: { ...c.hp, ...patch } }));
@@ -103,6 +104,8 @@ export function CharacterCard({ character }: { character: Character }) {
         Note
         <textarea rows={3} value={character.notes} onChange={(e) => set({ notes: e.target.value })} />
       </label>
+
+      {linkBase !== undefined && <PlayerLink base={linkBase} pcId={character.id} name={name} />}
     </article>
   );
 }

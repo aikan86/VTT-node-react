@@ -11,6 +11,7 @@ export * from "./sight";
 export * from "./conditions";
 export * from "./measure";
 export * from "./movement";
+export * from "./wand";
 export * from "./hp";
 export * from "./initiative";
 export * from "./placement";

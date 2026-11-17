@@ -25,6 +25,12 @@ interface Props {
   /** Celle già esplorate dal party (nebbia con memoria). */
   exploredCount: number;
   onResetExplored: () => void;
+  /** Bacchetta magica: serve un'immagine di sfondo. */
+  hasBackground: boolean;
+  wandTolerance: number;
+  onWandTolerance: (tolerance: number) => void;
+  /** Esito dell'ultimo clic con la bacchetta. */
+  wandStatus: string | null;
 }
 
 export function ElementsPanel({
@@ -46,6 +52,10 @@ export function ElementsPanel({
   onDark,
   exploredCount,
   onResetExplored,
+  hasBackground,
+  wandTolerance,
+  onWandTolerance,
+  wandStatus,
 }: Props) {
   return (
     <>
@@ -69,8 +79,33 @@ export function ElementsPanel({
             <span className="swatch" style={{ background: DEFAULT_LIGHT.color, borderRadius: "50%", marginRight: 6 }} />
             Luce
           </button>
+          <button
+            className={tool === "wand" ? "active" : ""}
+            aria-pressed={tool === "wand"}
+            disabled={!hasBackground}
+            title={hasBackground ? "Clic su un'area di colore uniforme: ne traccia il contorno come ostacolo alla vista" : "Serve un'immagine di sfondo (livello Sfondo)"}
+            onClick={() => onTool("wand")}
+          >
+            ✨ Bacchetta magica
+          </button>
         </div>
-        {tool === "light" ? (
+        {tool === "wand" ? (
+          <>
+            <p className={styles.callout}>
+              Clicca su un'area di colore uniforme della mappa (una roccia, un edificio, un muro disegnato): il contorno diventa un ostacolo alla vista. Puoi
+              cliccare più aree di fila; Esc per finire.
+            </p>
+            <label className="field">
+              Tolleranza colore: {wandTolerance}
+              <input type="range" min={4} max={120} step={2} value={wandTolerance} onChange={(e) => onWandTolerance(Number(e.target.value))} />
+            </label>
+            {wandStatus && (
+              <p role="status" className="muted" style={{ fontSize: "0.85rem", margin: 0 }}>
+                {wandStatus}
+              </p>
+            )}
+          </>
+        ) : tool === "light" ? (
           <p className={styles.callout}>Clicca sulla mappa per piazzare una luce al centro della cella. Muri, porte chiuse e ostacoli la fermano.</p>
         ) : tool === "sight" ? (
           <>

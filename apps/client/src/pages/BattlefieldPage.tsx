@@ -34,6 +34,7 @@ import { TokensPanel } from "../features/battlefield/panels/TokensPanel";
 import { SceneBar } from "../features/battlefield/SceneBar";
 import { BACKGROUND_ID } from "../features/battlefield/layers/BackgroundLayer";
 import type { MovementArea } from "../features/battlefield/layers/MovementLayer";
+import { loadRaster, WAND_ERRORS, wandOnRaster } from "../features/battlefield/wand";
 import { isRectTool, type DrawTool, type EffectTool, type ElementTool, type ObjectTool, type PendingPlacement, type Selection, type SketchDraft } from "../features/battlefield/types";
 import styles from "../features/battlefield/Battlefield.module.css";
 import { AddNpcDialog } from "../features/initiative/AddNpcDialog";
@@ -78,6 +79,29 @@ function Battlefield({ scene }: { scene: Scene }) {
   const [measuring, setMeasuring] = useState(false);
   /** Mostra il raggio di movimento del token selezionato. */
   const [showMovement, setShowMovement] = useState(true);
+  /** Bacchetta magica: tolleranza di colore ed esito dell'ultimo clic. */
+  const [wandTolerance, setWandTolerance] = useState(32);
+  const [wandStatus, setWandStatus] = useState<string | null>(null);
+
+  const runWand = async (world: Point) => {
+    const bg = scene.background;
+    if (!bg) return;
+    setWandStatus("Analisi dell'immagine…");
+    try {
+      const result = wandOnRaster(bg, await loadRaster(bg.imageUrl), world, wandTolerance);
+      if (!result.ok) {
+        setWandStatus(WAND_ERRORS[result.reason]);
+        return;
+      }
+      const blocker = { id: createId(), points: pxPointsToCells(result.polygon, scene.grid) };
+      update((s) => ({ ...s, sightBlockers: [...s.sightBlockers, blocker] }));
+      setSelection({ layer: "elements", id: blocker.id });
+      setWandStatus(`Ostacolo creato: ${result.polygon.length / 2} vertici. Selezionalo per spostarlo o Canc per eliminarlo.`);
+    } catch (err) {
+      setWandStatus(null);
+      reportError(err);
+    }
+  };
 
   const update = useCallback((fn: (s: Scene) => Scene) => useSceneStore.getState().update(scene.id, fn), [scene.id]);
 
@@ -120,6 +144,7 @@ function Battlefield({ scene }: { scene: Scene }) {
   // Cambio di strumento: la forma in tracciamento si scarta; con lo strumento ostacolo non resta nulla di selezionato
   useEffect(() => {
     setTrace([]);
+    setWandStatus(null);
     if (elementTool === "sight") setSelection(null);
   }, [elementTool]);
 
@@ -204,7 +229,7 @@ function Battlefield({ scene }: { scene: Scene }) {
     (activeLayer === "tokens" && pending !== null) ||
     (activeLayer === "effects" && (effectTool.placing || drawTool.mode === "text")) ||
     (activeLayer === "background" && objectTool !== null) ||
-    (activeLayer === "elements" && elementTool === "light");
+    (activeLayer === "elements" && (elementTool === "light" || elementTool === "wand"));
 
   const addDrawing = (drawing: Drawing) => update((s) => ({ ...s, drawings: [...s.drawings, drawing] }));
 
@@ -231,6 +256,8 @@ function Battlefield({ scene }: { scene: Scene }) {
       placeTokens(scene.id, pending, cell, sizeOfRef);
       if (placeHidden) update((s) => ({ ...s, tokens: s.tokens.map((t) => (pending.some((r) => sameRef(r, t.ref)) ? { ...t, hidden: true } : t)) }));
       setPending(null);
+    } else if (activeLayer === "elements" && elementTool === "wand") {
+      void runWand(world); // lo strumento resta attivo: si possono prendere più aree di fila
     } else if (activeLayer === "elements" && elementTool === "light") {
       // al centro della cella cliccata
       const light: Light = { id: createId(), x: cell.x + 0.5, y: cell.y + 0.5, ...DEFAULT_LIGHT };
@@ -358,6 +385,10 @@ function Battlefield({ scene }: { scene: Scene }) {
             dark={scene.dark}
             onDark={(dark) => update((s) => ({ ...s, dark, vision: dark ? { ...s.vision, enabled: true } : s.vision }))}
             exploredCount={scene.explored.length}
+            hasBackground={scene.background !== null}
+            wandTolerance={wandTolerance}
+            onWandTolerance={setWandTolerance}
+            wandStatus={elementTool === "wand" ? wandStatus : null}
             onResetExplored={() => {
               if (confirm("Azzerare le zone esplorate? Il party ricorderà solo ciò che vede da adesso.")) update(resetExplored);
             }}

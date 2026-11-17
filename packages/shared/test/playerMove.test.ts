@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canPlayerMove, movePartyToken, partyMover } from "../src/playerView";
+import { canPlayerMove, movePartyToken, ownMover, partyMover } from "../src/playerView";
 import { newScene, SceneSchema, type Scene } from "../src/schemas/scene";
 
 function scene(extra: Partial<Scene> = {}): Scene {
@@ -49,6 +49,18 @@ describe("partyMover: who moves on whose turn", () => {
     expect(movePartyToken(s, "borin", { x: 3, y: 3 }, ariaTurn)).toBe(s);
     expect(movePartyToken(s, "aria", { x: 3, y: 3 }, ariaTurn).tokens[0]).toMatchObject({ x: 3, y: 3 });
     expect(movePartyToken(s, "aria", { x: 3, y: 3 }, null)).toBe(s);
+  });
+});
+
+describe("ownMover: the single-player view", () => {
+  const aria = { kind: "pc" as const, id: "pc-a" };
+  const borin = { kind: "pc" as const, id: "pc-b" };
+
+  it("moves only its own character, and only on its turn during combat", () => {
+    expect(ownMover("any", aria)).toEqual(aria);
+    expect(ownMover(aria, aria)).toEqual(aria);
+    expect(ownMover(borin, aria)).toBeNull();
+    expect(ownMover(null, aria)).toBeNull();
   });
 });
 

@@ -7,6 +7,7 @@ import { DmRollsPage } from "./pages/DmRollsPage";
 import { InitiativePage } from "./pages/InitiativePage";
 import { PartyPage } from "./pages/PartyPage";
 import { PlayerViewPage } from "./pages/PlayerViewPage";
+import { PlayerPhonePage } from "./pages/PlayerPhonePage";
 import { CombatStatus } from "./features/initiative/CombatStatus";
 import { TransferButtons } from "./features/transfer/TransferButtons";
 import { flushCombat, receiveCombat, resyncCombat, useCombatStore } from "./store/combatStore";
@@ -105,11 +106,13 @@ export function App() {
 
   // Vista giocatori: a schermo intero, senza intestazione né controlli del master (i dati arrivano dagli stessi aggiornamenti in tempo reale)
   const playerRoute = useMatch("/giocatori");
-  if (playerRoute) {
+  // vista del singolo giocatore (telefono): /giocatori/:pgId
+  const phoneRoute = useMatch("/giocatori/:pgId");
+  if (playerRoute || phoneRoute) {
     if (state !== "ready") {
       return <div style={{ height: "100%", display: "grid", placeItems: "center" }}>{state === "failed" ? "Impossibile contattare il server. È avviato?" : "Caricamento…"}</div>;
     }
-    return <PlayerViewPage />;
+    return phoneRoute?.params.pgId ? <PlayerPhonePage pcId={phoneRoute.params.pgId} /> : <PlayerViewPage />;
   }
 
   return (

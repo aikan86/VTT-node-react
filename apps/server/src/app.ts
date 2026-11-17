@@ -1,4 +1,5 @@
 import { mkdirSync } from "node:fs";
+import { networkInterfaces } from "node:os";
 import Fastify, { type FastifyInstance } from "fastify";
 import multipart from "@fastify/multipart";
 import fastifyStatic from "@fastify/static";
@@ -21,6 +22,18 @@ export interface AppOptions {
   logger?: boolean;
   /** Conservazione della cronologia delle versioni (default: 200 versioni, raffiche di 5 s accorpate). */
   history?: HistoryOptions;
+  /** Indirizzo su cui il server accetta connessioni (per dire al master se i telefoni possono collegarsi). */
+  listenHost?: string;
+  /** Indirizzi IPv4 di rete del PC (default: letti dal sistema). */
+  networkAddresses?: () => string[];
+}
+
+/** Indirizzi IPv4 del PC sulla rete locale (niente loopback). */
+function lanAddresses(): string[] {
+  return Object.values(networkInterfaces())
+    .flat()
+    .filter((i): i is NonNullable<typeof i> => !!i && i.family === "IPv4" && !i.internal)
+    .map((i) => i.address);
 }
 
 export const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
@@ -54,6 +67,11 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
   registerHistoryRoutes(app, db, [characters, scenes, dmRolls, combat, handouts, monsters, npcGroups]);
   registerUploadRoutes(app, opts.uploadsDir);
   registerTransferRoutes(app, { characters, scenes, dmRolls, combat, handouts, monsters, npcGroups }, opts.uploadsDir);
+  // per i link dei giocatori: con che indirizzo un telefono sulla stessa rete raggiunge questo PC
+  app.get("/api/server-info", async () => ({
+    listenHost: opts.listenHost ?? null,
+    addresses: (opts.networkAddresses ?? lanAddresses)(),
+  }));
 
   if (opts.clientDist) {
     // L'HTML va sempre riconvalidato (punta agli asset della release corrente); gli asset hanno l'hash nel nome.

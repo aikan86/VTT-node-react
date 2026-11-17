@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { DEFAULT_VISION, type Light, type MapElement } from "@vtt/shared";
@@ -18,6 +18,7 @@ function renderPanel(props: Partial<Parameters<typeof ElementsPanel>[0]> = {}) {
     onResetExplored: vi.fn(),
     onLightChange: vi.fn(),
     onDark: vi.fn(),
+    onWandTolerance: vi.fn(),
   };
   render(
     <ElementsPanel
@@ -29,6 +30,9 @@ function renderPanel(props: Partial<Parameters<typeof ElementsPanel>[0]> = {}) {
       tracePoints={0}
       vision={{ ...DEFAULT_VISION, enabled: true }}
       exploredCount={0}
+      hasBackground
+      wandTolerance={32}
+      wandStatus={null}
       {...handlers}
       {...props}
     />,
@@ -120,6 +124,28 @@ describe("ElementsPanel dark scene", () => {
   it("is not shown as dark while vision is off", () => {
     renderPanel({ dark: true, vision: { ...DEFAULT_VISION, enabled: false } });
     expect(screen.getByRole("checkbox", { name: /scena buia/i })).not.toBeChecked();
+  });
+});
+
+describe("ElementsPanel magic wand", () => {
+  it("is offered only with a background image", async () => {
+    const { onTool } = renderPanel();
+    await userEvent.click(screen.getByRole("button", { name: /bacchetta magica/i }));
+    expect(onTool).toHaveBeenCalledWith("wand");
+  });
+
+  it("is disabled without a background image", () => {
+    renderPanel({ hasBackground: false });
+    expect(screen.getByRole("button", { name: /bacchetta magica/i })).toBeDisabled();
+  });
+
+  it("explains itself, sets the tolerance and reports the outcome", () => {
+    const { onWandTolerance } = renderPanel({ tool: "wand", wandStatus: "Ostacolo creato: 12 vertici." });
+    expect(screen.getByText(/clicca su un'area di colore uniforme/i)).toBeInTheDocument();
+    const slider = screen.getByRole("slider", { name: /tolleranza colore: 32/i });
+    fireEvent.change(slider, { target: { value: "60" } });
+    expect(onWandTolerance).toHaveBeenCalledWith(60);
+    expect(screen.getByRole("status")).toHaveTextContent("Ostacolo creato: 12 vertici.");
   });
 });
 

@@ -5,11 +5,14 @@ export interface Selection {
   id: string;
 }
 
-/** "light" piazza una luce con un click; "sight" traccia un ostacolo alla vista; gli altri disegnano elementi. */
-export type ElementTool = "select" | "sight" | "light" | ElementType;
+/**
+ * "light" piazza una luce con un click; "sight" traccia un ostacolo alla vista; "wand" lo ricava dal contorno di un'area
+ * di colore uniforme dell'immagine (bacchetta magica); gli altri disegnano elementi.
+ */
+export type ElementTool = "select" | "sight" | "light" | "wand" | ElementType;
 
 /** Gli strumenti che disegnano un rettangolo trascinando. */
-export const isRectTool = (tool: ElementTool): tool is ElementType => tool !== "select" && tool !== "sight" && tool !== "light";
+export const isRectTool = (tool: ElementTool): tool is ElementType => tool !== "select" && tool !== "sight" && tool !== "light" && tool !== "wand";
 
 /** Colore degli ostacoli alla vista tracciati a mano. */
 export const SIGHT_COLOR = "#a855f7";

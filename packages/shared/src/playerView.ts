@@ -21,6 +21,12 @@ export function partyMover(combat: Pick<Combat, "active" | "currentId" | "combat
   return current?.ref.kind === "pc" ? current.ref : null;
 }
 
+/** Vista del singolo giocatore: muove solo il proprio PG, e solo quando le regole del turno lo permettono. */
+export function ownMover(mover: PartyMover, own: Ref): PartyMover {
+  if (mover === "any") return own;
+  return mover !== null && sameRef(mover, own) ? own : null;
+}
+
 /** Dalla vista giocatori si possono spostare solo i PG non nascosti, se il master lo permette nella scena e (in combattimento) nel loro turno. */
 export function canPlayerMove(scene: Pick<Scene, "playersMoveParty">, token: Pick<Token, "ref" | "hidden">, mover: PartyMover = "any"): boolean {
   if (!scene.playersMoveParty || token.ref.kind !== "pc" || token.hidden || mover === null) return false;

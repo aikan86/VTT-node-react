@@ -10,6 +10,7 @@ import {
   DEFAULT_SPEED_FT,
   movementRange,
   playerScene,
+  sameRef,
   withoutUnseenTokens,
   type Point,
   type Ref,
@@ -42,6 +43,10 @@ interface Props {
   onMoveToken?: (token: Token) => void;
   /** Chi può muovere ora (fuori combattimento tutti i PG, in combattimento solo quello di turno). */
   mover?: PartyMover;
+  /** Vista del singolo giocatore: la nebbia segue solo quello che vede questo PG. */
+  viewer?: Ref;
+  /** Centra la mappa su questo PG all'apertura (e col pulsante "Centra su di me"). */
+  focus?: Ref;
 }
 
 /** Spostamento trascinato ma non ancora confermato: la scena (e quindi la vista) non cambia finché non si conferma. */
@@ -69,6 +74,8 @@ function PendingMoveLayer({ pending, size, color, grid, viewScale }: { pending: 
 
 const MIN_SCALE = 0.05;
 const MAX_SCALE = 6;
+/** Lato di una casella sullo schermo quando si centra su un PG: comodo da trascinare col dito. */
+const FOCUS_CELL_SCREEN_PX = 56;
 const noop = () => {};
 
 /**
@@ -76,7 +83,7 @@ const noop = () => {};
  * ostacoli alla vista tracciati e senza barre dei PF. Si adatta allo schermo; rotella per lo zoom,
  * trascinamento per spostarsi, doppio clic per rimettere la mappa a misura.
  */
-export function PlayerStage({ scene, resolve, currentRef, onMoveToken, mover = "any" }: Props) {
+export function PlayerStage({ scene, resolve, currentRef, onMoveToken, mover = "any", viewer, focus }: Props) {
   const [containerRef, size] = useElementSize<HTMLDivElement>();
   const [view, setView] = useState<View>({ x: 0, y: 0, scale: 1 });
   /** Righello (tasto R o pulsante): trascinando si misura invece di spostare la mappa. */
@@ -117,16 +124,38 @@ export function PlayerStage({ scene, resolve, currentRef, onMoveToken, mover = "
     if (!measuring) setRuler(null);
   }, [measuring]);
   const shown = useMemo(() => playerScene(scene), [scene]);
-  const sight = usePartySight(shown, resolve);
+  // vista del singolo giocatore: vede con gli occhi del suo PG (se è sulla mappa), non di tutto il party
+  const sightScene = useMemo(
+    () =>
+      viewer && shown.tokens.some((t) => sameRef(t.ref, viewer))
+        ? { ...shown, tokens: shown.tokens.filter((t) => t.ref.kind !== "pc" || sameRef(t.ref, viewer)) }
+        : shown,
+    [shown, viewer],
+  );
+  const sight = usePartySight(sightScene, resolve);
   // nelle zone ricordate (grigie) o al buio i nemici non compaiono: solo dove il party vede ora
   const inSight = useMemo(() => withoutUnseenTokens(shown, sight, (ref) => resolve(ref)?.size), [shown, sight, resolve]);
   const bg = scene.background;
-  const latest = useRef({ shown, resolve, size });
-  latest.current = { shown, resolve, size };
+  const latest = useRef({ shown, resolve, size, focus });
+  latest.current = { shown, resolve, size, focus };
+
+  /** Centra la mappa sul token di `ref` con caselle comode da toccare; false se il token non è sulla mappa. */
+  const centerOn = (ref: Ref): boolean => {
+    const { shown: s, resolve: r, size: sz } = latest.current;
+    const token = s.tokens.find((t) => sameRef(t.ref, ref));
+    if (!token || !sz.width) return false;
+    const g = s.grid;
+    const half = ((r(ref)?.size ?? 1) * g.cellPx) / 2;
+    const p = cellToPx(token, g);
+    const scale = clamp(FOCUS_CELL_SCREEN_PX / g.cellPx, MIN_SCALE, MAX_SCALE);
+    setView({ scale, x: sz.width / 2 - (p.x + half) * scale, y: sz.height / 2 - (p.y + half) * scale });
+    return true;
+  };
 
   const fit = () => {
-    const { shown: s, resolve: r, size: sz } = latest.current;
+    const { shown: s, resolve: r, size: sz, focus: f } = latest.current;
     if (!sz.width || !sz.height) return;
+    if (f && centerOn(f)) return;
     const b = contentBounds(s, (ref) => r(ref)?.size ?? 1);
     const width = Math.max(1, b.maxX - b.minX);
     const height = Math.max(1, b.maxY - b.minY);
@@ -186,8 +215,24 @@ export function PlayerStage({ scene, resolve, currentRef, onMoveToken, mover = "
       return { scale, x: pointer.x - world.x * scale, y: pointer.y - world.y * scale };
     });
 
+  /** Zoom a due dita (telefono): distanza tra le dita all'evento precedente. */
+  const pinch = useRef<number | null>(null);
+  const onTouchMove = (e: Konva.KonvaEventObject<TouchEvent>) => {
+    const touches = e.evt.touches;
+    const stage = e.target.getStage();
+    if (touches.length !== 2 || !stage) return;
+    e.evt.preventDefault();
+    if (stage.isDragging()) stage.stopDrag();
+    const [a, b] = [touches[0]!, touches[1]!];
+    const rect = stage.container().getBoundingClientRect();
+    const center = { x: (a.clientX + b.clientX) / 2 - rect.left, y: (a.clientY + b.clientY) / 2 - rect.top };
+    const dist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+    if (pinch.current) zoomAt(center, dist / pinch.current);
+    pinch.current = dist;
+  };
+
   return (
-    <div ref={containerRef} style={{ position: "absolute", inset: 0, cursor: measuring ? "crosshair" : undefined }}>
+    <div ref={containerRef} style={{ position: "absolute", inset: 0, cursor: measuring ? "crosshair" : undefined, touchAction: "none" }}>
       {size.width > 0 && (
         <Stage
           width={size.width}
@@ -214,6 +259,10 @@ export function PlayerStage({ scene, resolve, currentRef, onMoveToken, mover = "
           }}
           onPointerUp={() => {
             if (ruler?.dragging) setRuler({ ...ruler, dragging: false });
+          }}
+          onTouchMove={onTouchMove}
+          onTouchEnd={() => {
+            pinch.current = null;
           }}
           onWheel={(e) => {
             e.evt.preventDefault();
@@ -282,6 +331,11 @@ export function PlayerStage({ scene, resolve, currentRef, onMoveToken, mover = "
       )}
       <div className={styles.playerTools}>
         {measuring && <span className={styles.playerHint}>Trascina per misurare · Shift: punto libero · R o Esc: chiudi</span>}
+        {focus && shown.tokens.some((t) => sameRef(t.ref, focus)) && (
+          <button onClick={() => centerOn(focus)} title="Centra la mappa sul tuo personaggio">
+            ◎ Centra su di me
+          </button>
+        )}
         <button className={measuring ? "active" : ""} aria-pressed={measuring} onClick={() => setMeasuring((m) => !m)} title="Misura distanze (R)">
           📏 Righello
         </button>
