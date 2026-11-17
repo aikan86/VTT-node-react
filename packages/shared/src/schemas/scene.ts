@@ -277,6 +277,8 @@ export const SceneSchema = z.object({
   lights: z.array(LightSchema).max(500).default([]),
   /** Scena buia (con la visione attiva): il party vede solo dentro le luci o entro la scurovisione dei propri token. */
   dark: z.boolean().default(false),
+  /** I giocatori possono spostare i PG dalla loro vista (assente nelle scene salvate prima: sì). */
+  playersMoveParty: z.boolean().default(true),
 });
 export type Scene = z.infer<typeof SceneSchema>;
 
@@ -307,6 +309,7 @@ export function newScene(name = "Nuova scena"): Scene {
     explored: [],
     lights: [],
     dark: false,
+    playersMoveParty: true,
   };
 }
 

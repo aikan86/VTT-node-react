@@ -45,6 +45,7 @@ interface PanelOptions {
   onPlaceHidden?: (hidden: boolean) => void;
   showMovement?: boolean;
   onShowMovement?: (show: boolean) => void;
+  onPlayersMoveParty?: (allowed: boolean) => void;
 }
 
 function renderPanel(scene: Scene, onRemoveFromMap = vi.fn(), options: PanelOptions = {}) {
@@ -66,6 +67,7 @@ function renderPanel(scene: Scene, onRemoveFromMap = vi.fn(), options: PanelOpti
       onPlaceHidden={options.onPlaceHidden ?? vi.fn()}
       showMovement={options.showMovement ?? true}
       onShowMovement={options.onShowMovement ?? vi.fn()}
+      onPlayersMoveParty={options.onPlayersMoveParty ?? vi.fn()}
     />,
   );
   return onRemoveFromMap;
@@ -342,6 +344,22 @@ describe("TokensPanel: conditions", () => {
     expect(within(list).getByRole("img", { name: "Stordito" })).toHaveTextContent("💫");
     expect(within(list).getByRole("img", { name: "Avvelenato" })).toBeInTheDocument();
     expect(within(list).getAllByTestId("condition-icons")).toHaveLength(1);
+  });
+});
+
+describe("TokensPanel: players moving the party", () => {
+  it("is allowed by default and can be turned off", async () => {
+    const onPlayersMoveParty = vi.fn();
+    renderPanel(sceneWithAria(), vi.fn(), { onPlayersMoveParty });
+    const box = screen.getByRole("checkbox", { name: "I giocatori possono muovere i PG dalla loro vista" });
+    expect(box).toBeChecked();
+    await userEvent.click(box);
+    expect(onPlayersMoveParty).toHaveBeenCalledWith(false);
+  });
+
+  it("shows when the master has forbidden it", () => {
+    renderPanel({ ...sceneWithAria(), playersMoveParty: false });
+    expect(screen.getByRole("checkbox", { name: "I giocatori possono muovere i PG dalla loro vista" })).not.toBeChecked();
   });
 });
 

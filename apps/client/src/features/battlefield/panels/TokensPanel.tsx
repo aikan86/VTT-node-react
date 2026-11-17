@@ -32,9 +32,11 @@ interface Props {
   /** Mostra sulla mappa il raggio di movimento del token selezionato. */
   showMovement: boolean;
   onShowMovement: (show: boolean) => void;
+  /** Permette o vieta ai giocatori di spostare i PG dalla vista giocatori. */
+  onPlayersMoveParty: (allowed: boolean) => void;
 }
 
-export function TokensPanel({ scene, resolve, pending, onPending, onAddNpc, selected, onChangeToken, onRemoveToken, onRemoveFromMap, onAddToInitiative, onSetHidden, onSetNpcsHidden, placeHidden, onPlaceHidden, showMovement, onShowMovement }: Props) {
+export function TokensPanel({ scene, resolve, pending, onPending, onAddNpc, selected, onChangeToken, onRemoveToken, onRemoveFromMap, onAddToInitiative, onSetHidden, onSetNpcsHidden, placeHidden, onPlaceHidden, showMovement, onShowMovement, onPlayersMoveParty }: Props) {
   const characters = usePartyStore((s) => s.characters);
   const combat = useCombatStore((s) => s.combat);
   const locked = scene.layers.tokens.locked;
@@ -144,6 +146,10 @@ export function TokensPanel({ scene, resolve, pending, onPending, onAddNpc, sele
         {list(allRefs, "Nessun personaggio: crea i PG nella pagina Party o aggiungi un PNG.")}
         {missingPcs.length > 1 && <button onClick={() => onPending(missingPcs)}>Piazza tutto il party</button>}
         {missingNpcs.length > 1 && <button onClick={() => onPending(missingNpcs)}>Piazza tutti i PNG</button>}
+        <label className="row" style={{ flexWrap: "nowrap" }}>
+          <input type="checkbox" checked={scene.playersMoveParty} onChange={(e) => onPlayersMoveParty(e.target.checked)} />
+          I giocatori possono muovere i PG dalla loro vista
+        </label>
         {anyNpcVisible && (
           <button disabled={locked} onClick={() => onSetNpcsHidden(true)}>
             Nascondi tutti i PNG ai giocatori

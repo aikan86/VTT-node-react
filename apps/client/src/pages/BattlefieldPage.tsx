@@ -377,6 +377,7 @@ function Battlefield({ scene }: { scene: Scene }) {
             onPlaceHidden={setPlaceHidden}
             showMovement={showMovement}
             onShowMovement={setShowMovement}
+            onPlayersMoveParty={(allowed) => update((s) => ({ ...s, playersMoveParty: allowed }))}
             onRemoveToken={deleteSelection}
             onRemoveFromMap={removeFromMap}
             onAddToInitiative={(ref: Ref) => useCombatStore.getState().apply((c, _getMod, ctx) => addCombatant(c, ref, ctx.id))}

@@ -1,6 +1,23 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Stage } from "react-konva";
-import { playerScene, withoutUnseenTokens, type Point, type Ref, type Scene } from "@vtt/shared";
+import type Konva from "konva";
+import {
+  canPlayerMove,
+  cellCenter,
+  coveredCells,
+  DEFAULT_SPEED_FT,
+  movementRange,
+  playerScene,
+  withoutUnseenTokens,
+  type Point,
+  type Ref,
+  type Scene,
+  type Token,
+} from "@vtt/shared";
+import { isTyping } from "./hooks";
+import { MovementLayer, type MovementArea } from "./layers/MovementLayer";
+import { RulerLayer } from "./layers/RulerLayer";
+import styles from "./Battlefield.module.css";
 import type { EntityResolver } from "../../store/entities";
 import { clamp, contentBounds } from "./geometry";
 import { useElementSize } from "./hooks";
@@ -19,6 +36,8 @@ interface Props {
   resolve: EntityResolver;
   /** Chi ha il turno (evidenziato sul token). */
   currentRef: Ref | null;
+  /** Un giocatore ha trascinato un PG su una nuova cella (solo i token per cui `canPlayerMove`). */
+  onMoveToken?: (token: Token) => void;
 }
 
 const MIN_SCALE = 0.05;
@@ -30,9 +49,27 @@ const noop = () => {};
  * ostacoli alla vista tracciati e senza barre dei PF. Si adatta allo schermo; rotella per lo zoom,
  * trascinamento per spostarsi, doppio clic per rimettere la mappa a misura.
  */
-export function PlayerStage({ scene, resolve, currentRef }: Props) {
+export function PlayerStage({ scene, resolve, currentRef, onMoveToken }: Props) {
   const [containerRef, size] = useElementSize<HTMLDivElement>();
   const [view, setView] = useState<View>({ x: 0, y: 0, scale: 1 });
+  /** Righello (tasto R o pulsante): trascinando si misura invece di spostare la mappa. */
+  const [measuring, setMeasuring] = useState(false);
+  const [ruler, setRuler] = useState<{ start: Point; end: Point; dragging: boolean } | null>(null);
+  /** Raggio di movimento del PG che si sta trascinando. */
+  const [moveArea, setMoveArea] = useState<MovementArea | null>(null);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (isTyping(e) || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key === "r" || e.key === "R") setMeasuring((m) => !m);
+      else if (e.key === "Escape") setMeasuring(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+  useEffect(() => {
+    if (!measuring) setRuler(null);
+  }, [measuring]);
   const shown = useMemo(() => playerScene(scene), [scene]);
   const sight = usePartySight(shown, resolve);
   // nelle zone ricordate (grigie) o al buio i nemici non compaiono: solo dove il party vede ora
@@ -58,6 +95,23 @@ export function PlayerStage({ scene, resolve, currentRef }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fitKey, size.width, size.height]);
 
+  const canMove = (token: Token) => onMoveToken !== undefined && !measuring && canPlayerMove(shown, token);
+
+  const startDrag = (token: Token) => {
+    const sizeOf = resolve(token.ref)?.size ?? 1;
+    const speedFt = token.speedFt ?? DEFAULT_SPEED_FT;
+    if (speedFt <= 0) return;
+    // stesso calcolo del master: velocità e, più chiaro, scatto
+    const range = movementRange(shown, token, sizeOf, speedFt * 2);
+    setMoveArea({ cells: coveredCells(range, sizeOf), speedFt });
+  };
+
+  /** Punto del righello: centro della casella, oppure il punto esatto con Shift. */
+  const rulerPoint = (stage: Konva.Stage, free: boolean): Point | null => {
+    const world = stage.getRelativePointerPosition();
+    return world && (free ? world : cellCenter(world, scene.grid));
+  };
+
   const zoomAt = (pointer: Point, factor: number) =>
     setView((v) => {
       const scale = clamp(v.scale * factor, MIN_SCALE, MAX_SCALE);
@@ -66,7 +120,7 @@ export function PlayerStage({ scene, resolve, currentRef }: Props) {
     });
 
   return (
-    <div ref={containerRef} style={{ position: "absolute", inset: 0 }}>
+    <div ref={containerRef} style={{ position: "absolute", inset: 0, cursor: measuring ? "crosshair" : undefined }}>
       {size.width > 0 && (
         <Stage
           width={size.width}
@@ -75,9 +129,24 @@ export function PlayerStage({ scene, resolve, currentRef }: Props) {
           y={view.y}
           scaleX={view.scale}
           scaleY={view.scale}
-          draggable
+          draggable={!measuring}
           onDragEnd={(e) => {
             if (e.target === e.target.getStage()) setView((v) => ({ ...v, x: e.target.x(), y: e.target.y() }));
+          }}
+          onPointerDown={(e) => {
+            const stage = e.target.getStage();
+            if (!measuring || !stage || e.evt.button > 0) return;
+            const p = rulerPoint(stage, e.evt.shiftKey);
+            if (p) setRuler({ start: p, end: p, dragging: true });
+          }}
+          onPointerMove={(e) => {
+            const stage = e.target.getStage();
+            if (!ruler?.dragging || !stage) return;
+            const p = rulerPoint(stage, e.evt.shiftKey);
+            if (p) setRuler({ ...ruler, end: p });
+          }}
+          onPointerUp={() => {
+            if (ruler?.dragging) setRuler({ ...ruler, dragging: false });
           }}
           onWheel={(e) => {
             e.evt.preventDefault();
@@ -91,7 +160,23 @@ export function PlayerStage({ scene, resolve, currentRef }: Props) {
           <GridLayer scene={shown} view={view} size={size} />
           <ElementsLayer scene={shown} listening={false} editable={false} selectedId={null} draft={null} onSelect={noop} onChange={noop} />
           <LightsLayer scene={shown} />
-          <TokensLayer scene={inSight} resolve={resolve} listening={false} editable={false} selectedId={null} currentRef={currentRef} onSelect={noop} onMove={noop} hideHp />
+          {moveArea && <MovementLayer grid={shown.grid} area={moveArea} />}
+          <TokensLayer
+            scene={inSight}
+            resolve={resolve}
+            listening={!measuring && onMoveToken !== undefined}
+            editable={false}
+            selectedId={null}
+            currentRef={currentRef}
+            onSelect={noop}
+            movable={canMove}
+            onDragStart={startDrag}
+            onMove={(token) => {
+              setMoveArea(null);
+              onMoveToken?.(token);
+            }}
+            hideHp
+          />
           <VisionLayer scene={shown} sight={sight} view={view} size={size} darkness={1} />
           <EffectsLayer
             scene={shown}
@@ -106,8 +191,15 @@ export function PlayerStage({ scene, resolve, currentRef }: Props) {
             onDrawingChange={noop}
             onErase={noop}
           />
+          {ruler && <RulerLayer start={ruler.start} end={ruler.end} grid={shown.grid} viewScale={view.scale} />}
         </Stage>
       )}
+      <div className={styles.playerTools}>
+        {measuring && <span className={styles.playerHint}>Trascina per misurare · Shift: punto libero · R o Esc: chiudi</span>}
+        <button className={measuring ? "active" : ""} aria-pressed={measuring} onClick={() => setMeasuring((m) => !m)} title="Misura distanze (R)">
+          📏 Righello
+        </button>
+      </div>
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import type Konva from "konva";
 import { Circle, Group, Layer, Line, Path, Rect, Text } from "react-konva";
 import { cellToPx, CONDITION_INFO, sameRef, snapPxToCell, type Condition, type Ref, type Scene, type Token } from "@vtt/shared";
 import type { EntityResolver } from "../../../store/entities";
@@ -14,6 +15,10 @@ interface Props {
   onMove: (token: Token) => void;
   /** Non mostra le barre dei PF (vista giocatori). */
   hideHp?: boolean;
+  /** Token trascinabili anche se il livello non è modificabile (i PG nella vista giocatori). */
+  movable?: (token: Token) => boolean;
+  /** Inizio del trascinamento di un token. */
+  onDragStart?: (token: Token) => void;
 }
 
 const initials = (name: string) =>
@@ -73,7 +78,7 @@ function ConditionBadges({ conditions, size }: { conditions: readonly Condition[
   );
 }
 
-export function TokensLayer({ scene, resolve, listening, editable, selectedId, currentRef, onSelect, onMove, hideHp = false }: Props) {
+export function TokensLayer({ scene, resolve, listening, editable, selectedId, currentRef, onSelect, onMove, hideHp = false, movable, onDragStart }: Props) {
   const g = scene.grid;
 
   return (
@@ -89,16 +94,26 @@ export function TokensLayer({ scene, resolve, listening, editable, selectedId, c
         const isSelected = selectedId === token.id;
         const down = entity.hp.current <= 0;
         const barW = s - 8;
+        const draggable = editable || (movable?.(token) ?? false);
+        const setCursor = (e: Konva.KonvaEventObject<MouseEvent>, cursor: string) => {
+          const container = e.target.getStage()?.container();
+          if (container && !editable && draggable) container.style.cursor = cursor;
+        };
 
         return (
           <Group
             key={token.id}
             x={pos.x}
             y={pos.y}
-            draggable={editable}
+            draggable={draggable}
             onMouseDown={() => onSelect(token.id)}
             onTap={() => onSelect(token.id)}
-            onDragStart={(e) => e.target.moveToTop()}
+            onMouseEnter={(e) => setCursor(e, "grab")}
+            onMouseLeave={(e) => setCursor(e, "")}
+            onDragStart={(e) => {
+              e.target.moveToTop();
+              onDragStart?.(token);
+            }}
             onDragEnd={(e) => {
               const next = snapPxToCell(e.target.position(), g);
               e.target.position(cellToPx(next, g));
