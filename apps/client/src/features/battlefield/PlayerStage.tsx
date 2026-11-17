@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Stage } from "react-konva";
-import { playerScene, type Point, type Ref, type Scene } from "@vtt/shared";
+import { playerScene, withoutUnseenTokens, type Point, type Ref, type Scene } from "@vtt/shared";
 import type { EntityResolver } from "../../store/entities";
 import { clamp, contentBounds } from "./geometry";
 import { useElementSize } from "./hooks";
@@ -11,6 +11,7 @@ import { ObjectsLayer } from "./layers/ObjectsLayer";
 import { TokensLayer } from "./layers/TokensLayer";
 import { VisionLayer } from "./layers/VisionLayer";
 import type { View } from "./types";
+import { usePartyVision } from "./vision";
 
 interface Props {
   scene: Scene;
@@ -32,6 +33,9 @@ export function PlayerStage({ scene, resolve, currentRef }: Props) {
   const [containerRef, size] = useElementSize<HTMLDivElement>();
   const [view, setView] = useState<View>({ x: 0, y: 0, scale: 1 });
   const shown = useMemo(() => playerScene(scene), [scene]);
+  const visionPolygons = usePartyVision(shown, resolve);
+  // nelle zone ricordate (grigie) i nemici non compaiono: solo dove il party vede ora
+  const inSight = useMemo(() => withoutUnseenTokens(shown, visionPolygons, (ref) => resolve(ref)?.size), [shown, visionPolygons, resolve]);
   const bg = scene.background;
   const latest = useRef({ shown, resolve, size });
   latest.current = { shown, resolve, size };
@@ -85,8 +89,8 @@ export function PlayerStage({ scene, resolve, currentRef }: Props) {
           <ObjectsLayer scene={shown} listening={false} editable={false} selectedId={null} onSelect={noop} onChange={noop} />
           <GridLayer scene={shown} view={view} size={size} />
           <ElementsLayer scene={shown} listening={false} editable={false} selectedId={null} draft={null} onSelect={noop} onChange={noop} />
-          <TokensLayer scene={shown} resolve={resolve} listening={false} editable={false} selectedId={null} currentRef={currentRef} onSelect={noop} onMove={noop} hideHp />
-          <VisionLayer scene={shown} resolve={resolve} view={view} size={size} darkness={1} />
+          <TokensLayer scene={inSight} resolve={resolve} listening={false} editable={false} selectedId={null} currentRef={currentRef} onSelect={noop} onMove={noop} hideHp />
+          <VisionLayer scene={shown} polygons={visionPolygons} view={view} size={size} darkness={1} />
           <EffectsLayer
             scene={shown}
             listening={false}

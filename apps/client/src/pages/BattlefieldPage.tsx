@@ -1,8 +1,25 @@
-import { useCallback, useEffect, useState } from "react";
-import { addCombatant, createId, ELEMENT_COLORS, OBJECT_DEFAULTS, sameRef, type Drawing, type LayerKey, type MapObject, type Point, type Ref, type Scene } from "@vtt/shared";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  addCombatant,
+  addExplored,
+  createId,
+  ELEMENT_COLORS,
+  OBJECT_DEFAULTS,
+  resetExplored,
+  sameRef,
+  toggleDoor,
+  visibleCells,
+  type Drawing,
+  type LayerKey,
+  type MapObject,
+  type Point,
+  type Ref,
+  type Scene,
+} from "@vtt/shared";
 import { BattleStage } from "../features/battlefield/BattleStage";
 import { isTyping } from "../features/battlefield/hooks";
-import { calibrateBackground, pxPointsToCells, snapTo, withBackgroundGeometry } from "../features/battlefield/geometry";
+import { calibrateBackground, contentBounds, pxPointsToCells, snapTo, withBackgroundGeometry } from "../features/battlefield/geometry";
+import { usePartyVision } from "../features/battlefield/vision";
 import { BackgroundPanel } from "../features/battlefield/panels/BackgroundPanel";
 import { CalibrationDialog } from "../features/battlefield/panels/CalibrationDialog";
 import { EffectsPanel } from "../features/battlefield/panels/EffectsPanel";
@@ -20,6 +37,9 @@ import { useCombatStore } from "../store/combatStore";
 import { sizeOfRef, useEntityResolver } from "../store/entities";
 import { useActiveScene, useSceneStore } from "../store/sceneStore";
 import { reportError } from "../store/statusStore";
+
+/** Oltre i contenuti della scena la visione senza limite non viene ricordata, salvo questo bordo (in celle). */
+const EXPLORE_MARGIN_CELLS = 10;
 
 export function BattlefieldPage() {
   const scene = useActiveScene();
@@ -49,6 +69,24 @@ function Battlefield({ scene }: { scene: Scene }) {
   const [trace, setTrace] = useState<Point[]>([]);
 
   const update = useCallback((fn: (s: Scene) => Scene) => useSceneStore.getState().update(scene.id, fn), [scene.id]);
+
+  const visionPolygons = usePartyVision(scene, resolve);
+  const latestScene = useRef(scene);
+  latestScene.current = scene;
+
+  // Nebbia con memoria: le celle che il party vede ora restano esplorate (salvate nella scena)
+  useEffect(() => {
+    const s = latestScene.current;
+    if (!s.vision.enabled || visionPolygons.length === 0) return;
+    const b = contentBounds(s, (ref) => resolve(ref)?.size ?? 1);
+    const margin = EXPLORE_MARGIN_CELLS * s.grid.cellPx;
+    const limit = { minX: b.minX - margin, minY: b.minY - margin, maxX: b.maxX + margin, maxY: b.maxY + margin };
+    const cells = visibleCells(visionPolygons, s.grid, limit);
+    if (addExplored(s, cells) !== s) update((current) => addExplored(current, cells));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visionPolygons, update, scene.explored.length === 0]); // dopo l'azzeramento si ricorda subito ciò che si vede ora
+
+  const toggleDoorById = useCallback((id: string) => update((s) => toggleDoor(s, id)), [update]);
 
   // Cambio scena o livello: azzera selezione e strumenti in corso
   useEffect(() => {
@@ -113,6 +151,12 @@ function Battlefield({ scene }: { scene: Scene }) {
       } else if ((e.key === "h" || e.key === "H") && !e.ctrlKey && !e.metaKey && !e.altKey && selection?.layer === "tokens" && !scene.layers.tokens.locked) {
         e.preventDefault();
         toggleHiddenSelected();
+      } else if ((e.key === "o" || e.key === "O") && !e.ctrlKey && !e.metaKey && !e.altKey && selection?.layer === "elements") {
+        const door = scene.elements.find((el) => el.id === selection.id && el.type === "door");
+        if (door) {
+          e.preventDefault();
+          toggleDoorById(door.id);
+        }
       } else if (e.key === "Enter" && elementTool === "sight" && trace.length >= 3) {
         e.preventDefault();
         closeTrace();
@@ -126,7 +170,7 @@ function Battlefield({ scene }: { scene: Scene }) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [closeTrace, deleteSelection, elementTool, selection, scene.layers, toggleHiddenSelected, trace.length]);
+  }, [closeTrace, deleteSelection, elementTool, selection, scene.layers, scene.elements, toggleDoorById, toggleHiddenSelected, trace.length]);
 
   const placing =
     (activeLayer === "tokens" && pending !== null) ||
@@ -273,6 +317,11 @@ function Battlefield({ scene }: { scene: Scene }) {
             onCancelTrace={() => setTrace([])}
             vision={scene.vision}
             onVision={(patch) => update((s) => ({ ...s, vision: { ...s.vision, ...patch } }))}
+            onToggleDoor={toggleDoorById}
+            exploredCount={scene.explored.length}
+            onResetExplored={() => {
+              if (confirm("Azzerare le zone esplorate? Il party ricorderà solo ciò che vede da adesso.")) update(resetExplored);
+            }}
           />
         )}
         {activeLayer === "tokens" && (
@@ -350,6 +399,8 @@ function Battlefield({ scene }: { scene: Scene }) {
           onSketch={onSketch}
           onDrawingChange={(drawing) => replace("drawings", drawing)}
           onEraseDrawing={eraseDrawing}
+          visionPolygons={visionPolygons}
+          onToggleDoor={toggleDoorById}
         />
       </div>
 

@@ -16,9 +16,28 @@ interface Props {
   onCancelTrace: () => void;
   vision: Vision;
   onVision: (patch: Partial<Vision>) => void;
+  onToggleDoor: (id: string) => void;
+  /** Celle già esplorate dal party (nebbia con memoria). */
+  exploredCount: number;
+  onResetExplored: () => void;
 }
 
-export function ElementsPanel({ tool, onTool, selected, onChange, onDelete, selectedBlocker, tracePoints, onCloseTrace, onCancelTrace, vision, onVision }: Props) {
+export function ElementsPanel({
+  tool,
+  onTool,
+  selected,
+  onChange,
+  onDelete,
+  selectedBlocker,
+  tracePoints,
+  onCloseTrace,
+  onCancelTrace,
+  vision,
+  onVision,
+  onToggleDoor,
+  exploredCount,
+  onResetExplored,
+}: Props) {
   return (
     <>
       <section className={styles.section}>
@@ -68,7 +87,7 @@ export function ElementsPanel({ tool, onTool, selected, onChange, onDelete, sele
                 value={selected.type}
                 onChange={(e) => {
                   const type = e.target.value as MapElement["type"];
-                  onChange({ ...selected, type, color: ELEMENT_COLORS[type] });
+                  onChange({ ...selected, type, color: ELEMENT_COLORS[type], open: type === "door" ? selected.open : undefined });
                 }}
               >
                 {ELEMENT_TYPES.map((t) => (
@@ -87,6 +106,16 @@ export function ElementsPanel({ tool, onTool, selected, onChange, onDelete, sele
             Etichetta
             <input value={selected.label ?? ""} maxLength={80} onChange={(e) => onChange({ ...selected, label: e.target.value || undefined })} />
           </label>
+          {selected.type === "door" && (
+            <>
+              <button aria-pressed={!!selected.open} onClick={() => onToggleDoor(selected.id)}>
+                {selected.open ? "Chiudi porta" : "Apri porta"} (O)
+              </button>
+              <span className="muted" style={{ fontSize: "0.8rem" }}>
+                {selected.open ? "Aperta: non blocca la vista." : "Chiusa: blocca la vista."} Dagli altri livelli basta un click sulla porta.
+              </span>
+            </>
+          )}
           <span className="muted" style={{ fontSize: "0.8rem" }}>
             {selected.w} × {selected.h} celle · trascina le maniglie per ridimensionare o ruotare
           </span>
@@ -115,7 +144,7 @@ export function ElementsPanel({ tool, onTool, selected, onChange, onDelete, sele
           Mostra cosa vede il party
         </label>
         <p className="muted" style={{ fontSize: "0.8rem", margin: 0 }}>
-          I personaggi sulla mappa vedono a 360°. Muri, porte, ostacoli e le forme tracciate qui bloccano la vista; il resto resta visibile.
+          I personaggi sulla mappa vedono a 360°. Muri, porte chiuse, ostacoli e le forme tracciate qui bloccano la vista; il resto resta visibile.
         </p>
         <div className={styles.grid2}>
           <label className="field">
@@ -127,6 +156,12 @@ export function ElementsPanel({ tool, onTool, selected, onChange, onDelete, sele
             <input type="range" min={0.2} max={1} step={0.05} value={vision.darkness} onChange={(e) => onVision({ darkness: Number(e.target.value) })} />
           </label>
         </div>
+        <p className="muted" style={{ fontSize: "0.8rem", margin: 0 }}>
+          Le zone già viste restano visibili in grigio scuro ({exploredCount === 1 ? "1 cella esplorata" : `${exploredCount} celle esplorate`}).
+        </p>
+        <button disabled={exploredCount === 0} onClick={onResetExplored}>
+          Azzera zone esplorate
+        </button>
       </section>
     </>
   );

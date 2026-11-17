@@ -68,6 +68,8 @@ export const MapElementSchema = z.object({
   rotation: z.number(),
   color: ColorSchema,
   label: z.string().max(80).optional(),
+  /** Solo per le porte: aperta non blocca la vista (assente = chiusa). */
+  open: z.boolean().optional(),
 });
 export type MapElement = z.infer<typeof MapElementSchema>;
 
@@ -222,6 +224,10 @@ export const MapObjectSchema = z.object({
 });
 export type MapObject = z.infer<typeof MapObjectSchema>;
 
+/** Tetto delle celle esplorate salvate in una scena (≈ 2 MB nel peggiore dei casi). */
+export const MAX_EXPLORED_CELLS = 200_000;
+const ExploredCellSchema = z.string().regex(/^-?\d+,-?\d+$/, "Cella come \"x,y\"");
+
 export const SceneSchema = z.object({
   id: IdSchema,
   name: z.string().trim().min(1).max(80),
@@ -245,6 +251,8 @@ export const SceneSchema = z.object({
   shownToPlayers: z.boolean().default(false),
   /** Oggetti dello sfondo: seguono il livello Sfondo (visibilità e blocco). */
   objects: z.array(MapObjectSchema).default([]),
+  /** Nebbia con memoria: celle già viste dal party, come chiavi "x,y" (vedi `cellKey`). */
+  explored: z.array(ExploredCellSchema).max(MAX_EXPLORED_CELLS).default([]),
 });
 export type Scene = z.infer<typeof SceneSchema>;
 
@@ -272,6 +280,7 @@ export function newScene(name = "Nuova scena"): Scene {
     vision: { ...DEFAULT_VISION },
     shownToPlayers: false,
     objects: [],
+    explored: [],
   };
 }
 

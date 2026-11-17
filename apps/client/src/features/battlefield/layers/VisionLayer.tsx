@@ -1,12 +1,12 @@
 import { useMemo } from "react";
-import { Layer, Line, Rect } from "react-konva";
-import { cellToPx, sightSegments, visibilityPolygon, visionRadiusPx, type Point, type Scene } from "@vtt/shared";
-import type { EntityResolver } from "../../../store/entities";
+import { Layer, Line, Rect, Shape } from "react-konva";
+import { exploredRuns, type Scene } from "@vtt/shared";
 import type { View } from "../types";
 
 interface Props {
   scene: Scene;
-  resolve: EntityResolver;
+  /** Poligoni di ciò che il party vede ora (da `usePartyVision`). */
+  polygons: number[][];
   view: View;
   size: { width: number; height: number };
   /** Opacità del velo al posto di quella della scena (la vista giocatori usa 1: ciò che non vedono è nero). */
@@ -14,41 +14,19 @@ interface Props {
 }
 
 const VIEW_MARGIN_PX = 50;
+/** Quanta parte del velo si toglie sulle zone già esplorate: restano visibili ma in grigio scuro. */
+const EXPLORED_REVEAL = 0.4;
 
 /**
- * Oscura tutto ciò che il party non vede: velo scuro su tutto il campo, bucato dal poligono di visibilità
- * di ogni personaggio (PG) sulla mappa. Il DM vede comunque sotto il velo, attenuato.
+ * Oscura tutto ciò che il party non vede: velo scuro su tutto il campo, schiarito sulle celle già esplorate
+ * (memoria della nebbia) e bucato del tutto dal poligono di visibilità di ogni personaggio (PG) sulla mappa.
+ * Il DM vede comunque sotto il velo, attenuato.
  */
-export function VisionLayer({ scene, resolve, view, size, darkness }: Props) {
+export function VisionLayer({ scene, polygons, view, size, darkness }: Props) {
   const g = scene.grid;
-  const vision = scene.vision;
+  const runs = useMemo(() => exploredRuns(scene.explored), [scene.explored]);
 
-  const origins: Point[] = [];
-  if (vision.enabled) {
-    for (const token of scene.tokens) {
-      if (token.ref.kind !== "pc") continue;
-      const entity = resolve(token.ref);
-      if (!entity) continue;
-      const pos = cellToPx(token, g);
-      const half = (entity.size * g.cellPx) / 2;
-      origins.push({ x: pos.x + half, y: pos.y + half });
-    }
-  }
-  const originsKey = origins.map((o) => `${o.x},${o.y}`).join("|");
-
-  const segments = useMemo(
-    () => sightSegments(scene),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [scene.elements, scene.sightBlockers, scene.objects, g.cellPx, g.offsetX, g.offsetY],
-  );
-  const radius = visionRadiusPx(vision, g);
-  const polygons = useMemo(
-    () => origins.map((o) => visibilityPolygon(o, segments, radius)),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [originsKey, segments, radius],
-  );
-
-  if (!vision.enabled || origins.length === 0) return null;
+  if (!scene.vision.enabled || polygons.length === 0) return null;
 
   return (
     <Layer listening={false}>
@@ -58,8 +36,21 @@ export function VisionLayer({ scene, resolve, view, size, darkness }: Props) {
         width={size.width / view.scale + VIEW_MARGIN_PX * 2}
         height={size.height / view.scale + VIEW_MARGIN_PX * 2}
         fill="#000000"
-        opacity={darkness ?? vision.darkness}
+        opacity={darkness ?? scene.vision.darkness}
       />
+      {runs.length > 0 && (
+        // un'unica forma: le celle adiacenti non lasciano righe chiare tra loro
+        <Shape
+          sceneFunc={(ctx, shape) => {
+            ctx.beginPath();
+            for (const r of runs) ctx.rect(g.offsetX + r.x * g.cellPx, g.offsetY + r.y * g.cellPx, r.w * g.cellPx, g.cellPx);
+            ctx.fillShape(shape);
+          }}
+          fill="#000000"
+          opacity={EXPLORED_REVEAL}
+          globalCompositeOperation="destination-out"
+        />
+      )}
       {polygons.map((points, i) => (
         <Line key={i} points={points} closed fill="#000000" globalCompositeOperation="destination-out" />
       ))}

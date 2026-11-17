@@ -45,6 +45,9 @@ interface Props {
   onSketch: (sketch: SketchDraft) => void;
   onDrawingChange: (drawing: Drawing) => void;
   onEraseDrawing: (id: string) => void;
+  /** Ciò che il party vede ora (da `usePartyVision`). */
+  visionPolygons: number[][];
+  onToggleDoor: (id: string) => void;
 }
 
 /** Sotto questa distanza sullo schermo un tratto non viene salvato e i punti a mano libera vengono scartati. */
@@ -101,6 +104,8 @@ export function BattleStage(props: Props) {
   const editable = (layer: LayerKey) => activeLayer === layer && !locked && !spaceHeld && !drawing && !placing && !sketchKind && !erasing && !calibrating && !tracing;
   // mentre si traccia, i click passano allo Stage anche sopra gli effetti esistenti
   const listening = (layer: LayerKey) => activeLayer === layer && !spaceHeld && !sketchKind && !calibrating && !tracing;
+  // fuori dal livello Elementi un click su una porta la apre o la chiude (anche a livello bloccato: è gioco, non modifica)
+  const doorsClickable = activeLayer !== "elements" && !spaceHeld && !placing && !sketchKind && !erasing && !calibrating;
   const minStroke = MIN_STROKE_SCREEN_PX / view.scale;
 
   const worldPointer = (stage: Konva.Stage): Point | null => stage.getRelativePointerPosition();
@@ -267,6 +272,8 @@ export function BattleStage(props: Props) {
             draft={draftRect && { ...draftRect, color: elementColor }}
             onSelect={select("elements")}
             onChange={props.onElementChange}
+            doorsClickable={doorsClickable}
+            onToggleDoor={props.onToggleDoor}
           />
           <SightBlockersLayer
             scene={scene}
@@ -290,7 +297,7 @@ export function BattleStage(props: Props) {
             onSelect={select("tokens")}
             onMove={props.onTokenMove}
           />
-          <VisionLayer scene={scene} resolve={props.resolve} view={view} size={size} />
+          <VisionLayer scene={scene} polygons={props.visionPolygons} view={view} size={size} />
           <EffectsLayer
             scene={scene}
             listening={listening("effects")}
@@ -320,7 +327,7 @@ export function BattleStage(props: Props) {
       <div className={styles.hint}>
         {props.calibration && props.calibration.length < 2
           ? `Calibrazione: clicca il punto ${props.calibration.length + 1} di 2 sull'immagine · Esc: annulla`
-          : "Rotella: zoom · Spazio o tasto centrale + trascina: sposta · Canc: elimina · Esc: annulla"}
+          : "Rotella: zoom · Spazio o tasto centrale + trascina: sposta · Click su una porta o O: apri/chiudi · Canc: elimina · Esc: annulla"}
       </div>
     </div>
   );

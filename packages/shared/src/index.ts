@@ -6,6 +6,7 @@ export * from "./dice";
 export * from "./grid";
 export * from "./playerView";
 export * from "./visibility";
+export * from "./fog";
 export * from "./hp";
 export * from "./initiative";
 export * from "./placement";

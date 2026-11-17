@@ -1,13 +1,38 @@
-import { feetToPx, type Point } from "./grid";
-import type { Scene } from "./schemas/scene";
+import { cellToPx, feetToPx, type Point } from "./grid";
+import type { Ref } from "./schemas/common";
+import type { MapElement, Scene } from "./schemas/scene";
 
 export interface Segment {
   a: Point;
   b: Point;
 }
 
-/** Elementi rettangolari che bloccano la vista (le porte sono considerate chiuse). */
-const SIGHT_BLOCKING_ELEMENTS: ReadonlySet<string> = new Set(["wall", "door", "obstacle"]);
+/** Muri e ostacoli bloccano sempre la vista; le porte solo se chiuse; il terreno difficile mai. */
+export function elementBlocksSight(el: Pick<MapElement, "type" | "open">): boolean {
+  if (el.type === "door") return !el.open;
+  return el.type === "wall" || el.type === "obstacle";
+}
+
+/** Apre o chiude la porta `id`; la scena resta identica se l'elemento non esiste o non è una porta. */
+export function toggleDoor(scene: Scene, id: string): Scene {
+  const door = scene.elements.find((el) => el.id === id);
+  if (!door || door.type !== "door") return scene;
+  return { ...scene, elements: scene.elements.map((el) => (el === door ? { ...el, open: !el.open } : el)) };
+}
+
+/** Centri, in pixel del mondo, dei personaggi giocanti sulla mappa: da qui parte la visione del party. */
+export function partyOrigins(scene: Pick<Scene, "tokens" | "grid">, sizeOf: (ref: Ref) => number | undefined): Point[] {
+  const origins: Point[] = [];
+  for (const token of scene.tokens) {
+    if (token.ref.kind !== "pc") continue;
+    const size = sizeOf(token.ref);
+    if (size === undefined) continue;
+    const pos = cellToPx(token, scene.grid);
+    const half = (size * scene.grid.cellPx) / 2;
+    origins.push({ x: pos.x + half, y: pos.y + half });
+  }
+  return origins;
+}
 
 /** Raggio di calcolo quando la visione non ha limite, in pixel del mondo. */
 export const UNLIMITED_VISION_PX = 20_000;
@@ -18,7 +43,7 @@ export function visionRadiusPx(vision: { radiusFt: number }, grid: { feetPerCell
 }
 
 /**
- * Segmenti che bloccano la vista, in pixel del mondo: i lati degli elementi rettangolari (muri, porte, ostacoli),
+ * Segmenti che bloccano la vista, in pixel del mondo: i lati degli elementi rettangolari (muri, porte chiuse, ostacoli),
  * degli oggetti dello sfondo che la bloccano (ruotati attorno al loro angolo in alto a sinistra come sulla mappa)
  * e i poligoni tracciati a mano.
  */
@@ -47,7 +72,7 @@ export function sightSegments(scene: Pick<Scene, "elements" | "sightBlockers" | 
     addPolygon([origin, { x: origin.x + u.x, y: origin.y + u.y }, { x: origin.x + u.x + v.x, y: origin.y + u.y + v.y }, { x: origin.x + v.x, y: origin.y + v.y }]);
   };
   for (const el of scene.elements) {
-    if (SIGHT_BLOCKING_ELEMENTS.has(el.type)) addRect(el.x, el.y, el.w, el.h, el.rotation);
+    if (elementBlocksSight(el)) addRect(el.x, el.y, el.w, el.h, el.rotation);
   }
   for (const o of scene.objects) {
     if (o.blocksSight) addRect(o.x, o.y, o.w, o.h, o.rotation);
