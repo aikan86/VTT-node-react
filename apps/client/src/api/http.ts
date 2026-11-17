@@ -4,6 +4,9 @@ import {
   type Character,
   type Combat,
   type DmRoll,
+  type Handout,
+  type Monster,
+  type NpcGroup,
   type Scene,
   type Versioned,
 } from "@vtt/shared";
@@ -73,6 +76,9 @@ export const api = {
   characters: collection<Character>("/api/characters"),
   scenes: collection<Scene>("/api/scenes"),
   dmRolls: collection<DmRoll>("/api/dm-rolls"),
+  handouts: collection<Handout>("/api/handouts"),
+  monsters: collection<Monster>("/api/monsters"),
+  npcGroups: collection<NpcGroup>("/api/npc-groups"),
   combat: {
     get: () => request<Versioned<Combat>>("GET", "/api/combat"),
     put: (combat: Combat, baseRev: number) => conditionalPut<Combat>("/api/combat", combat, baseRev),

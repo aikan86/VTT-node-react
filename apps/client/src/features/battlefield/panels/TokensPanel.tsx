@@ -1,4 +1,5 @@
-import { DEFAULT_SPEED_FT, modLookupFrom, sameRef, sortCombatants, type Ref, type Scene, type Token } from "@vtt/shared";
+import { DEFAULT_SPEED_FT, groupSummary, modLookupFrom, sameRef, sortCombatants, type NpcGroup, type Ref, type Scene, type Token } from "@vtt/shared";
+import { useLibraryStore } from "../../../store/libraryStore";
 import { ConditionIcons, ConditionPicker } from "../../../components/Conditions";
 import { EyeIcon } from "../../../components/EyeIcon";
 import { HpEditor } from "../../../components/HpEditor";
@@ -34,10 +35,13 @@ interface Props {
   onShowMovement: (show: boolean) => void;
   /** Permette o vieta ai giocatori di spostare i PG dalla vista giocatori. */
   onPlayersMoveParty: (allowed: boolean) => void;
+  /** Crea i PNG del gruppo (nell'iniziativa) e li prepara da piazzare con un clic sulla mappa. */
+  onPlaceGroup: (group: NpcGroup) => void;
 }
 
-export function TokensPanel({ scene, resolve, pending, onPending, onAddNpc, selected, onChangeToken, onRemoveToken, onRemoveFromMap, onAddToInitiative, onSetHidden, onSetNpcsHidden, placeHidden, onPlaceHidden, showMovement, onShowMovement, onPlayersMoveParty }: Props) {
+export function TokensPanel({ scene, resolve, pending, onPending, onAddNpc, selected, onChangeToken, onRemoveToken, onRemoveFromMap, onAddToInitiative, onSetHidden, onSetNpcsHidden, placeHidden, onPlaceHidden, showMovement, onShowMovement, onPlayersMoveParty, onPlaceGroup }: Props) {
   const characters = usePartyStore((s) => s.characters);
+  const groups = useLibraryStore((s) => s.npcGroups);
   const combat = useCombatStore((s) => s.combat);
   const locked = scene.layers.tokens.locked;
   const onMap = (ref: Ref) => scene.tokens.some((t) => sameRef(t.ref, ref));
@@ -144,7 +148,29 @@ export function TokensPanel({ scene, resolve, pending, onPending, onAddNpc, sele
           + Aggiungi PNG
         </button>
         {list(allRefs, "Nessun personaggio: crea i PG nella pagina Party o aggiungi un PNG.")}
-        {missingPcs.length > 1 && <button onClick={() => onPending(missingPcs)}>Piazza tutto il party</button>}
+        {groups.length > 0 && (
+          <div className={styles.groups}>
+            <h4>Gruppi di PNG</h4>
+            <ul className={styles.list} aria-label="Gruppi di PNG">
+              {groups.map((g) => (
+                <li key={g.id}>
+                  <span title={groupSummary(g)}>
+                    <span className={styles.entityName}>{g.name}</span>
+                    <span className="muted" style={{ fontSize: "0.8rem" }}>
+                      {g.members.reduce((n, m) => n + m.quantity, 0)} PNG
+                    </span>
+                  </span>
+                  <span>
+                    <button disabled={locked} onClick={() => onPlaceGroup(g)} aria-label={`Piazza il gruppo ${g.name}`} title={`${groupSummary(g)}: entrano nell'iniziativa, poi clicca sulla mappa`}>
+                      Piazza
+                    </button>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {missingPcs.length > 1 &&<button onClick={() => onPending(missingPcs)}>Piazza tutto il party</button>}
         {missingNpcs.length > 1 && <button onClick={() => onPending(missingNpcs)}>Piazza tutti i PNG</button>}
         <label className="row" style={{ flexWrap: "nowrap" }}>
           <input type="checkbox" checked={scene.playersMoveParty} onChange={(e) => onPlayersMoveParty(e.target.checked)} />

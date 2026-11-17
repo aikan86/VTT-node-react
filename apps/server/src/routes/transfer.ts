@@ -10,6 +10,9 @@ import {
   StateExportSchema,
   type CharacterSchema,
   type DmRollSchema,
+  type HandoutSchema,
+  type MonsterSchema,
+  type NpcGroupSchema,
   type SceneSchema,
   type StateExport,
 } from "@vtt/shared";
@@ -25,6 +28,9 @@ export interface TransferRepos {
   scenes: Repo<typeof SceneSchema>;
   dmRolls: Repo<typeof DmRollSchema>;
   combat: CombatRepo;
+  handouts: Repo<typeof HandoutSchema>;
+  monsters: Repo<typeof MonsterSchema>;
+  npcGroups: Repo<typeof NpcGroupSchema>;
 }
 
 const UPLOAD_URL = /\/uploads\/([\w-]{1,100}\.(?:png|jpg|webp|gif))/g;
@@ -46,6 +52,9 @@ export function registerTransferRoutes(app: FastifyInstance, repos: TransferRepo
       scenes: repos.scenes.list().map((d) => d.data),
       dmRolls: repos.dmRolls.list().map((d) => d.data),
       combat: stored ? withoutId(stored.data) : null,
+      handouts: repos.handouts.list().map((d) => d.data),
+      monsters: repos.monsters.list().map((d) => d.data),
+      npcGroups: repos.npcGroups.list().map((d) => d.data),
     };
 
     // solo le immagini a cui i documenti fanno riferimento (niente file orfani)
@@ -75,11 +84,18 @@ export function registerTransferRoutes(app: FastifyInstance, repos: TransferRepo
     replaceAll(repos.dmRolls, file.dmRolls, origin);
     if (file.combat) repos.combat.put({ ...file.combat, id: COMBAT_DOC_ID }, { origin });
     else repos.combat.delete(COMBAT_DOC_ID, origin);
+    // salvataggi di versioni precedenti: senza queste sezioni, si tiene quello che c'è
+    if (file.handouts) replaceAll(repos.handouts, file.handouts, origin);
+    if (file.monsters) replaceAll(repos.monsters, file.monsters, origin);
+    if (file.npcGroups) replaceAll(repos.npcGroups, file.npcGroups, origin);
 
     return {
       characters: file.characters.length,
       scenes: file.scenes.length,
       dmRolls: file.dmRolls.length,
+      handouts: file.handouts?.length ?? 0,
+      monsters: file.monsters?.length ?? 0,
+      npcGroups: file.npcGroups?.length ?? 0,
       uploads: Object.keys(file.uploads).length,
     };
   });

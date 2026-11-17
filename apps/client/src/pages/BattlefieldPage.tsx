@@ -38,7 +38,8 @@ import { isRectTool, type DrawTool, type EffectTool, type ElementTool, type Obje
 import styles from "../features/battlefield/Battlefield.module.css";
 import { AddNpcDialog } from "../features/initiative/AddNpcDialog";
 import { useInitiative } from "../features/initiative/useInitiative";
-import { createNpcs, placeTokens } from "../store/actions";
+import { createNpcEntries, placeTokens } from "../store/actions";
+import { groupEntries } from "../features/initiative/AddNpcDialog";
 import { useCombatStore } from "../store/combatStore";
 import { sizeOfRef, useEntityResolver } from "../store/entities";
 import { useActiveScene, useSceneStore } from "../store/sceneStore";
@@ -369,6 +370,7 @@ function Battlefield({ scene }: { scene: Scene }) {
             pending={pending}
             onPending={setPending}
             onAddNpc={() => setNpcDialog(true)}
+            onPlaceGroup={(group) => setPending(createNpcEntries(groupEntries(group.members)))}
             selected={selectedOf("tokens", scene.tokens)}
             onChangeToken={(token) => replace("tokens", token)}
             onSetHidden={setHiddenForRef}
@@ -461,8 +463,8 @@ function Battlefield({ scene }: { scene: Scene }) {
       {npcDialog && (
         <AddNpcDialog
           onClose={() => setNpcDialog(false)}
-          onSubmit={({ template, quantity }) => {
-            const refs = createNpcs(template, quantity);
+          onSubmit={({ entries }) => {
+            const refs = createNpcEntries(entries);
             // i nuovi PNG non sono ancora sulla mappa: il prossimo click li piazza
             setPending(refs.filter((r) => !scene.tokens.some((t) => sameRef(t.ref, r))));
             setNpcDialog(false);

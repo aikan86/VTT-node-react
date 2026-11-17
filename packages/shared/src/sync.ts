@@ -25,5 +25,8 @@ export const COLLECTIONS = {
   scenes: "scenes",
   combat: "combat",
   dmRolls: "dm-rolls",
+  handouts: "handouts",
+  monsters: "monsters",
+  npcGroups: "npc-groups",
 } as const;
 export const COMBAT_DOC_ID = "current";

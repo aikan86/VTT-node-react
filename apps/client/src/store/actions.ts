@@ -88,6 +88,22 @@ export function createNpcs(template: NpcTemplate, quantity: number): Ref[] {
   return refs;
 }
 
+/** Crea i PNG di più modelli (un gruppo) in un'unica modifica del combattimento; restituisce i riferimenti creati. */
+export function createNpcEntries(entries: readonly { template: NpcTemplate; quantity: number }[]): Ref[] {
+  let refs: Ref[] = [];
+  useCombatStore.getState().apply((combat, _getMod, ctx) => {
+    refs = [];
+    let next = combat;
+    for (const { template, quantity } of entries) {
+      const result = addNpcs(next, template, quantity, ctx.id);
+      refs.push(...result.npcs.map((n): Ref => ({ kind: "npc", id: n.id })));
+      next = result.combat;
+    }
+    return next;
+  });
+  return refs;
+}
+
 /** Piazza token nella scena vicino a `start`, evitando le celle occupate. Ignora chi è già presente. */
 export function placeTokens(sceneId: string, refs: Ref[], start: Point, sizeOf: (ref: Ref) => number) {
   useSceneStore.getState().update(sceneId, (scene: Scene, ctx) => {

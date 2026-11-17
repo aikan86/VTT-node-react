@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { COLLECTIONS, type Character, type DmRoll, type Scene } from "@vtt/shared";
+import { COLLECTIONS, type Character, type DmRoll, type Handout, type Monster, type NpcGroup, type Scene } from "@vtt/shared";
 import { connectLive } from "./api/live";
 import { Navigate, NavLink, Route, Routes, useMatch } from "react-router";
 import { BattlefieldPage } from "./pages/BattlefieldPage";
@@ -11,6 +11,8 @@ import { CombatStatus } from "./features/initiative/CombatStatus";
 import { TransferButtons } from "./features/transfer/TransferButtons";
 import { flushCombat, receiveCombat, resyncCombat, useCombatStore } from "./store/combatStore";
 import { dmRollSync, useDmRollStore } from "./store/dmRollStore";
+import { flushLibrary, handoutSync, loadLibrary, monsterSync, npcGroupSync, resyncLibrary } from "./store/libraryStore";
+import { HandoutsPage } from "./pages/HandoutsPage";
 import { flushParty, partySync, usePartyStore } from "./store/partyStore";
 import { flushScenes, sceneSync, useSceneStore } from "./store/sceneStore";
 import { reportError, useStatusStore } from "./store/statusStore";
@@ -25,6 +27,7 @@ const boot = () =>
     useCombatStore.getState().load(),
     useSceneStore.getState().load(),
     useDmRollStore.getState().load(),
+    loadLibrary(),
   ]).catch((err: unknown) => {
     bootPromise = null;
     throw err;
@@ -36,7 +39,7 @@ function startLiveSync(): () => void {
     onStatus: (connected) => useStatusStore.getState().setLive(connected),
     onOpen: () => {
       // eventi persi mentre la connessione era giù: riallinea tutto
-      Promise.all([partySync.resync(), sceneSync.resync(), dmRollSync.resync(), resyncCombat()]).catch(reportError);
+      Promise.all([partySync.resync(), sceneSync.resync(), dmRollSync.resync(), resyncCombat(), resyncLibrary()]).catch(reportError);
     },
     onChange: (change) => {
       const versioned = { id: change.id, rev: change.rev };
@@ -49,6 +52,12 @@ function startLiveSync(): () => void {
           return dmRollSync.receive({ ...versioned, data: change.data as DmRoll | null });
         case COLLECTIONS.combat:
           return receiveCombat(change.rev, change.data);
+        case COLLECTIONS.handouts:
+          return handoutSync.receive({ ...versioned, data: change.data as Handout | null });
+        case COLLECTIONS.monsters:
+          return monsterSync.receive({ ...versioned, data: change.data as Monster | null });
+        case COLLECTIONS.npcGroups:
+          return npcGroupSync.receive({ ...versioned, data: change.data as NpcGroup | null });
       }
     },
   });
@@ -78,6 +87,7 @@ export function App() {
       void flushParty();
       void flushCombat();
       void flushScenes();
+      void flushLibrary();
     };
     // un tab che passa in background salva subito: chi lo usa dopo parte da dati aggiornati
     const onVisibility = () => {
@@ -111,6 +121,7 @@ export function App() {
           <NavLink to="/party">Party</NavLink>
           <NavLink to="/iniziativa">Iniziativa</NavLink>
           <NavLink to="/tiri-dm">Tiri DM</NavLink>
+          <NavLink to="/handout">Handout</NavLink>
         </nav>
         <div className={styles.status}>
           {state === "ready" && <CombatStatus />}
@@ -141,6 +152,7 @@ export function App() {
             <Route path="/party" element={<PartyPage />} />
             <Route path="/iniziativa" element={<InitiativePage />} />
             <Route path="/tiri-dm" element={<DmRollsPage />} />
+            <Route path="/handout" element={<HandoutsPage />} />
             <Route path="*" element={<Navigate to="/mappa" replace />} />
           </Routes>
         )}

@@ -43,7 +43,7 @@ describe("InitiativePage", () => {
     const name = within(dialog).getByLabelText("Nome");
     await user.clear(name);
     await user.type(name, "Orco");
-    await user.click(within(dialog).getByRole("button", { name: "Aggiungi" }));
+    await user.click(within(dialog).getByRole("button", { name: "Aggiungi PNG" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 
     // Tiri manuali: Aria 10+3=13, Borin 18+0=18, Orco (mod +2) 5+2=7
@@ -101,7 +101,7 @@ describe("InitiativePage", () => {
     const dialog = screen.getByRole("dialog", { name: "Aggiungi PNG" });
     await user.clear(within(dialog).getByLabelText("Nome"));
     await user.type(within(dialog).getByLabelText("Nome"), "Orco");
-    await user.click(within(dialog).getByRole("button", { name: "Aggiungi" }));
+    await user.click(within(dialog).getByRole("button", { name: "Aggiungi PNG" }));
 
     // PG non rinominabili dal tracker
     expect(screen.queryByRole("button", { name: "Rinomina Aria" })).not.toBeInTheDocument();
@@ -145,7 +145,7 @@ describe("InitiativePage", () => {
     const dialog = screen.getByRole("dialog", { name: "Aggiungi PNG" });
     await user.clear(within(dialog).getByLabelText("Nome"));
     await user.type(within(dialog).getByLabelText("Nome"), "Orco");
-    await user.click(within(dialog).getByRole("button", { name: "Aggiungi" }));
+    await user.click(within(dialog).getByRole("button", { name: "Aggiungi PNG" }));
 
     fireEvent.change(screen.getByLabelText("Colore di Aria"), { target: { value: "#123456" } });
     expect(usePartyStore.getState().characters.find((c) => c.id === "pc-a")!.color).toBe("#123456");

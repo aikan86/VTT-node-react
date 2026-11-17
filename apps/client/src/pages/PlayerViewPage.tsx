@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { getTotal, modLookupFrom, movePartyToken, playerCombatants, sameRef, type Combat, type Scene } from "@vtt/shared";
+import { useLibraryStore } from "../store/libraryStore";
+import { currentHandout, getTotal, modLookupFrom, movePartyToken, playerCombatants, sameRef, type Combat, type Scene } from "@vtt/shared";
 import { ConditionIcons } from "../components/Conditions";
 import { PlayerStage } from "../features/battlefield/PlayerStage";
 import { useCombatStore } from "../store/combatStore";
@@ -67,6 +68,7 @@ export function PlayerViewPage() {
   const resolve = useEntityResolver();
   const live = useStatusStore((s) => s.live);
   const { full, toggle } = useFullscreen();
+  const handout = useLibraryStore((s) => currentHandout(s.handouts));
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -95,6 +97,12 @@ export function PlayerViewPage() {
           <h1>In attesa del master…</h1>
           <p>La mappa comparirà qui appena il master la mostrerà ai giocatori.</p>
         </div>
+      )}
+      {handout && (
+        <figure className={styles.handout} aria-label={`Handout: ${handout.title}`}>
+          <figcaption>{handout.title}</figcaption>
+          <img src={handout.imageUrl} alt={handout.title} />
+        </figure>
       )}
       <button className={styles.fs} onClick={toggle} aria-label={full ? "Esci dallo schermo intero" : "Schermo intero"}>
         {full ? "Esci da schermo intero (F)" : "⛶ Schermo intero (F)"}

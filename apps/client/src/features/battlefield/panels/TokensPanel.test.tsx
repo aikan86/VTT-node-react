@@ -1,7 +1,8 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { emptyCombat, newCharacter, newScene, type Condition, type Ref, type Scene, type Token } from "@vtt/shared";
+import { emptyCombat, newCharacter, newScene, type Condition, type NpcGroup, type Ref, type Scene, type Token } from "@vtt/shared";
+import { npcGroupSync } from "../../../store/libraryStore";
 import { setEntityConditions } from "../../../store/actions";
 import { useCombatStore } from "../../../store/combatStore";
 import { usePartyStore } from "../../../store/partyStore";
@@ -46,6 +47,7 @@ interface PanelOptions {
   showMovement?: boolean;
   onShowMovement?: (show: boolean) => void;
   onPlayersMoveParty?: (allowed: boolean) => void;
+  onPlaceGroup?: (group: NpcGroup) => void;
 }
 
 function renderPanel(scene: Scene, onRemoveFromMap = vi.fn(), options: PanelOptions = {}) {
@@ -68,6 +70,7 @@ function renderPanel(scene: Scene, onRemoveFromMap = vi.fn(), options: PanelOpti
       showMovement={options.showMovement ?? true}
       onShowMovement={options.onShowMovement ?? vi.fn()}
       onPlayersMoveParty={options.onPlayersMoveParty ?? vi.fn()}
+      onPlaceGroup={options.onPlaceGroup ?? vi.fn()}
     />,
   );
   return onRemoveFromMap;
@@ -360,6 +363,28 @@ describe("TokensPanel: players moving the party", () => {
   it("shows when the master has forbidden it", () => {
     renderPanel({ ...sceneWithAria(), playersMoveParty: false });
     expect(screen.getByRole("checkbox", { name: "I giocatori possono muovere i PG dalla loro vista" })).not.toBeChecked();
+  });
+});
+
+describe("TokensPanel: NPC groups", () => {
+  const goblin = { name: "Goblin", hp: 7, ac: 15, initiativeMod: 2, size: 1, color: "#dc2626" };
+  const band: NpcGroup = { id: "g1", name: "Banda di goblin", members: [{ monster: goblin, quantity: 4 }, { monster: { ...goblin, name: "Capo goblin" }, quantity: 1 }] };
+
+  it("lists saved groups and places one with a click", async () => {
+    npcGroupSync.hydrate([{ rev: 1, data: band }]);
+    const onPlaceGroup = vi.fn();
+    renderPanel(sceneWithAria(), vi.fn(), { onPlaceGroup });
+    const list = screen.getByRole("list", { name: "Gruppi di PNG" });
+    expect(within(list).getByText("Banda di goblin")).toBeInTheDocument();
+    expect(within(list).getByText("5 PNG")).toBeInTheDocument();
+    await userEvent.click(within(list).getByRole("button", { name: "Piazza il gruppo Banda di goblin" }));
+    expect(onPlaceGroup).toHaveBeenCalledWith(band);
+  });
+
+  it("shows nothing when there are no groups", () => {
+    npcGroupSync.hydrate([]);
+    renderPanel(sceneWithAria());
+    expect(screen.queryByRole("list", { name: "Gruppi di PNG" })).not.toBeInTheDocument();
   });
 });
 
