@@ -11,6 +11,11 @@
 .list { display: flex; flex-direction: column; gap: 0.3rem; margin: 0; padding: 0; list-style: none; }
 .list li { display: flex; align-items: center; gap: 0.5rem; justify-content: space-between; padding: 0.3rem 0.4rem; background: var(--panel-2); border-radius: 6px; }
 .list li > span { display: flex; align-items: center; gap: 0.4rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Pulsanti a destra sempre interi; a sinistra cede solo il nome (con i puntini), non icone e badge */
+.list li > span:first-child { min-width: 0; flex-wrap: wrap; row-gap: 0.15rem; }
+.list li > span:first-child > * { flex: none; }
+.list li > span:first-child > .entityName { flex: 0 1 auto; min-width: 2.5em; overflow: hidden; text-overflow: ellipsis; }
+.list li > span:last-child { flex: none; overflow: visible; }
 /* "sulla mappa": in hover/focus diventa il pulsante per togliere il token; le due scritte condividono la cella, niente salti */
 .list .onMap { display: grid; flex: none; padding: 0.15rem 0.45rem; font-size: 0.8rem; background: transparent; border-color: transparent; color: var(--muted); }
 .onMapLabel, .onMapAction { grid-area: 1 / 1; text-align: center; }

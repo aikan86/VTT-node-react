@@ -47,7 +47,10 @@ function InitiativeOrder({ combat, scene }: { combat: Combat; scene: Scene }) {
               <span className={styles.rank}>{i + 1}</span>
               <span className="swatch" style={{ background: entity.color }} />
               <span className={styles.name}>{entity.name}</span>
-              <ConditionIcons conditions={entity.conditions} />
+              {/* sempre presente: tiene allineata la colonna dei totali */}
+              <span>
+                <ConditionIcons conditions={entity.conditions} />
+              </span>
               <span className={styles.total}>{total ?? "–"}</span>
             </li>
           );

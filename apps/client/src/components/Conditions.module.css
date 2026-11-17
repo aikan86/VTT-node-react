@@ -6,6 +6,13 @@
   white-space: nowrap;
 }
 
+.more {
+  font-size: 0.75em;
+  font-weight: 600;
+  opacity: 0.8;
+  align-self: center;
+}
+
 .picker {
   display: flex;
   flex-wrap: wrap;

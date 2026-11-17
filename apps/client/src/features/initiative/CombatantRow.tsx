@@ -28,6 +28,7 @@ export function CombatantRow({ row, active, onSetRoll, onSetNotes, onToggleActed
     .join(" ");
 
   return (
+    <>
     <tr className={className} aria-current={current ? "step" : undefined} data-testid="combatant-row">
       <td>
         <input
@@ -76,7 +77,6 @@ export function CombatantRow({ row, active, onSetRoll, onSetNotes, onToggleActed
             🏷
           </button>
         </div>
-        {pickConditions && <ConditionPicker name={entity.name} conditions={entity.conditions} onChange={(list) => setEntityConditions(entity.ref, list)} />}
       </td>
       <td>
         <div className="row" style={{ flexWrap: "nowrap", gap: "0.25rem" }}>
@@ -133,6 +133,15 @@ export function CombatantRow({ row, active, onSetRoll, onSetNotes, onToggleActed
         </div>
       </td>
     </tr>
+    {pickConditions && (
+      <tr className={styles.pickerRow}>
+        <td />
+        <td colSpan={8}>
+          <ConditionPicker name={entity.name} conditions={entity.conditions} onChange={(list) => setEntityConditions(entity.ref, list)} />
+        </td>
+      </tr>
+    )}
+    </>
   );
 }
 

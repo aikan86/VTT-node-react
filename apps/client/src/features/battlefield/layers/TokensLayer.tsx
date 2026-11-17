@@ -52,7 +52,7 @@ function HiddenMark({ size }: { size: number }) {
 /** Icone delle condizioni in fila sul bordo alto del token, da destra; quelle che non ci stanno diventano "+N". */
 function ConditionBadges({ conditions, size }: { conditions: readonly Condition[]; size: number }) {
   if (conditions.length === 0) return null;
-  const d = Math.max(14, size * 0.3);
+  const d = clamp(size * 0.34, 16, 30);
   const fit = Math.max(1, Math.floor(size / d));
   const overflow = conditions.length > fit;
   const shown = overflow ? conditions.slice(0, fit - 1) : conditions;

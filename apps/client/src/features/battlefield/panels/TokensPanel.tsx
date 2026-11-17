@@ -75,8 +75,10 @@ export function TokensPanel({ scene, resolve, pending, onPending, onAddNpc, sele
             <li key={ref.id} className={current ? styles.current : undefined} aria-current={current ? "step" : undefined}>
               <span>
                 <span className="swatch" style={{ background: e.color }} />
-                <span data-testid="entity-name">{e.name}</span>
-                <ConditionIcons conditions={e.conditions} />
+                <span className={styles.entityName} data-testid="entity-name" title={e.name}>
+                  {e.name}
+                </span>
+                <ConditionIcons conditions={e.conditions} max={3} />
                 {ref.kind === "npc" && <span className="badge">PNG</span>}
                 {placed && hiddenOnMap(ref) && (
                   <span className="badge" title="Nascosto ai giocatori">

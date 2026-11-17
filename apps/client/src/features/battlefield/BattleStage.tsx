@@ -367,7 +367,7 @@ export function BattleStage(props: Props) {
           +
         </button>
         <button onClick={fit}>Adatta</button>
-        <button aria-pressed={measuring} onClick={props.onToggleRuler} title="Misura distanze (R)">
+        <button className={measuring ? "active" : ""} aria-pressed={measuring} onClick={props.onToggleRuler} title="Misura distanze (R)">
           📏 Righello
         </button>
       </div>

@@ -178,7 +178,7 @@ describe("InitiativePage: conditions", () => {
     expect(within(aria()).queryByRole("img", { name: "Prono" })).not.toBeInTheDocument();
 
     await user.click(within(aria()).getByRole("button", { name: "Modifica condizioni di Aria" }));
-    const picker = within(aria()).getByRole("group", { name: "Condizioni di Aria" });
+    const picker = screen.getByRole("group", { name: "Condizioni di Aria" });
     await user.click(within(picker).getByRole("button", { name: /Prono/ }));
     await user.click(within(picker).getByRole("button", { name: /Stordito/ }));
 
