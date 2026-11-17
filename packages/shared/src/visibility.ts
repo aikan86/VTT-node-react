@@ -47,22 +47,27 @@ export function sightSegments(scene: Pick<Scene, "elements" | "sightBlockers" | 
     if (corners.length >= 3) addPolygon(corners);
   }
 
-  const addRect = (x: number, y: number, w: number, h: number, rotation: number) => {
-    const rad = (rotation * Math.PI) / 180;
-    const cos = Math.cos(rad);
-    const sin = Math.sin(rad);
-    const origin = { x: g.offsetX + x * g.cellPx, y: g.offsetY + y * g.cellPx };
-    const u = { x: cos * w * g.cellPx, y: sin * w * g.cellPx };
-    const v = { x: -sin * h * g.cellPx, y: cos * h * g.cellPx };
-    addPolygon([origin, { x: origin.x + u.x, y: origin.y + u.y }, { x: origin.x + u.x + v.x, y: origin.y + u.y + v.y }, { x: origin.x + v.x, y: origin.y + v.y }]);
-  };
   for (const el of scene.elements) {
-    if (elementBlocksSight(el)) addRect(el.x, el.y, el.w, el.h, el.rotation);
+    if (elementBlocksSight(el)) addPolygon(rectCorners(el, g));
   }
   for (const o of scene.objects) {
-    if (o.blocksSight) addRect(o.x, o.y, o.w, o.h, o.rotation);
+    if (o.blocksSight) addPolygon(rectCorners(o, g));
   }
   return segments;
+}
+
+/** Vertici in pixel del mondo di un rettangolo in celle, ruotato attorno al suo angolo in alto a sinistra (come sulla mappa). */
+export function rectCorners(
+  r: { x: number; y: number; w: number; h: number; rotation: number },
+  g: Pick<Scene["grid"], "cellPx" | "offsetX" | "offsetY">,
+): Point[] {
+  const rad = (r.rotation * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  const origin = { x: g.offsetX + r.x * g.cellPx, y: g.offsetY + r.y * g.cellPx };
+  const u = { x: cos * r.w * g.cellPx, y: sin * r.w * g.cellPx };
+  const v = { x: -sin * r.h * g.cellPx, y: cos * r.h * g.cellPx };
+  return [origin, { x: origin.x + u.x, y: origin.y + u.y }, { x: origin.x + u.x + v.x, y: origin.y + u.y + v.y }, { x: origin.x + v.x, y: origin.y + v.y }];
 }
 
 /** Distanza lungo il raggio (origine `o`, direzione `dx, dy`) a cui incontra il segmento; null se non lo incontra. */

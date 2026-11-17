@@ -1,4 +1,4 @@
-import { cellToPx, pxToCell, snapPxToCell, type Background, type Grid, type Point, type Ref, type Scene } from "@vtt/shared";
+import { cellToPx, METERS_PER_FOOT, pxToCell, snapPxToCell, type Background, type Grid, type Point, type Ref, type Scene } from "@vtt/shared";
 
 export interface Bounds {
   minX: number;
@@ -158,8 +158,7 @@ export function withBackgroundGeometry(scene: Scene, next: Pick<Background, "ima
   return { ...scene, background: { ...bg, x, y, widthPx, heightPx, rotation } };
 }
 
-/** Metri per piede secondo la convenzione di D&D: 5 ft = 1,5 m. */
-export const METERS_PER_FOOT = 0.3;
+export { METERS_PER_FOOT };
 
 export type DistanceUnit = "cells" | "m" | "ft";
 

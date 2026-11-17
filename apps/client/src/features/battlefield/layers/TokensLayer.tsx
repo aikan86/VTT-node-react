@@ -1,5 +1,5 @@
 import { Circle, Group, Layer, Line, Path, Rect, Text } from "react-konva";
-import { cellToPx, sameRef, snapPxToCell, type Ref, type Scene, type Token } from "@vtt/shared";
+import { cellToPx, CONDITION_INFO, sameRef, snapPxToCell, type Condition, type Ref, type Scene, type Token } from "@vtt/shared";
 import type { EntityResolver } from "../../../store/entities";
 import { clamp } from "../geometry";
 
@@ -45,6 +45,30 @@ function HiddenMark({ size }: { size: number }) {
           <Line points={[4, 4, 20, 20]} stroke={stroke} strokeWidth={width} lineCap="round" />
         </Group>
       ))}
+    </Group>
+  );
+}
+
+/** Icone delle condizioni in fila sul bordo alto del token, da destra; quelle che non ci stanno diventano "+N". */
+function ConditionBadges({ conditions, size }: { conditions: readonly Condition[]; size: number }) {
+  if (conditions.length === 0) return null;
+  const d = Math.max(14, size * 0.3);
+  const fit = Math.max(1, Math.floor(size / d));
+  const overflow = conditions.length > fit;
+  const shown = overflow ? conditions.slice(0, fit - 1) : conditions;
+  const badges: { key: string; text: string }[] = shown.map((c) => ({ key: c, text: CONDITION_INFO[c].icon }));
+  if (overflow) badges.push({ key: "more", text: `+${conditions.length - shown.length}` });
+  return (
+    <Group listening={false}>
+      {badges.map((b, i) => {
+        const x = size - d / 2 - i * d;
+        return (
+          <Group key={b.key} x={x} y={d * 0.2}>
+            <Circle radius={d / 2} fill="#111827" stroke="#ffffff" strokeWidth={1} opacity={0.9} />
+            <Text text={b.text} x={-d / 2} y={-d / 2} width={d} height={d} align="center" verticalAlign="middle" fontSize={d * (b.key === "more" ? 0.5 : 0.62)} fill="#ffffff" />
+          </Group>
+        );
+      })}
     </Group>
   );
 }
@@ -132,6 +156,7 @@ export function TokensLayer({ scene, resolve, listening, editable, selectedId, c
               shadowOpacity={1}
               listening={false}
             />
+            <ConditionBadges conditions={entity.conditions} size={s} />
             </Group>
             {token.hidden && <HiddenMark size={s} />}
           </Group>

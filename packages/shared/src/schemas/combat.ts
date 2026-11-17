@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ConditionsSchema } from "../conditions";
 import { ColorSchema, HpSchema, IdSchema, RefSchema, SizeSchema } from "./common";
 
 /** PNG creato al volo: vive solo dentro il documento di combattimento. */
@@ -11,6 +12,7 @@ export const NpcSchema = z
     ac: z.number().int().min(0).max(50),
     initiativeMod: z.number().int().min(-20).max(30),
     size: SizeSchema.default(1),
+    conditions: ConditionsSchema,
   })
   .loose();
 export type Npc = z.infer<typeof NpcSchema>;

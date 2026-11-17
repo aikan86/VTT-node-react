@@ -167,3 +167,26 @@ describe("InitiativePage", () => {
     expect(useCombatStore.getState().combat.combatants.every((c) => c.roll === null)).toBe(true);
   });
 });
+
+describe("InitiativePage: conditions", () => {
+  it("toggles conditions on a combatant and shows their icons in the row", async () => {
+    const user = userEvent.setup();
+    render(<InitiativePage />);
+    await user.click(screen.getByRole("button", { name: "+ Aggiungi party" }));
+
+    const aria = () => screen.getAllByTestId("combatant-row").find((row) => within(row).queryByText("Aria"))!;
+    expect(within(aria()).queryByRole("img", { name: "Prono" })).not.toBeInTheDocument();
+
+    await user.click(within(aria()).getByRole("button", { name: "Modifica condizioni di Aria" }));
+    const picker = within(aria()).getByRole("group", { name: "Condizioni di Aria" });
+    await user.click(within(picker).getByRole("button", { name: /Prono/ }));
+    await user.click(within(picker).getByRole("button", { name: /Stordito/ }));
+
+    expect(within(aria()).getByRole("img", { name: "Prono" })).toHaveTextContent("🛌");
+    expect(within(aria()).getByRole("img", { name: "Stordito" })).toBeInTheDocument();
+    expect(usePartyStore.getState().characters.find((c) => c.id === "pc-a")?.conditions).toEqual(["prone", "stunned"]);
+
+    await user.click(within(picker).getByRole("button", { name: /Prono/ }));
+    expect(within(aria()).queryByRole("img", { name: "Prono" })).not.toBeInTheDocument();
+  });
+});

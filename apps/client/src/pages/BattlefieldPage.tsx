@@ -1,8 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   addCombatant,
   addExplored,
+  coveredCells,
   createId,
+  DEFAULT_SPEED_FT,
+  movementRange,
   ELEMENT_COLORS,
   OBJECT_DEFAULTS,
   resetExplored,
@@ -30,6 +33,7 @@ import { LayerPanel } from "../features/battlefield/panels/LayerPanel";
 import { TokensPanel } from "../features/battlefield/panels/TokensPanel";
 import { SceneBar } from "../features/battlefield/SceneBar";
 import { BACKGROUND_ID } from "../features/battlefield/layers/BackgroundLayer";
+import type { MovementArea } from "../features/battlefield/layers/MovementLayer";
 import { isRectTool, type DrawTool, type EffectTool, type ElementTool, type ObjectTool, type PendingPlacement, type Selection, type SketchDraft } from "../features/battlefield/types";
 import styles from "../features/battlefield/Battlefield.module.css";
 import { AddNpcDialog } from "../features/initiative/AddNpcDialog";
@@ -69,6 +73,10 @@ function Battlefield({ scene }: { scene: Scene }) {
   const [calibration, setCalibration] = useState<Point[] | null>(null);
   /** Vertici (pixel del mondo) della forma "ostacolo alla vista" in tracciamento. */
   const [trace, setTrace] = useState<Point[]>([]);
+  /** Righello (tasto R). */
+  const [measuring, setMeasuring] = useState(false);
+  /** Mostra il raggio di movimento del token selezionato. */
+  const [showMovement, setShowMovement] = useState(true);
 
   const update = useCallback((fn: (s: Scene) => Scene) => useSceneStore.getState().update(scene.id, fn), [scene.id]);
 
@@ -142,7 +150,12 @@ function Battlefield({ scene }: { scene: Scene }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (isTyping(e) || document.querySelector('[role="dialog"]')) return;
-      if (e.key === "Escape") {
+      if (e.key === "Escape" && measuring) {
+        setMeasuring(false);
+      } else if ((e.key === "r" || e.key === "R") && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        setMeasuring((m) => !m);
+      } else if (e.key === "Escape") {
         setSelection(null);
         setPending(null);
         setElementTool("select");
@@ -172,7 +185,19 @@ function Battlefield({ scene }: { scene: Scene }) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [closeTrace, deleteSelection, elementTool, selection, scene.layers, scene.elements, toggleDoorById, toggleHiddenSelected, trace.length]);
+  }, [closeTrace, deleteSelection, elementTool, measuring, selection, scene.layers, scene.elements, toggleDoorById, toggleHiddenSelected, trace.length]);
+
+  // Raggio di movimento del token selezionato: con la sua velocità e, più chiaro, con uno scatto (il doppio)
+  const selectedToken = selection?.layer === "tokens" ? scene.tokens.find((t) => t.id === selection.id) : undefined;
+  const movingSize = selectedToken ? (resolve(selectedToken.ref)?.size ?? 1) : 1;
+  const speedFt = selectedToken?.speedFt ?? DEFAULT_SPEED_FT;
+  const { elements, grid } = scene;
+  const movement = useMemo<MovementArea | null>(() => {
+    if (!selectedToken || !showMovement || activeLayer !== "tokens" || speedFt <= 0) return null;
+    const range = movementRange({ elements, grid }, selectedToken, movingSize, speedFt * 2);
+    return { cells: coveredCells(range, movingSize), speedFt };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedToken?.x, selectedToken?.y, selectedToken?.id, movingSize, speedFt, showMovement, activeLayer, elements, grid]);
 
   const placing =
     (activeLayer === "tokens" && pending !== null) ||
@@ -350,6 +375,8 @@ function Battlefield({ scene }: { scene: Scene }) {
             onSetNpcsHidden={setNpcsHidden}
             placeHidden={placeHidden}
             onPlaceHidden={setPlaceHidden}
+            showMovement={showMovement}
+            onShowMovement={setShowMovement}
             onRemoveToken={deleteSelection}
             onRemoveFromMap={removeFromMap}
             onAddToInitiative={(ref: Ref) => useCombatStore.getState().apply((c, _getMod, ctx) => addCombatant(c, ref, ctx.id))}
@@ -415,6 +442,9 @@ function Battlefield({ scene }: { scene: Scene }) {
           sight={sight}
           onToggleDoor={toggleDoorById}
           onLightChange={(light) => replace("lights", light)}
+          measuring={measuring}
+          onToggleRuler={() => setMeasuring((m) => !m)}
+          movement={movement}
         />
       </div>
 

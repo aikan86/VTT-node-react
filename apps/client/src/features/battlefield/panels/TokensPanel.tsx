@@ -1,10 +1,11 @@
-import { modLookupFrom, sameRef, sortCombatants, type Ref, type Scene, type Token } from "@vtt/shared";
+import { DEFAULT_SPEED_FT, modLookupFrom, sameRef, sortCombatants, type Ref, type Scene, type Token } from "@vtt/shared";
+import { ConditionIcons, ConditionPicker } from "../../../components/Conditions";
 import { EyeIcon } from "../../../components/EyeIcon";
 import { HpEditor } from "../../../components/HpEditor";
 import { NumberInput } from "../../../components/NumberInput";
 import { useCombatStore } from "../../../store/combatStore";
 import type { EntityResolver } from "../../../store/entities";
-import { setEntityHp } from "../../../store/actions";
+import { setEntityConditions, setEntityHp } from "../../../store/actions";
 import { usePartyStore } from "../../../store/partyStore";
 import type { PendingPlacement } from "../types";
 import styles from "../Battlefield.module.css";
@@ -28,9 +29,12 @@ interface Props {
   /** I token che si stanno per piazzare nascono nascosti ai giocatori. */
   placeHidden: boolean;
   onPlaceHidden: (hidden: boolean) => void;
+  /** Mostra sulla mappa il raggio di movimento del token selezionato. */
+  showMovement: boolean;
+  onShowMovement: (show: boolean) => void;
 }
 
-export function TokensPanel({ scene, resolve, pending, onPending, onAddNpc, selected, onChangeToken, onRemoveToken, onRemoveFromMap, onAddToInitiative, onSetHidden, onSetNpcsHidden, placeHidden, onPlaceHidden }: Props) {
+export function TokensPanel({ scene, resolve, pending, onPending, onAddNpc, selected, onChangeToken, onRemoveToken, onRemoveFromMap, onAddToInitiative, onSetHidden, onSetNpcsHidden, placeHidden, onPlaceHidden, showMovement, onShowMovement }: Props) {
   const characters = usePartyStore((s) => s.characters);
   const combat = useCombatStore((s) => s.combat);
   const locked = scene.layers.tokens.locked;
@@ -72,6 +76,7 @@ export function TokensPanel({ scene, resolve, pending, onPending, onAddNpc, sele
               <span>
                 <span className="swatch" style={{ background: e.color }} />
                 <span data-testid="entity-name">{e.name}</span>
+                <ConditionIcons conditions={e.conditions} />
                 {ref.kind === "npc" && <span className="badge">PNG</span>}
                 {placed && hiddenOnMap(ref) && (
                   <span className="badge" title="Nascosto ai giocatori">
@@ -176,6 +181,30 @@ export function TokensPanel({ scene, resolve, pending, onPending, onAddNpc, sele
               />
             </label>
           )}
+          <label className="field">
+            Velocità (ft)
+            <NumberInput
+              value={selected.speedFt ?? DEFAULT_SPEED_FT}
+              min={0}
+              max={1000}
+              disabled={locked}
+              onChange={(v) => onChangeToken({ ...selected, speedFt: v === null || v === DEFAULT_SPEED_FT ? undefined : v })}
+            />
+          </label>
+          <label className="row" style={{ flexWrap: "nowrap" }}>
+            <input type="checkbox" checked={showMovement} onChange={(e) => onShowMovement(e.target.checked)} />
+            Mostra raggio di movimento
+          </label>
+          {showMovement && (
+            <p className="muted" style={{ fontSize: "0.8rem", margin: 0 }}>
+              Azzurro: caselle raggiungibili con {selected.speedFt ?? DEFAULT_SPEED_FT} ft; più chiaro: con uno scatto. Il terreno difficile costa il doppio, muri, ostacoli e porte chiuse
+              non si attraversano.
+            </p>
+          )}
+          <div className="field">
+            Condizioni
+            <ConditionPicker name={entity.name} conditions={entity.conditions} onChange={(list) => setEntityConditions(entity.ref, list)} />
+          </div>
           {!inInitiative && <button onClick={() => onAddToInitiative(entity.ref)}>Aggiungi all'iniziativa</button>}
           <button className="danger" onClick={() => onRemoveToken(selected.id)}>
             Rimuovi dalla mappa

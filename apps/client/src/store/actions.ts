@@ -5,6 +5,7 @@ import {
   removeRef,
   sameRef,
   updateNpc,
+  type Condition,
   type Hp,
   type NpcTemplate,
   type Point,
@@ -52,6 +53,19 @@ export function setEntityHp(ref: Ref, hp: Hp) {
     useCombatStore.getState().apply((combat) => ({
       ...combat,
       npcs: combat.npcs.map((n) => (n.id === ref.id ? { ...n, hp } : n)),
+    }));
+  }
+}
+
+/** Condizioni di un PG o PNG (lista vuota = nessuna: il campo viene tolto). */
+export function setEntityConditions(ref: Ref, list: Condition[]) {
+  const conditions = list.length ? list : undefined;
+  if (ref.kind === "pc") {
+    usePartyStore.getState().update(ref.id, (c) => ({ ...c, conditions }));
+  } else {
+    useCombatStore.getState().apply((combat) => ({
+      ...combat,
+      npcs: combat.npcs.map((n) => (n.id === ref.id ? { ...n, conditions } : n)),
     }));
   }
 }

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ConditionsSchema } from "../conditions";
 import { ColorSchema, HpSchema, IdSchema, SizeSchema, createId } from "./common";
 
 export const SAVE_KEYS = ["str", "dex", "con", "int", "wis", "cha"] as const;
@@ -40,6 +41,8 @@ export const CharacterSchema = z
     saves: SavesSchema,
     notes: z.string().max(20_000).default(""),
     size: SizeSchema.default(1),
+    /** Condizioni in corso (accecato, prono…): mostrate sul token e nell'iniziativa. */
+    conditions: ConditionsSchema,
   })
   .loose();
 export type Character = z.infer<typeof CharacterSchema>;

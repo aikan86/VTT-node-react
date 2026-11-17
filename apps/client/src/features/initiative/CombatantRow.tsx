@@ -1,8 +1,9 @@
 import { useRef, useState } from "react";
 import { rollD20 } from "@vtt/shared";
+import { ConditionIcons, ConditionPicker } from "../../components/Conditions";
 import { HpEditor } from "../../components/HpEditor";
 import { NumberInput } from "../../components/NumberInput";
-import { removeFromInitiative, renameNpc, setEntityColor, setEntityHp } from "../../store/actions";
+import { removeFromInitiative, renameNpc, setEntityColor, setEntityConditions, setEntityHp } from "../../store/actions";
 import type { CombatantRowData } from "./useInitiative";
 import styles from "./Initiative.module.css";
 
@@ -21,6 +22,7 @@ export function CombatantRow({ row, active, onSetRoll, onSetNotes, onToggleActed
   const { combatant: c, entity, total, current } = row;
   const isNpc = entity.ref.kind === "npc";
   const [editing, setEditing] = useState(false);
+  const [pickConditions, setPickConditions] = useState(false);
   const className = [styles.row, current && styles.current, c.acted && styles.acted, entity.hp.current <= 0 && styles.down]
     .filter(Boolean)
     .join(" ");
@@ -61,9 +63,20 @@ export function CombatantRow({ row, active, onSetRoll, onSetNotes, onToggleActed
           ) : (
             <span className={styles.name}>{entity.name}</span>
           )}
+          <ConditionIcons conditions={entity.conditions} />
           {isNpc && <span className="badge">PNG</span>}
           {current && <span className={styles.turn}>◀ turno</span>}
+          <button
+            className="icon"
+            aria-expanded={pickConditions}
+            aria-label={`Modifica condizioni di ${entity.name}`}
+            title="Condizioni (accecato, prono…)"
+            onClick={() => setPickConditions((v) => !v)}
+          >
+            🏷
+          </button>
         </div>
+        {pickConditions && <ConditionPicker name={entity.name} conditions={entity.conditions} onChange={(list) => setEntityConditions(entity.ref, list)} />}
       </td>
       <td>
         <div className="row" style={{ flexWrap: "nowrap", gap: "0.25rem" }}>

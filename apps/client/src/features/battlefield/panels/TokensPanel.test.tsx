@@ -1,7 +1,8 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { emptyCombat, newCharacter, newScene, type Ref, type Scene, type Token } from "@vtt/shared";
+import { emptyCombat, newCharacter, newScene, type Condition, type Ref, type Scene, type Token } from "@vtt/shared";
+import { setEntityConditions } from "../../../store/actions";
 import { useCombatStore } from "../../../store/combatStore";
 import { usePartyStore } from "../../../store/partyStore";
 import type { EntityView } from "../../../store/entities";
@@ -12,11 +13,18 @@ vi.mock("../../../api/http", async (importOriginal) => ({
   api: {},
 }));
 
+vi.mock("../../../store/actions", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../store/actions")>()),
+  setEntityConditions: vi.fn(),
+}));
+
 const aria = newCharacter({ id: "pc-a", name: "Aria" });
 const borin = newCharacter({ id: "pc-b", name: "Borin" });
 const NAMES: Record<string, string> = { "pc-a": "Aria", "pc-b": "Borin", "pc-c": "Cael", "n1": "Goblin" };
+/** Condizioni restituite dal resolver nei test. */
+let conditionsOf: Record<string, Condition[]> = {};
 const resolve = (ref: Ref) =>
-  ({ ref, name: NAMES[ref.id] ?? ref.id, color: "#3b82f6", hp: aria.hp, ac: 15, initiativeMod: 0, size: 1 }) satisfies EntityView;
+  ({ ref, name: NAMES[ref.id] ?? ref.id, color: "#3b82f6", hp: aria.hp, ac: 15, initiativeMod: 0, size: 1, conditions: conditionsOf[ref.id] ?? [] }) satisfies EntityView;
 
 function sceneWithAria(locked = false): Scene {
   const scene = newScene("Test");
@@ -35,6 +43,8 @@ interface PanelOptions {
   onSetNpcsHidden?: (hidden: boolean) => void;
   placeHidden?: boolean;
   onPlaceHidden?: (hidden: boolean) => void;
+  showMovement?: boolean;
+  onShowMovement?: (show: boolean) => void;
 }
 
 function renderPanel(scene: Scene, onRemoveFromMap = vi.fn(), options: PanelOptions = {}) {
@@ -54,6 +64,8 @@ function renderPanel(scene: Scene, onRemoveFromMap = vi.fn(), options: PanelOpti
       onSetNpcsHidden={options.onSetNpcsHidden ?? vi.fn()}
       placeHidden={options.placeHidden ?? false}
       onPlaceHidden={options.onPlaceHidden ?? vi.fn()}
+      showMovement={options.showMovement ?? true}
+      onShowMovement={options.onShowMovement ?? vi.fn()}
     />,
   );
   return onRemoveFromMap;
@@ -65,6 +77,8 @@ beforeEach(() => {
     { rev: 1, data: borin },
   ]);
   useCombatStore.getState().hydrate({ rev: 0, data: emptyCombat() });
+  conditionsOf = {};
+  vi.mocked(setEntityConditions).mockClear();
 });
 
 describe("TokensPanel", () => {
@@ -272,6 +286,62 @@ describe("TokensPanel: darkvision", () => {
   it("is disabled when the tokens layer is locked", () => {
     renderPanel(sceneWithAria(true), vi.fn(), { selected: ariaToken });
     expect(screen.getByRole("textbox", { name: "Scurovisione (ft)" })).toBeDisabled();
+  });
+});
+
+describe("TokensPanel: speed and movement range", () => {
+  const ariaToken: Token = { id: "t1", ref: { kind: "pc", id: "pc-a" }, x: 0, y: 0 };
+
+  it("shows the default speed and saves a different one", async () => {
+    const onChangeToken = vi.fn();
+    renderPanel(sceneWithAria(), vi.fn(), { selected: ariaToken, onChangeToken });
+    const field = screen.getByRole("textbox", { name: "Velocità (ft)" });
+    expect(field).toHaveValue("30");
+    await userEvent.clear(field);
+    await userEvent.type(field, "25");
+    expect(onChangeToken).toHaveBeenLastCalledWith({ ...ariaToken, speedFt: 25 });
+  });
+
+  it("is offered for NPCs too", () => {
+    const goblin: Token = { id: "t2", ref: { kind: "npc", id: "n1" }, x: 1, y: 0, speedFt: 40 };
+    renderPanel({ ...sceneWithAria(), tokens: [goblin] }, vi.fn(), { selected: goblin });
+    expect(screen.getByRole("textbox", { name: "Velocità (ft)" })).toHaveValue("40");
+    expect(screen.getByText(/raggiungibili con 40 ft/)).toBeInTheDocument();
+  });
+
+  it("toggles the movement range", async () => {
+    const onShowMovement = vi.fn();
+    renderPanel(sceneWithAria(), vi.fn(), { selected: ariaToken, showMovement: false, onShowMovement });
+    const box = screen.getByRole("checkbox", { name: "Mostra raggio di movimento" });
+    expect(box).not.toBeChecked();
+    expect(screen.queryByText(/terreno difficile costa il doppio/i)).not.toBeInTheDocument();
+    await userEvent.click(box);
+    expect(onShowMovement).toHaveBeenCalledWith(true);
+  });
+});
+
+describe("TokensPanel: conditions", () => {
+  const ariaToken: Token = { id: "t1", ref: { kind: "pc", id: "pc-a" }, x: 0, y: 0 };
+
+  it("toggles conditions of the selected character", async () => {
+    conditionsOf = { "pc-a": ["prone"] };
+    renderPanel(sceneWithAria(), vi.fn(), { selected: ariaToken });
+    const picker = screen.getByRole("group", { name: "Condizioni di Aria" });
+    expect(within(picker).getByRole("button", { name: /Prono/ })).toHaveAttribute("aria-pressed", "true");
+    expect(within(picker).getByRole("button", { name: /Accecato/ })).toHaveAttribute("aria-pressed", "false");
+    await userEvent.click(within(picker).getByRole("button", { name: /Accecato/ }));
+    expect(setEntityConditions).toHaveBeenCalledWith({ kind: "pc", id: "pc-a" }, ["blinded", "prone"]);
+    await userEvent.click(within(picker).getByRole("button", { name: /Prono/ }));
+    expect(setEntityConditions).toHaveBeenLastCalledWith({ kind: "pc", id: "pc-a" }, []);
+  });
+
+  it("shows condition icons next to the name in the list", () => {
+    conditionsOf = { "pc-a": ["stunned", "poisoned"] };
+    renderPanel(sceneWithAria());
+    const list = screen.getByRole("list", { name: "Personaggi" });
+    expect(within(list).getByRole("img", { name: "Stordito" })).toHaveTextContent("💫");
+    expect(within(list).getByRole("img", { name: "Avvelenato" })).toBeInTheDocument();
+    expect(within(list).getAllByTestId("condition-icons")).toHaveLength(1);
   });
 });
 

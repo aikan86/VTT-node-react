@@ -83,6 +83,8 @@ export const TokenSchema = z.object({
   hidden: z.boolean().optional(),
   /** Scurovisione in piedi: in una scena buia il personaggio vede entro questo raggio anche senza luce. */
   darkvisionFt: z.number().int().min(0).max(1000).optional(),
+  /** Velocità di movimento in piedi (assente = `DEFAULT_SPEED_FT`). */
+  speedFt: z.number().int().min(0).max(1000).optional(),
 });
 export type Token = z.infer<typeof TokenSchema>;
 

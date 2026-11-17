@@ -1,0 +1,25 @@
+.icons {
+  display: inline-flex;
+  gap: 0.1rem;
+  font-size: 0.9em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.picker button {
+  padding: 0.15rem 0.4rem;
+  font-size: 0.8rem;
+  opacity: 0.75;
+}
+
+.picker button.on {
+  opacity: 1;
+  outline: 2px solid #e0a526;
+  outline-offset: -2px;
+}

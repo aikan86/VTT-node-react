@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { getTotal, modLookupFrom, playerCombatants, sameRef, type Combat, type Scene } from "@vtt/shared";
+import { ConditionIcons } from "../components/Conditions";
 import { PlayerStage } from "../features/battlefield/PlayerStage";
 import { useCombatStore } from "../store/combatStore";
 import { useEntityResolver } from "../store/entities";
@@ -46,6 +47,7 @@ function InitiativeOrder({ combat, scene }: { combat: Combat; scene: Scene }) {
               <span className={styles.rank}>{i + 1}</span>
               <span className="swatch" style={{ background: entity.color }} />
               <span className={styles.name}>{entity.name}</span>
+              <ConditionIcons conditions={entity.conditions} />
               <span className={styles.total}>{total ?? "–"}</span>
             </li>
           );
