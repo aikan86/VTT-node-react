@@ -123,6 +123,23 @@ describe("ElementsPanel dark scene", () => {
   });
 });
 
+describe("ElementsPanel fog of war", () => {
+  it("can be switched off, and then says players see the whole map", async () => {
+    const { onVision } = renderPanel({ vision: { ...DEFAULT_VISION, enabled: false } });
+    const box = screen.getByRole("checkbox", { name: /nebbia di guerra/i });
+    expect(box).not.toBeChecked();
+    expect(screen.getByText(/vedono tutta la mappa/i)).toBeInTheDocument();
+    await userEvent.click(box);
+    expect(onVision).toHaveBeenCalledWith({ enabled: true });
+  });
+
+  it("does not show the note while it is on", () => {
+    renderPanel();
+    expect(screen.getByRole("checkbox", { name: /nebbia di guerra/i })).toBeChecked();
+    expect(screen.queryByText(/vedono tutta la mappa/i)).not.toBeInTheDocument();
+  });
+});
+
 describe("ElementsPanel fog memory", () => {
   it("shows how many cells were explored and resets them", async () => {
     const { onResetExplored } = renderPanel({ exploredCount: 42 });

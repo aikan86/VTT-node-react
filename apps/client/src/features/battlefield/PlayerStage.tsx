@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Stage } from "react-konva";
+import { Circle, Layer, Line, Stage } from "react-konva";
 import type Konva from "konva";
 import {
   canPlayerMove,
   cellCenter,
+  cellToPx,
+  type PartyMover,
   coveredCells,
   DEFAULT_SPEED_FT,
   movementRange,
@@ -36,8 +38,33 @@ interface Props {
   resolve: EntityResolver;
   /** Chi ha il turno (evidenziato sul token). */
   currentRef: Ref | null;
-  /** Un giocatore ha trascinato un PG su una nuova cella (solo i token per cui `canPlayerMove`). */
+  /** Spostamento confermato da un giocatore (solo i token per cui `canPlayerMove`). */
   onMoveToken?: (token: Token) => void;
+  /** Chi può muovere ora (fuori combattimento tutti i PG, in combattimento solo quello di turno). */
+  mover?: PartyMover;
+}
+
+/** Spostamento trascinato ma non ancora confermato: la scena (e quindi la vista) non cambia finché non si conferma. */
+interface PendingMove {
+  token: Token;
+  to: Point;
+  /** Piedi spesi per arrivarci; null se non è raggiungibile nemmeno con uno scatto. */
+  costFt: number | null;
+  speedFt: number;
+}
+
+/** Destinazione proposta: sagoma tratteggiata del token e percorso dal punto di partenza (sopra la nebbia, ma non rivela nulla). */
+function PendingMoveLayer({ pending, size, color, grid, viewScale }: { pending: PendingMove; size: number; color: string; grid: Scene["grid"]; viewScale: number }) {
+  const k = 1 / viewScale;
+  const r = (size * grid.cellPx) / 2;
+  const from = cellToPx(pending.token, grid);
+  const to = cellToPx(pending.to, grid);
+  return (
+    <Layer listening={false}>
+      <Line points={[from.x + r, from.y + r, to.x + r, to.y + r]} stroke="#facc15" strokeWidth={2.5 * k} dash={[8 * k, 6 * k]} lineCap="round" />
+      <Circle x={to.x + r} y={to.y + r} radius={r - 3} fill={color} opacity={0.45} stroke="#facc15" strokeWidth={3 * k} dash={[6 * k, 4 * k]} />
+    </Layer>
+  );
 }
 
 const MIN_SCALE = 0.05;
@@ -49,7 +76,7 @@ const noop = () => {};
  * ostacoli alla vista tracciati e senza barre dei PF. Si adatta allo schermo; rotella per lo zoom,
  * trascinamento per spostarsi, doppio clic per rimettere la mappa a misura.
  */
-export function PlayerStage({ scene, resolve, currentRef, onMoveToken }: Props) {
+export function PlayerStage({ scene, resolve, currentRef, onMoveToken, mover = "any" }: Props) {
   const [containerRef, size] = useElementSize<HTMLDivElement>();
   const [view, setView] = useState<View>({ x: 0, y: 0, scale: 1 });
   /** Righello (tasto R o pulsante): trascinando si misura invece di spostare la mappa. */
@@ -57,11 +84,30 @@ export function PlayerStage({ scene, resolve, currentRef, onMoveToken }: Props) 
   const [ruler, setRuler] = useState<{ start: Point; end: Point; dragging: boolean } | null>(null);
   /** Raggio di movimento del PG che si sta trascinando. */
   const [moveArea, setMoveArea] = useState<MovementArea | null>(null);
+  /** Posizioni raggiungibili (con scatto) del PG trascinato, per dire quanto costa la destinazione. */
+  const reach = useRef<Map<string, number>>(new Map());
+  const [pending, setPending] = useState<PendingMove | null>(null);
+
+  const cancelMove = () => {
+    setPending(null);
+    setMoveArea(null);
+  };
+  const confirmMove = () => {
+    if (pending) onMoveToken?.({ ...pending.token, ...pending.to });
+    cancelMove();
+  };
+  const keys = useRef({ cancelMove, confirmMove, pending });
+  keys.current = { cancelMove, confirmMove, pending };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (isTyping(e) || e.ctrlKey || e.metaKey || e.altKey) return;
-      if (e.key === "r" || e.key === "R") setMeasuring((m) => !m);
+      const { pending: p, cancelMove: cancel, confirmMove: confirm } = keys.current;
+      if (p && e.key === "Escape") cancel();
+      else if (p && e.key === "Enter") {
+        e.preventDefault();
+        confirm();
+      } else if (e.key === "r" || e.key === "R") setMeasuring((m) => !m);
       else if (e.key === "Escape") setMeasuring(false);
     };
     window.addEventListener("keydown", onKey);
@@ -95,15 +141,36 @@ export function PlayerStage({ scene, resolve, currentRef, onMoveToken }: Props) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fitKey, size.width, size.height]);
 
-  const canMove = (token: Token) => onMoveToken !== undefined && !measuring && canPlayerMove(shown, token);
+  const canMove = (token: Token) => onMoveToken !== undefined && !measuring && canPlayerMove(shown, token, mover);
+
+  // cambio di turno, permesso tolto o token sparito: lo spostamento in sospeso decade
+  const pendingToken = pending && shown.tokens.find((t) => t.id === pending.token.id);
+  const pendingValid = !!pendingToken && pendingToken.x === pending!.token.x && pendingToken.y === pending!.token.y && canMove(pendingToken);
+  useEffect(() => {
+    if (pending && !pendingValid) cancelMove();
+  }, [pending, pendingValid]);
 
   const startDrag = (token: Token) => {
+    setPending(null);
     const sizeOf = resolve(token.ref)?.size ?? 1;
     const speedFt = token.speedFt ?? DEFAULT_SPEED_FT;
-    if (speedFt <= 0) return;
     // stesso calcolo del master: velocità e, più chiaro, scatto
     const range = movementRange(shown, token, sizeOf, speedFt * 2);
-    setMoveArea({ cells: coveredCells(range, sizeOf), speedFt });
+    reach.current = new Map(range.map((r) => [`${r.x},${r.y}`, r.costFt]));
+    setMoveArea(speedFt > 0 ? { cells: coveredCells(range, sizeOf), speedFt } : null);
+  };
+
+  const pendingEntity = pending ? resolve(pending.token.ref) : undefined;
+
+  /** Rilascio: il token torna al suo posto e si chiede conferma (niente da confermare se non si è mosso). */
+  const proposeMove = (moved: Token) => {
+    const original = shown.tokens.find((t) => t.id === moved.id);
+    if (!original || (original.x === moved.x && original.y === moved.y)) {
+      cancelMove();
+      return;
+    }
+    const to = { x: moved.x, y: moved.y };
+    setPending({ token: original, to, costFt: reach.current.get(`${to.x},${to.y}`) ?? null, speedFt: original.speedFt ?? DEFAULT_SPEED_FT });
   };
 
   /** Punto del righello: centro della casella, oppure il punto esatto con Shift. */
@@ -171,10 +238,8 @@ export function PlayerStage({ scene, resolve, currentRef, onMoveToken }: Props) 
             onSelect={noop}
             movable={canMove}
             onDragStart={startDrag}
-            onMove={(token) => {
-              setMoveArea(null);
-              onMoveToken?.(token);
-            }}
+            onMove={proposeMove}
+            snapBack
             hideHp
           />
           <VisionLayer scene={shown} sight={sight} view={view} size={size} darkness={1} />
@@ -192,7 +257,28 @@ export function PlayerStage({ scene, resolve, currentRef, onMoveToken }: Props) 
             onErase={noop}
           />
           {ruler && <RulerLayer start={ruler.start} end={ruler.end} grid={shown.grid} viewScale={view.scale} />}
+          {pending && pendingEntity && (
+            <PendingMoveLayer pending={pending} size={pendingEntity.size} color={pendingEntity.color} grid={shown.grid} viewScale={view.scale} />
+          )}
         </Stage>
+      )}
+      {pending && pendingEntity && (
+        <div className={styles.confirmMove} role="dialog" aria-label="Conferma lo spostamento">
+          <span>
+            Spostare <strong>{pendingEntity.name}</strong> qui?{" "}
+            <span className="muted">
+              {pending.costFt === null
+                ? "Oltre la portata, anche con uno scatto."
+                : pending.costFt <= pending.speedFt
+                  ? `${pending.costFt} ft su ${pending.speedFt}.`
+                  : `${pending.costFt} ft: serve uno scatto.`}
+            </span>
+          </span>
+          <button className="primary" onClick={confirmMove}>
+            Conferma (Invio)
+          </button>
+          <button onClick={cancelMove}>Annulla (Esc)</button>
+        </div>
       )}
       <div className={styles.playerTools}>
         {measuring && <span className={styles.playerHint}>Trascina per misurare · Shift: punto libero · R o Esc: chiudi</span>}

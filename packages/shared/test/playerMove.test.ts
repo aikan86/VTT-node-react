@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canPlayerMove, movePartyToken } from "../src/playerView";
+import { canPlayerMove, movePartyToken, partyMover } from "../src/playerView";
 import { newScene, SceneSchema, type Scene } from "../src/schemas/scene";
 
 function scene(extra: Partial<Scene> = {}): Scene {
@@ -21,6 +21,34 @@ describe("canPlayerMove", () => {
     expect(canPlayerMove(s, s.tokens[1]!)).toBe(false); // nascosto
     expect(canPlayerMove(s, s.tokens[2]!)).toBe(false); // PNG
     expect(canPlayerMove({ playersMoveParty: false }, s.tokens[0]!)).toBe(false);
+  });
+});
+
+describe("partyMover: who moves on whose turn", () => {
+  const combatants = [
+    { id: "c1", ref: { kind: "pc" as const, id: "pc-a" }, roll: 15, acted: false, order: 0, notes: "" },
+    { id: "c2", ref: { kind: "npc" as const, id: "n1" }, roll: 10, acted: false, order: 1, notes: "" },
+  ];
+
+  it("lets every character move outside combat", () => {
+    expect(partyMover({ active: false, currentId: "c1", combatants })).toBe("any");
+  });
+
+  it("in combat only the character whose turn it is, nobody during an NPC's turn", () => {
+    expect(partyMover({ active: true, currentId: "c1", combatants })).toEqual({ kind: "pc", id: "pc-a" });
+    expect(partyMover({ active: true, currentId: "c2", combatants })).toBeNull();
+    expect(partyMover({ active: true, currentId: null, combatants })).toBeNull();
+  });
+
+  it("is applied to the tokens", () => {
+    const s = scene({ tokens: [...scene().tokens, { id: "borin", ref: { kind: "pc", id: "pc-b" }, x: 2, y: 2 }] });
+    const ariaTurn = { kind: "pc" as const, id: "pc-a" };
+    expect(canPlayerMove(s, s.tokens[0]!, ariaTurn)).toBe(true);
+    expect(canPlayerMove(s, s.tokens[3]!, ariaTurn)).toBe(false);
+    expect(canPlayerMove(s, s.tokens[0]!, null)).toBe(false);
+    expect(movePartyToken(s, "borin", { x: 3, y: 3 }, ariaTurn)).toBe(s);
+    expect(movePartyToken(s, "aria", { x: 3, y: 3 }, ariaTurn).tokens[0]).toMatchObject({ x: 3, y: 3 });
+    expect(movePartyToken(s, "aria", { x: 3, y: 3 }, null)).toBe(s);
   });
 });
 

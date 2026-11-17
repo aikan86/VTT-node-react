@@ -46,6 +46,18 @@ export function SceneBar({ scene }: { scene: Scene }) {
       </button>
       <span className="row" style={{ marginLeft: "auto", gap: "0.4rem" }}>
         <button
+          className={scene.vision.enabled ? "active" : ""}
+          aria-pressed={scene.vision.enabled}
+          title={
+            scene.vision.enabled
+              ? "Nebbia di guerra attiva: i giocatori vedono solo ciò che vede il party. Clicca per mostrare loro tutta la mappa"
+              : "Nebbia di guerra spenta: i giocatori vedono tutta la mappa. Clicca per mostrare solo ciò che vede il party"
+          }
+          onClick={() => update(scene.id, (s) => ({ ...s, vision: { ...s.vision, enabled: !s.vision.enabled } }))}
+        >
+          🌫 Nebbia di guerra{scene.vision.enabled ? "" : ": spenta"}
+        </button>
+        <button
           className={scene.shownToPlayers ? "active" : ""}
           aria-pressed={scene.shownToPlayers}
           title={scene.shownToPlayers ? "Smetti di mostrarla: i giocatori tornano in attesa" : "I giocatori vedranno questa scena"}

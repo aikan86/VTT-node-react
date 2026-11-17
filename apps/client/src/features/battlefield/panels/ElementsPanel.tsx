@@ -182,8 +182,13 @@ export function ElementsPanel({
         <h3>Visione del party</h3>
         <label className="row" style={{ flexWrap: "nowrap" }}>
           <input type="checkbox" checked={vision.enabled} onChange={(e) => onVision({ enabled: e.target.checked })} />
-          Mostra cosa vede il party
+          Nebbia di guerra: i giocatori vedono solo ciò che vede il party
         </label>
+        {!vision.enabled && (
+          <p className="muted" style={{ fontSize: "0.8rem", margin: 0 }}>
+            Spenta: i giocatori vedono tutta la mappa, a prescindere da raggio visivo e ostacoli.
+          </p>
+        )}
         <label className="row" style={{ flexWrap: "nowrap" }}>
           <input type="checkbox" checked={dark && vision.enabled} onChange={(e) => onDark(e.target.checked)} />
           Scena buia

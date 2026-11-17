@@ -38,6 +38,7 @@
 .groups h4 { margin: 0.3rem 0 0; font-size: 0.8rem; font-weight: 600; color: var(--muted); }
 /* Vista giocatori: righello in basso a destra */
 .playerTools { position: absolute; right: 0.75rem; bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem; }
+.confirmMove { position: absolute; left: 50%; bottom: 1rem; transform: translateX(-50%); display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; justify-content: center; max-width: calc(100% - 2rem); padding: 0.6rem 0.8rem; background: rgb(18 20 25 / 0.92); border: 1px solid var(--accent); border-radius: 10px; font-size: clamp(0.95rem, 1.4vw, 1.2rem); }
 .playerHint { font-size: 0.85rem; color: var(--muted); background: rgb(18 20 25 / 0.85); padding: 0.3rem 0.6rem; border-radius: 6px; }
 .hint { position: absolute; left: 0.75rem; bottom: 0.75rem; font-size: 0.75rem; color: var(--muted); background: rgb(18 20 25 / 0.8); padding: 0.25rem 0.5rem; border-radius: 6px; pointer-events: none; }
 

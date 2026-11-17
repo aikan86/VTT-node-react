@@ -176,6 +176,11 @@ export function TokensPanel({ scene, resolve, pending, onPending, onAddNpc, sele
           <input type="checkbox" checked={scene.playersMoveParty} onChange={(e) => onPlayersMoveParty(e.target.checked)} />
           I giocatori possono muovere i PG dalla loro vista
         </label>
+        {scene.playersMoveParty && (
+          <p className="muted" style={{ fontSize: "0.8rem", margin: 0 }}>
+            In combattimento solo il PG di turno; ogni spostamento va confermato dal giocatore.
+          </p>
+        )}
         {anyNpcVisible && (
           <button disabled={locked} onClick={() => onSetNpcsHidden(true)}>
             Nascondi tutti i PNG ai giocatori

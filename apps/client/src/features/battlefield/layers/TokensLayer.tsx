@@ -19,6 +19,8 @@ interface Props {
   movable?: (token: Token) => boolean;
   /** Inizio del trascinamento di un token. */
   onDragStart?: (token: Token) => void;
+  /** Dopo il rilascio il token torna dov'era: `onMove` riceve solo la destinazione proposta (da confermare). */
+  snapBack?: boolean;
 }
 
 const initials = (name: string) =>
@@ -78,7 +80,7 @@ function ConditionBadges({ conditions, size }: { conditions: readonly Condition[
   );
 }
 
-export function TokensLayer({ scene, resolve, listening, editable, selectedId, currentRef, onSelect, onMove, hideHp = false, movable, onDragStart }: Props) {
+export function TokensLayer({ scene, resolve, listening, editable, selectedId, currentRef, onSelect, onMove, hideHp = false, movable, onDragStart, snapBack = false }: Props) {
   const g = scene.grid;
 
   return (
@@ -116,7 +118,7 @@ export function TokensLayer({ scene, resolve, listening, editable, selectedId, c
             }}
             onDragEnd={(e) => {
               const next = snapPxToCell(e.target.position(), g);
-              e.target.position(cellToPx(next, g));
+              e.target.position(snapBack ? pos : cellToPx(next, g));
               onMove({ ...token, ...next });
             }}
           >

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLibraryStore } from "../store/libraryStore";
-import { currentHandout, getTotal, modLookupFrom, movePartyToken, playerCombatants, sameRef, type Combat, type Scene } from "@vtt/shared";
+import { currentHandout, getTotal, modLookupFrom, movePartyToken, partyMover, playerCombatants, sameRef, type Combat, type Scene } from "@vtt/shared";
 import { ConditionIcons } from "../components/Conditions";
 import { PlayerStage } from "../features/battlefield/PlayerStage";
 import { useCombatStore } from "../store/combatStore";
@@ -88,7 +88,9 @@ export function PlayerViewPage() {
             scene={scene}
             resolve={resolve}
             currentRef={current && scene.tokens.some((t) => sameRef(t.ref, current.ref) && !t.hidden) ? current.ref : null}
-            onMoveToken={(token) => useSceneStore.getState().update(scene.id, (s) => movePartyToken(s, token.id, token))}
+            mover={partyMover(combat)}
+            // ricontrolla il turno al momento del salvataggio (potrebbe essere cambiato nel frattempo)
+            onMoveToken={(token) => useSceneStore.getState().update(scene.id, (s) => movePartyToken(s, token.id, token, partyMover(useCombatStore.getState().combat)))}
           />
           <InitiativeOrder combat={combat} scene={scene} />
         </>
