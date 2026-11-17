@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { floodFill, magicWand, simplifyPolygon, simplifyToLimit, traceContour, type Raster } from "../src/wand";
+import { floodFill, floodFillThick, magicWand, simplifyPolygon, simplifyToLimit, traceContour, wandRadius, type Raster } from "../src/wand";
 import { pointInPolygon } from "../src/visibility";
 
 const COLORS: Record<string, [number, number, number, number]> = {
@@ -53,6 +53,52 @@ describe("floodFill", () => {
   it("is empty outside the image", () => {
     expect(floodFill(img, -1, 0, 10).count).toBe(0);
     expect(floodFill(img, 6, 0, 10).count).toBe(0);
+  });
+});
+
+describe("floodFillThick: does not leak along thin ink lines", () => {
+  // due "vuoti" scuri 6x5 collegati da una linea d'inchiostro dello stesso colore, larga 1 pixel
+  const img = raster([
+    "....................",
+    ".######......######.",
+    ".######......######.",
+    ".##################.",
+    ".######......######.",
+    ".######......######.",
+    "....................",
+  ]);
+
+  it("the plain fill takes both areas and the line", () => {
+    expect(floodFill(img, 2, 2, 10).count).toBe(6 * 5 * 2 + 6);
+  });
+
+  it("the thick fill stays in the clicked area, with its exact edges", () => {
+    const r = floodFillThick(img, 2, 2, 10, 1);
+    expect(r.count).toBe(30);
+    expect(pairs(traceContour(r))).toEqual([
+      [1, 1],
+      [7, 1],
+      [7, 6],
+      [1, 6],
+    ]);
+  });
+
+  it("still works when clicking right on a thin detail", () => {
+    expect(floodFillThick(img, 9, 3, 10, 1).count).toBe(floodFill(img, 9, 3, 10).count);
+  });
+
+  it("finds the area when the click lands near its edge", () => {
+    expect(floodFillThick(img, 1, 1, 10, 1).count).toBe(30);
+  });
+
+  it("is the plain fill with radius 0", () => {
+    expect(floodFillThick(img, 2, 2, 10, 0).count).toBe(floodFill(img, 2, 2, 10).count);
+  });
+
+  it("scales the radius with the image", () => {
+    expect(wandRadius({ width: 1600, height: 900 })).toBe(2);
+    expect(wandRadius({ width: 400, height: 300 })).toBe(1);
+    expect(wandRadius({ width: 12, height: 6 })).toBe(0);
   });
 });
 

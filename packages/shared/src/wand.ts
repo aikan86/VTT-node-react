@@ -26,32 +26,43 @@ export interface Region {
  * I pixel quasi trasparenti contano come "nessun colore" e non vengono mai presi, salvo che lo sia anche il seme.
  */
 export function floodFill(raster: Raster, seedX: number, seedY: number, tolerance: number): Region {
-  const { width, height, data } = raster;
-  const mask = new Uint8Array(width * height);
+  const { width, height } = raster;
   const sx = Math.floor(seedX);
   const sy = Math.floor(seedY);
-  if (sx < 0 || sy < 0 || sx >= width || sy >= height) return { mask, width, height, count: 0 };
+  if (sx < 0 || sy < 0 || sx >= width || sy >= height) return { mask: new Uint8Array(width * height), width, height, count: 0 };
+  const matches = colorMatcher(raster, sx, sy, tolerance);
+  return fillFrom(width, height, sy * width + sx, matches);
+}
+
+/** Il colore del pixel i è entro la tolleranza da quello del seme? */
+function colorMatcher(raster: Raster, sx: number, sy: number, tolerance: number): (i: number) => boolean {
+  const { width, data } = raster;
   const s = (sy * width + sx) * 4;
   const [r, g, b, a] = [data[s]!, data[s + 1]!, data[s + 2]!, data[s + 3]!];
   const seedTransparent = a < 16;
-  const matches = (i: number) => {
+  return (i: number) => {
     const o = i * 4;
     const transparent = data[o + 3]! < 16;
     if (transparent || seedTransparent) return transparent === seedTransparent;
     return Math.max(Math.abs(data[o]! - r), Math.abs(data[o + 1]! - g), Math.abs(data[o + 2]! - b)) <= tolerance;
   };
+}
+
+/** Riempimento 4-connesso dal pixel `seed` attraverso i pixel ammessi. */
+function fillFrom(width: number, height: number, seed: number, allowed: (i: number) => boolean): Region {
+  const mask = new Uint8Array(width * height);
   // pila esplicita: niente ricorsione, regge aree di milioni di pixel
   const stack = new Int32Array(width * height);
   let top = 0;
   let count = 0;
-  stack[top++] = sy * width + sx;
-  mask[sy * width + sx] = 1;
+  stack[top++] = seed;
+  mask[seed] = 1;
   while (top > 0) {
     const i = stack[--top]!;
     count++;
     const x = i % width;
     const push = (j: number) => {
-      if (!mask[j] && matches(j)) {
+      if (!mask[j] && allowed(j)) {
         mask[j] = 1;
         stack[top++] = j;
       }
@@ -62,6 +73,71 @@ export function floodFill(raster: Raster, seedX: number, seedY: number, toleranc
     if (i < width * (height - 1)) push(i + width);
   }
   return { mask, width, height, count };
+}
+
+/**
+ * Filtro a finestra quadrata (lato 2r+1), separabile: con `all` = erosione (1 solo se tutta la finestra è 1),
+ * altrimenti dilatazione (1 se almeno un pixel della finestra è 1). Fuori dall'immagine conta come `all`
+ * (così le aree che toccano il bordo non si restringono).
+ */
+function windowFilter(src: Uint8Array, width: number, height: number, r: number, all: boolean): Uint8Array {
+  const pass = (input: Uint8Array, horizontal: boolean) => {
+    const out = new Uint8Array(input.length);
+    const lines = horizontal ? height : width;
+    const len = horizontal ? width : height;
+    const at = (line: number, k: number) => (horizontal ? line * width + k : k * width + line);
+    for (let line = 0; line < lines; line++) {
+      // conta dei pixel "sbagliati" (0 per l'erosione, 1 per la dilatazione) nella finestra corrente
+      const bad = (k: number) => (k < 0 || k >= len ? 0 : all ? (input[at(line, k)] ? 0 : 1) : input[at(line, k)] ? 1 : 0);
+      let count = 0;
+      for (let k = -r; k <= r; k++) count += bad(k);
+      for (let k = 0; k < len; k++) {
+        out[at(line, k)] = all ? (count === 0 ? 1 : 0) : count > 0 ? 1 : 0;
+        count += bad(k + r + 1) - bad(k - r);
+      }
+    }
+    return out;
+  };
+  return pass(pass(src, true), false);
+}
+
+/**
+ * Come `floodFill`, ma senza passare per le strettoie più sottili di 2·radius+1 pixel: i contorni a inchiostro e le fughe
+ * tra le pietre, dello stesso colore scuro dei vuoti, altrimenti collegherebbero tutta la mappa. Si riempie l'area
+ * "erosa" (solo i pixel con tutta la finestra del colore giusto) e poi la si riallarga fino al bordo vero.
+ * Se il clic cade in un dettaglio più sottile della finestra, vale il riempimento normale.
+ */
+export function floodFillThick(raster: Raster, seedX: number, seedY: number, tolerance: number, radius: number): Region {
+  const { width, height } = raster;
+  const sx = Math.floor(seedX);
+  const sy = Math.floor(seedY);
+  if (radius <= 0 || sx < 0 || sy < 0 || sx >= width || sy >= height) return floodFill(raster, seedX, seedY, tolerance);
+  const matches = colorMatcher(raster, sx, sy, tolerance);
+  const candidate = new Uint8Array(width * height);
+  for (let i = 0; i < candidate.length; i++) candidate[i] = matches(i) ? 1 : 0;
+  const core = windowFilter(candidate, width, height, radius, true);
+
+  // il seme dentro l'area erosa: il pixel cliccato o il più vicino entro la finestra
+  let seed = -1;
+  let best = Infinity;
+  for (let dy = -radius * 2; dy <= radius * 2; dy++) {
+    for (let dx = -radius * 2; dx <= radius * 2; dx++) {
+      const x = sx + dx;
+      const y = sy + dy;
+      if (x < 0 || y < 0 || x >= width || y >= height || !core[y * width + x]) continue;
+      const d = dx * dx + dy * dy;
+      if (d < best) {
+        best = d;
+        seed = y * width + x;
+      }
+    }
+  }
+  if (seed < 0) return floodFill(raster, seedX, seedY, tolerance);
+
+  const inner = fillFrom(width, height, seed, (i) => core[i] === 1);
+  const grown = windowFilter(inner.mask, width, height, radius, false);
+  // riallargata solo sui pixel del colore giusto, e di nuovo un solo pezzo connesso
+  return fillFrom(width, height, seed, (i) => grown[i] === 1 && candidate[i] === 1);
 }
 
 /**
@@ -188,15 +264,23 @@ export interface WandOptions {
   minPixels: number;
   /** Frazione massima dell'immagine (oltre si è preso il pavimento, non un ostacolo). */
   maxFraction: number;
+  /**
+   * Le strettoie più sottili di 2·radius+1 pixel non vengono attraversate (contorni a inchiostro, fughe tra le pietre).
+   * Se assente: 1 pixel ogni 800 di lato dell'immagine (2 per un'immagine da 1600), 0 per le immagini minuscole.
+   */
+  radius?: number;
 }
 
 export const DEFAULT_WAND: WandOptions = { tolerance: 32, epsilon: 1.5, maxVertices: 200, minPixels: 24, maxFraction: 0.5 };
+
+/** Spessore delle strettoie da non attraversare, in proporzione all'immagine. */
+export const wandRadius = (raster: Pick<Raster, "width" | "height">) => Math.round(Math.max(raster.width, raster.height) / 800);
 
 /** Bacchetta magica completa: dal clic al poligono semplificato (pixel dell'immagine). */
 export function magicWand(raster: Raster, x: number, y: number, options: Partial<WandOptions> = {}): WandResult {
   const o = { ...DEFAULT_WAND, ...options };
   if (x < 0 || y < 0 || x >= raster.width || y >= raster.height) return { ok: false, reason: "outside" };
-  const region = floodFill(raster, x, y, o.tolerance);
+  const region = floodFillThick(raster, x, y, o.tolerance, o.radius ?? wandRadius(raster));
   if (region.count < o.minPixels) return { ok: false, reason: "too-small" };
   if (region.count > raster.width * raster.height * o.maxFraction) return { ok: false, reason: "too-large" };
   const polygon = simplifyToLimit(traceContour(region), o.epsilon, o.maxVertices);
