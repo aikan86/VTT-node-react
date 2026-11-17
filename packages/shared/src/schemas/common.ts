@@ -18,6 +18,12 @@ export type Ref = z.infer<typeof RefSchema>;
 /** Taglia in celle occupate per lato (1 = Media/Piccola, 2 = Grande, 3 = Enorme, 4 = Mastodontica). */
 export const SizeSchema = z.number().int().min(1).max(4);
 
+/** Immagine del token: un file caricato nel VTT (`/uploads/...`), mai un indirizzo esterno. */
+export const TokenImageSchema = z
+  .string()
+  .regex(/^\/uploads\/[\w-]{1,100}\.(png|jpg|webp|gif)$/, "Immagine caricata nel VTT")
+  .optional();
+
 export const ColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/, "Colore esadecimale #rrggbb");
 
 export function createId(): string {

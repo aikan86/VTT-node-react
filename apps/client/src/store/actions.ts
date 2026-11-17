@@ -70,6 +70,18 @@ export function setEntityConditions(ref: Ref, list: Condition[]) {
   }
 }
 
+/** Immagine del token di un PG o PNG (undefined = nessuna, tornano le iniziali). */
+export function setEntityImage(ref: Ref, imageUrl: string | undefined) {
+  if (ref.kind === "pc") {
+    usePartyStore.getState().update(ref.id, (c) => ({ ...c, imageUrl }));
+  } else {
+    useCombatStore.getState().apply((combat) => ({
+      ...combat,
+      npcs: combat.npcs.map((n) => (n.id === ref.id ? { ...n, imageUrl } : n)),
+    }));
+  }
+}
+
 /** Rinomina un PNG; i nomi vuoti vengono ignorati. */
 export function renameNpc(npcId: string, name: string) {
   const trimmed = name.trim();

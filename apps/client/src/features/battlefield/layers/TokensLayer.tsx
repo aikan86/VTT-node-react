@@ -1,5 +1,6 @@
 import type Konva from "konva";
-import { Circle, Group, Layer, Line, Path, Rect, Text } from "react-konva";
+import { Circle, Group, Image as KImage, Layer, Line, Path, Rect, Text } from "react-konva";
+import { useImage } from "../hooks";
 import { cellToPx, CONDITION_INFO, sameRef, snapPxToCell, type Condition, type Ref, type Scene, type Token } from "@vtt/shared";
 import type { EntityResolver } from "../../../store/entities";
 import { clamp } from "../geometry";
@@ -52,6 +53,41 @@ function HiddenMark({ size }: { size: number }) {
           <Line points={[4, 4, 20, 20]} stroke={stroke} strokeWidth={width} lineCap="round" />
         </Group>
       ))}
+    </Group>
+  );
+}
+
+/**
+ * Interno del token: l'immagine ritagliata nel cerchio (il bordo resta del colore del personaggio) oppure, senza immagine
+ * o finché non è caricata, le iniziali.
+ */
+function TokenFace({ imageUrl, name, size, dim }: { imageUrl: string | undefined; name: string; size: number; dim: boolean }) {
+  const image = useImage(imageUrl);
+  const r = size / 2;
+  if (!image) {
+    return (
+      <Text text={initials(name)} width={size} height={size} align="center" verticalAlign="middle" fontSize={Math.max(10, size * 0.34)} fontStyle="bold" fill="#ffffff" listening={false} />
+    );
+  }
+  // ritaglio quadrato centrato (immagini non quadrate comprese), dentro al bordo colorato
+  const inner = r - 6;
+  const side = Math.min(image.width, image.height);
+  return (
+    <Group
+      listening={false}
+      opacity={dim ? 0.45 : 1}
+      clipFunc={(ctx) => {
+        ctx.arc(r, r, inner, 0, Math.PI * 2, false);
+      }}
+    >
+      <KImage
+        image={image}
+        x={r - inner}
+        y={r - inner}
+        width={inner * 2}
+        height={inner * 2}
+        crop={{ x: (image.width - side) / 2, y: (image.height - side) / 2, width: side, height: side }}
+      />
     </Group>
   );
 }
@@ -138,17 +174,7 @@ export function TokensLayer({ scene, resolve, listening, editable, selectedId, c
               shadowBlur={6}
               shadowOpacity={0.5}
             />
-            <Text
-              text={initials(entity.name)}
-              width={s}
-              height={s}
-              align="center"
-              verticalAlign="middle"
-              fontSize={Math.max(10, s * 0.34)}
-              fontStyle="bold"
-              fill="#ffffff"
-              listening={false}
-            />
+            <TokenFace imageUrl={entity.imageUrl} name={entity.name} size={s} dim={down} />
             {down && (
               <Line points={[s * 0.25, s * 0.25, s * 0.75, s * 0.75, s * 0.5, s * 0.5, s * 0.75, s * 0.25, s * 0.25, s * 0.75]} stroke="#ef4444" strokeWidth={4} listening={false} />
             )}

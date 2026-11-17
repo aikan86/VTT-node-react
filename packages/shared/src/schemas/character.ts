@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { ConditionsSchema } from "../conditions";
-import { ColorSchema, HpSchema, IdSchema, SizeSchema, createId } from "./common";
+import { ColorSchema, HpSchema, IdSchema, SizeSchema, TokenImageSchema, createId } from "./common";
 
 export const SAVE_KEYS = ["str", "dex", "con", "int", "wis", "cha"] as const;
 export type SaveKey = (typeof SAVE_KEYS)[number];
@@ -43,6 +43,8 @@ export const CharacterSchema = z
     size: SizeSchema.default(1),
     /** Condizioni in corso (accecato, prono…): mostrate sul token e nell'iniziativa. */
     conditions: ConditionsSchema,
+    /** Immagine nel cerchio del token. */
+    imageUrl: TokenImageSchema,
   })
   .loose();
 export type Character = z.infer<typeof CharacterSchema>;

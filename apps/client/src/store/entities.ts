@@ -13,6 +13,8 @@ export interface EntityView {
   initiativeMod: number;
   size: number;
   conditions: Condition[];
+  /** Immagine nel cerchio del token. */
+  imageUrl?: string;
 }
 
 export type EntityResolver = (ref: Ref) => EntityView | undefined;
@@ -24,7 +26,7 @@ export function useEntityResolver(): EntityResolver {
     (ref: Ref) => {
       const e = ref.kind === "pc" ? characters.find((c) => c.id === ref.id) : npcs.find((n) => n.id === ref.id);
       return e
-        ? { ref, name: e.name, color: e.color, hp: e.hp, ac: e.ac, initiativeMod: e.initiativeMod, size: e.size, conditions: e.conditions ?? [] }
+        ? { ref, name: e.name, color: e.color, hp: e.hp, ac: e.ac, initiativeMod: e.initiativeMod, size: e.size, conditions: e.conditions ?? [], imageUrl: e.imageUrl }
         : undefined;
     },
     [characters, npcs],

@@ -93,6 +93,8 @@ export const api = {
     }
     return (await res.json()) as { url: string };
   },
+  /** Illustrazione di un mostro dall'SRD 5e online, scaricata dal server tra le immagini del VTT. */
+  srdImage: (index: string) => request<{ url: string; cached: boolean }>("GET", `/api/srd-image/${encodeURIComponent(index)}`),
   /** Indirizzo che scarica l'intero stato come file JSON. */
   exportUrl: "/api/export",
   /** Sostituisce l'intero stato con quello del file esportato (inviato così com'è, senza rielaborarlo). */

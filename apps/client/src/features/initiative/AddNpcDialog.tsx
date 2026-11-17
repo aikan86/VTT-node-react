@@ -4,12 +4,14 @@ import {
   monsterTemplate,
   parseMonsterFile,
   PRESET_MONSTERS,
+  srdIndexFor,
   statsFromTemplate,
   type MonsterStats,
   type NpcGroupMember,
   type NpcTemplate,
 } from "@vtt/shared";
 import { Modal } from "../../components/Modal";
+import { TokenImagePicker } from "../../components/TokenImagePicker";
 import { NumberInput } from "../../components/NumberInput";
 import { addMonsters, deleteMonster, deleteNpcGroup, saveNpcGroup, useLibraryStore } from "../../store/libraryStore";
 import { SIZE_OPTIONS } from "../party/CharacterCard";
@@ -50,6 +52,7 @@ export function AddNpcDialog({ onClose, onSubmit, showPlaceOption = false }: Pro
   const [quantity, setQuantity] = useState(1);
   const [color, setColor] = useState(GOBLIN.color);
   const [size, setSize] = useState<number>(GOBLIN.size);
+  const [imageUrl, setImageUrl] = useState<string | undefined>(GOBLIN.imageUrl);
   const [placeOnMap, setPlaceOnMap] = useState(true);
   const [importMessage, setImportMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const [draft, setDraft] = useState<NpcGroupMember[]>([]);
@@ -57,8 +60,21 @@ export function AddNpcDialog({ onClose, onSubmit, showPlaceOption = false }: Pro
   const fileRef = useRef<HTMLInputElement>(null);
 
   const valid = name.trim().length > 0;
-  const template = (): NpcTemplate => ({ name: name.trim(), initiativeMod, hp: { current: hpMax, max: hpMax, temp: 0 }, ac, color, size });
+  const template = (): NpcTemplate => ({
+    name: name.trim(),
+    initiativeMod,
+    hp: { current: hpMax, max: hpMax, temp: 0 },
+    ac,
+    color,
+    size,
+    ...(imageUrl ? { imageUrl } : {}),
+  });
   const customId = source.startsWith("custom:") ? source.slice("custom:".length) : null;
+  const monsterOf = (value: string): MonsterStats | undefined => {
+    const [kind, key] = value.split(":") as [string, string];
+    return kind === "preset" ? PRESET_MONSTERS[Number(key)] : kind === "custom" ? monsters.find((x) => x.id === key) : undefined;
+  };
+  const chosen = monsterOf(source);
 
   const fill = (m: MonsterStats) => {
     setName(m.name);
@@ -67,12 +83,12 @@ export function AddNpcDialog({ onClose, onSubmit, showPlaceOption = false }: Pro
     setAc(m.ac);
     setColor(m.color);
     setSize(m.size);
+    setImageUrl(m.imageUrl);
   };
 
   const choose = (value: string) => {
     setSource(value);
-    const [kind, key] = value.split(":") as [string, string];
-    const m = kind === "preset" ? PRESET_MONSTERS[Number(key)] : kind === "custom" ? monsters.find((x) => x.id === key) : undefined;
+    const m = monsterOf(value);
     if (m) fill(m);
   };
 
@@ -142,7 +158,7 @@ export function AddNpcDialog({ onClose, onSubmit, showPlaceOption = false }: Pro
               type="button"
               disabled={!valid}
               onClick={() => {
-                const [saved] = addMonsters([statsFromTemplate(template())]);
+                const [saved] = addMonsters([{ ...statsFromTemplate(template()), ...(chosen?.srd ? { srd: chosen.srd } : {}) }]);
                 if (saved) setSource(`custom:${saved.id}`);
               }}
             >
@@ -204,6 +220,16 @@ export function AddNpcDialog({ onClose, onSubmit, showPlaceOption = false }: Pro
             Quantità
             <NumberInput value={quantity} onChange={(v) => setQuantity(v ?? 1)} min={1} max={30} style={{ width: "100%" }} />
           </label>
+        </div>
+        <div className="field">
+          Immagine del token
+          <TokenImagePicker
+            name={name.trim() || "PNG"}
+            imageUrl={imageUrl}
+            onChange={setImageUrl}
+            srdIndex={srdIndexFor({ name, srd: chosen?.srd })}
+            autoSearchKey={chosen ? source : null}
+          />
         </div>
         <label className="field">
           Taglia

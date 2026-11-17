@@ -1,4 +1,4 @@
-import { DEFAULT_SPEED_FT, formatMove, groupSummary, modLookupFrom, sameRef, sortCombatants, type NpcGroup, type Ref, type Scene, type Token } from "@vtt/shared";
+import { DEFAULT_SPEED_FT, formatMove, groupSummary, srdIndexFor, modLookupFrom, sameRef, sortCombatants, type NpcGroup, type Ref, type Scene, type Token } from "@vtt/shared";
 import { useLibraryStore } from "../../../store/libraryStore";
 import { ConditionIcons, ConditionPicker } from "../../../components/Conditions";
 import { EyeIcon } from "../../../components/EyeIcon";
@@ -6,7 +6,8 @@ import { HpEditor } from "../../../components/HpEditor";
 import { NumberInput } from "../../../components/NumberInput";
 import { useCombatStore } from "../../../store/combatStore";
 import type { EntityResolver } from "../../../store/entities";
-import { setEntityConditions, setEntityHp } from "../../../store/actions";
+import { setEntityConditions, setEntityHp, setEntityImage } from "../../../store/actions";
+import { TokenImagePicker } from "../../../components/TokenImagePicker";
 import { usePartyStore } from "../../../store/partyStore";
 import type { PendingPlacement } from "../types";
 import styles from "../Battlefield.module.css";
@@ -205,6 +206,12 @@ export function TokensPanel({ scene, resolve, pending, onPending, onAddNpc, sele
             </span>
           </div>
           <HpEditor hp={entity.hp} label={entity.name} onChange={(hp) => setEntityHp(entity.ref, hp)} />
+          <TokenImagePicker
+            name={entity.name}
+            imageUrl={entity.imageUrl}
+            onChange={(url) => setEntityImage(entity.ref, url)}
+            srdIndex={entity.ref.kind === "npc" ? srdIndexFor({ name: entity.name }) : null}
+          />
           <label className="row" style={{ flexWrap: "nowrap" }}>
             <input type="checkbox" checked={!selected.hidden} disabled={locked} onChange={(e) => onChangeToken({ ...selected, hidden: !e.target.checked })} />
             Visibile ai giocatori (H)

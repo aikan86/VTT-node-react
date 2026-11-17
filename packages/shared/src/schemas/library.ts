@@ -1,5 +1,8 @@
 import { z } from "zod";
-import { ColorSchema, IdSchema, SizeSchema, createId } from "./common";
+import { ColorSchema, IdSchema, SizeSchema, TokenImageSchema, createId } from "./common";
+
+/** Identificativo di un mostro nell'SRD 5e online: minuscole, cifre e trattini. */
+export const SrdIndexSchema = z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/).max(80);
 
 /** Immagine che il master mostra a schermo intero ai giocatori (una lettera, una mappa del tesoro, un ritratto…). */
 export const HandoutSchema = z.object({
@@ -27,6 +30,10 @@ export const MonsterStatsSchema = z.object({
   color: ColorSchema,
   /** Grado di sfida, solo informativo ("1/4", "5"…). */
   cr: z.string().trim().max(10).optional(),
+  /** Immagine del token (già scaricata o caricata nel VTT). */
+  imageUrl: TokenImageSchema,
+  /** Nome del mostro nell'SRD 5e online (es. "giant-spider"), per cercarne l'illustrazione. */
+  srd: SrdIndexSchema.optional(),
 });
 export type MonsterStats = z.infer<typeof MonsterStatsSchema>;
 

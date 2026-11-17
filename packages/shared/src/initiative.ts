@@ -5,7 +5,7 @@ import type { Combat, Combatant, Npc } from "./schemas/combat";
 /** Restituisce il modificatore di iniziativa dell'entità referenziata. */
 export type ModLookup = (ref: Ref) => number;
 
-export type NpcTemplate = Pick<Npc, "name" | "color" | "hp" | "ac" | "initiativeMod" | "size">;
+export type NpcTemplate = Pick<Npc, "name" | "color" | "hp" | "ac" | "initiativeMod" | "size" | "imageUrl">;
 
 export function getTotal(c: Combatant, getMod: ModLookup): number | null {
   return c.roll === null ? null : c.roll + getMod(c.ref);

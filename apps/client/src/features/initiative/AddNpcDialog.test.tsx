@@ -8,7 +8,12 @@ vi.mock("../../api/http", async (importOriginal) => {
   const created = vi.fn(async (doc: unknown) => ({ rev: 1, data: doc }));
   const removed = vi.fn(async () => undefined);
   const col = { list: vi.fn(async () => []), create: created, update: vi.fn(async () => ({ status: "ok", rev: 2 })), remove: removed };
-  return { ...(await importOriginal<typeof import("../../api/http")>()), api: { monsters: col, npcGroups: col, handouts: col } };
+  // finto archivio SRD: illustrazioni per goblin e orco, nient'altro
+  const srdImage = vi.fn(async (index: string) => {
+    if (index === "goblin" || index === "orc") return { url: `/uploads/srd-${index}.png`, cached: true };
+    throw new Error("Mostro non presente nell'SRD 5e");
+  });
+  return { ...(await importOriginal<typeof import("../../api/http")>()), api: { monsters: col, npcGroups: col, handouts: col, srdImage } };
 });
 
 beforeEach(() => {
@@ -49,7 +54,7 @@ describe("AddNpcDialog: bestiary", () => {
       { name: "Owlbear", hit_points: 59, armor_class: [{ value: 13 }], dexterity: 12, size: "Large" },
     ]);
     await userEvent.upload(screen.getByLabelText("File JSON del bestiario"), file(json));
-    expect(await screen.findByRole("status")).toHaveTextContent("Importati 2 mostri nel tuo bestiario (1 scartati");
+    expect(await screen.findByText(/Importati 2 mostri nel tuo bestiario \(1 scartati/)).toBeInTheDocument();
     expect(useLibraryStore.getState().monsters.map((m) => m.name)).toEqual(["Kenku", "Owlbear"]);
     const mine = within(monsterSelect()).getByRole("group", { name: "Il tuo bestiario" });
     await userEvent.selectOptions(monsterSelect(), within(mine).getByRole("option", { name: "Owlbear" }));
@@ -72,6 +77,50 @@ describe("AddNpcDialog: bestiary", () => {
     expect(useLibraryStore.getState().monsters.map((m) => m.name)).toEqual(["Sgherro del barone"]);
     await userEvent.click(screen.getByRole("button", { name: "Rimuovi dal bestiario" }));
     expect(useLibraryStore.getState().monsters).toEqual([]);
+  });
+});
+
+describe("AddNpcDialog: token image", () => {
+  const preview = (name: string) => screen.findByRole("img", { name: `Immagine del token di ${name}` });
+
+  it("finds the illustration of the chosen monster online and uses it for the NPCs", async () => {
+    const onSubmit = open();
+    expect(await preview("Goblin")).toHaveAttribute("src", "/uploads/srd-goblin.png");
+    expect(screen.getByText(/Illustrazione: dnd5eapi\.co/)).toBeInTheDocument();
+    await userEvent.selectOptions(monsterSelect(), screen.getByRole("option", { name: "Orco (GS 1/2)" }));
+    expect(await preview("Orco")).toHaveAttribute("src", "/uploads/srd-orc.png");
+    await userEvent.click(screen.getByRole("button", { name: "Aggiungi PNG" }));
+    expect(onSubmit.mock.calls[0]![0].entries[0].template).toMatchObject({ name: "Orco", imageUrl: "/uploads/srd-orc.png" });
+  });
+
+  it("says when there is none, and the NPC keeps its initials", async () => {
+    const onSubmit = open();
+    await preview("Goblin");
+    await userEvent.selectOptions(monsterSelect(), screen.getByRole("option", { name: "Troll (GS 5)" }));
+    expect(await screen.findByText(/Nessuna illustrazione online/)).toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: /Immagine del token/ })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Aggiungi PNG" }));
+    expect(onSubmit.mock.calls[0]![0].entries[0].template.imageUrl).toBeUndefined();
+  });
+
+  it("can remove the image", async () => {
+    const onSubmit = open();
+    await preview("Goblin");
+    await userEvent.click(screen.getByRole("button", { name: "Rimuovi" }));
+    expect(screen.queryByRole("img", { name: /Immagine del token/ })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Aggiungi PNG" }));
+    expect(onSubmit.mock.calls[0]![0].entries[0].template.imageUrl).toBeUndefined();
+  });
+
+  it("keeps the image when a monster is saved to the bestiary or to a group", async () => {
+    open();
+    await preview("Goblin");
+    await userEvent.click(screen.getByRole("button", { name: "Salva nel bestiario" }));
+    expect(useLibraryStore.getState().monsters[0]).toMatchObject({ name: "Goblin", imageUrl: "/uploads/srd-goblin.png", srd: "goblin" });
+    await userEvent.click(screen.getByRole("button", { name: "+ Aggiungi al gruppo: 1 Goblin" }));
+    await userEvent.type(screen.getByLabelText("Nome del gruppo"), "Pattuglia");
+    await userEvent.click(screen.getByRole("button", { name: "Salva gruppo" }));
+    expect(useLibraryStore.getState().npcGroups[0]!.members[0]!.monster.imageUrl).toBe("/uploads/srd-goblin.png");
   });
 });
 

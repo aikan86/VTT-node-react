@@ -1,8 +1,38 @@
 import type { NpcTemplate } from "./initiative";
 import { MonsterStatsSchema, type Handout, type MonsterStats, type NpcGroup } from "./schemas/library";
 
+/** Nome inglese nell'SRD 5e online dei mostri preimpostati (per l'illustrazione). */
+const PRESET_SRD: Record<string, string> = {
+  Coboldo: "kobold",
+  Bandito: "bandit",
+  Cultista: "cultist",
+  Guardia: "guard",
+  Goblin: "goblin",
+  Scheletro: "skeleton",
+  Zombi: "zombie",
+  Lupo: "wolf",
+  Hobgoblin: "hobgoblin",
+  Orco: "orc",
+  Gnoll: "gnoll",
+  Ghoul: "ghoul",
+  Bugbear: "bugbear",
+  "Ragno gigante": "giant-spider",
+  "Lupo crudele": "dire-wolf",
+  "Orso bruno": "brown-bear",
+  "Capo dei banditi": "bandit-captain",
+  Ogre: "ogre",
+  Mimic: "mimic",
+  "Cubo gelatinoso": "gelatinous-cube",
+  "Gufo-orso": "owlbear",
+  Troll: "troll",
+  "Giovane drago rosso": "young-red-dragon",
+};
+
+/** Da dove vengono le illustrazioni cercate online (da citare dove si mostrano). */
+export const SRD_IMAGE_CREDIT = "dnd5eapi.co (SRD 5e)";
+
 /** Mostri preimpostati (statistiche base del SRD 5e, nomi in italiano). */
-export const PRESET_MONSTERS: readonly MonsterStats[] = [
+export const PRESET_MONSTERS: readonly MonsterStats[] = ([
   { name: "Coboldo", hp: 5, ac: 12, initiativeMod: 2, size: 1, color: "#b45309", cr: "1/8" },
   { name: "Bandito", hp: 11, ac: 12, initiativeMod: 1, size: 1, color: "#78716c", cr: "1/8" },
   { name: "Cultista", hp: 9, ac: 12, initiativeMod: 1, size: 1, color: "#7f1d1d", cr: "1/8" },
@@ -26,16 +56,48 @@ export const PRESET_MONSTERS: readonly MonsterStats[] = [
   { name: "Gufo-orso", hp: 59, ac: 13, initiativeMod: 1, size: 2, color: "#a3a3a3", cr: "3" },
   { name: "Troll", hp: 84, ac: 15, initiativeMod: 1, size: 2, color: "#166534", cr: "5" },
   { name: "Giovane drago rosso", hp: 178, ac: 18, initiativeMod: 0, size: 2, color: "#b91c1c", cr: "10" },
-];
+] as MonsterStats[]).map((m) => ({ ...m, srd: PRESET_SRD[m.name] }));
 
 /** Modello da cui il tracker crea i PNG. */
 export function monsterTemplate(m: MonsterStats): NpcTemplate {
-  return { name: m.name, color: m.color, hp: { current: m.hp, max: m.hp, temp: 0 }, ac: m.ac, initiativeMod: m.initiativeMod, size: m.size };
+  return {
+    name: m.name,
+    color: m.color,
+    hp: { current: m.hp, max: m.hp, temp: 0 },
+    ac: m.ac,
+    initiativeMod: m.initiativeMod,
+    size: m.size,
+    ...(m.imageUrl ? { imageUrl: m.imageUrl } : {}),
+  };
 }
 
 /** Statistiche dai campi di un PNG già impostato (dal dialogo). */
 export function statsFromTemplate(t: NpcTemplate): MonsterStats {
-  return { name: t.name, hp: t.hp.max, ac: t.ac, initiativeMod: t.initiativeMod, size: t.size, color: t.color };
+  return { name: t.name, hp: t.hp.max, ac: t.ac, initiativeMod: t.initiativeMod, size: t.size, color: t.color, ...(t.imageUrl ? { imageUrl: t.imageUrl } : {}) };
+}
+
+/** "Giant Spider" → "giant-spider" (senza accenti né simboli); null se non resta nulla. */
+export function srdSlug(name: string): string | null {
+  const slug = name
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80)
+    .replace(/-+$/, "");
+  return slug || null;
+}
+
+/**
+ * Nome con cui cercare l'illustrazione di un mostro nell'SRD online: quello indicato, o quello inglese dei preimpostati
+ * (anche per i PNG numerati: "Goblin 3" → "goblin"), altrimenti il nome stesso ("Owlbear" → "owlbear").
+ */
+export function srdIndexFor(monster: { name: string; srd?: string }): string | null {
+  if (monster.srd) return monster.srd;
+  const base = monster.name.replace(/\s+\d+$/, "").trim();
+  const preset = PRESET_MONSTERS.find((m) => m.name.toLowerCase() === base.toLowerCase());
+  return preset?.srd ?? srdSlug(base);
 }
 
 const DEFAULT_COLOR = "#dc2626";
@@ -86,7 +148,11 @@ export function normalizeMonster(input: unknown): MonsterStats | null {
   const crRaw = first(raw, ["cr", "challenge_rating", "challengeRating", "gs"]);
   const cr = typeof crRaw === "number" ? formatCr(crRaw) : typeof crRaw === "string" ? crRaw : undefined;
   const color = first(raw, ["color", "colore"]);
+  // identificativo SRD (i file 5e-database lo chiamano "index"): serve a cercare l'illustrazione online
+  const srdRaw = first(raw, ["srd", "index"]);
+  const srd = typeof srdRaw === "string" ? srdSlug(srdRaw) : null;
   const parsed = MonsterStatsSchema.safeParse({
+    ...(srd ? { srd } : {}),
     name: typeof name === "string" ? name : undefined,
     hp: hp === undefined ? undefined : Math.round(hp),
     ac: ac === undefined ? undefined : Math.round(ac),

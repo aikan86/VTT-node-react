@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { currentHandout, groupSummary, monsterTemplate, normalizeMonster, parseMonsterFile, PRESET_MONSTERS, statsFromTemplate } from "../src/bestiary";
+import { currentHandout, groupSummary, monsterTemplate, normalizeMonster, parseMonsterFile, PRESET_MONSTERS, srdIndexFor, srdSlug, statsFromTemplate } from "../src/bestiary";
 import { StateExportSchema } from "../src/schemas/export";
 import { HandoutSchema, MonsterStatsSchema, newHandout, NpcGroupSchema, type Handout } from "../src/schemas/library";
 
@@ -15,6 +15,42 @@ describe("preset monsters", () => {
     const t = monsterTemplate(goblin);
     expect(t).toEqual({ name: "Goblin", color: goblin.color, hp: { current: 7, max: 7, temp: 0 }, ac: 15, initiativeMod: 2, size: 1 });
     expect(statsFromTemplate(t)).toEqual({ name: "Goblin", hp: 7, ac: 15, initiativeMod: 2, size: 1, color: goblin.color });
+  });
+});
+
+describe("illustrations from the online SRD", () => {
+  it("every preset knows its English SRD name", () => {
+    for (const m of PRESET_MONSTERS) expect(m.srd, m.name).toMatch(/^[a-z0-9]+(-[a-z0-9]+)*$/);
+    expect(PRESET_MONSTERS.find((m) => m.name === "Gufo-orso")?.srd).toBe("owlbear");
+  });
+
+  it("finds the SRD name of numbered NPCs, presets and English names", () => {
+    expect(srdIndexFor({ name: "Goblin 3" })).toBe("goblin");
+    expect(srdIndexFor({ name: "Ragno gigante 2" })).toBe("giant-spider");
+    expect(srdIndexFor({ name: "Giant Spider" })).toBe("giant-spider");
+    expect(srdIndexFor({ name: "Sgherro", srd: "thug" })).toBe("thug");
+    expect(srdSlug("Élfo  oscuro!")).toBe("elfo-oscuro");
+    expect(srdSlug("!!!")).toBeNull();
+  });
+
+  it("keeps the image on templates and bestiary entries", () => {
+    const orc = { ...PRESET_MONSTERS.find((m) => m.name === "Orco")!, imageUrl: "/uploads/srd-orc.png" };
+    const t = monsterTemplate(orc);
+    expect(t.imageUrl).toBe("/uploads/srd-orc.png");
+    expect(statsFromTemplate(t).imageUrl).toBe("/uploads/srd-orc.png");
+    expect(monsterTemplate({ ...orc, imageUrl: undefined })).not.toHaveProperty("imageUrl");
+  });
+
+  it("only accepts images stored in the VTT, never external addresses", () => {
+    const base = { name: "X", hp: 5, ac: 10, initiativeMod: 0, size: 1, color: "#000000" };
+    expect(MonsterStatsSchema.safeParse({ ...base, imageUrl: "/uploads/srd-orc.png" }).success).toBe(true);
+    expect(MonsterStatsSchema.safeParse({ ...base, imageUrl: "https://example.com/orc.png" }).success).toBe(false);
+    expect(MonsterStatsSchema.safeParse({ ...base, imageUrl: "/uploads/../secret.png" }).success).toBe(false);
+  });
+
+  it("reads the SRD name from imported 5e files", () => {
+    expect(normalizeMonster({ index: "giant-spider", name: "Giant Spider", hit_points: 26, armor_class: 14 })?.srd).toBe("giant-spider");
+    expect(normalizeMonster({ name: "Senza", hp: 5, ac: 10 })).not.toHaveProperty("srd");
   });
 });
 

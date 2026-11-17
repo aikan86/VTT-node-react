@@ -12,6 +12,7 @@ import { registerCombatRoutes, StoredCombatSchema } from "./routes/combat";
 import { registerEventRoutes } from "./routes/events";
 import { registerHistoryRoutes } from "./routes/history";
 import { registerUploadRoutes } from "./routes/uploads";
+import { registerSrdImageRoutes, type FetchLike } from "./routes/srdImage";
 import { registerTransferRoutes } from "./routes/transfer";
 
 export interface AppOptions {
@@ -26,6 +27,8 @@ export interface AppOptions {
   listenHost?: string;
   /** Indirizzi IPv4 di rete del PC (default: letti dal sistema). */
   networkAddresses?: () => string[];
+  /** Richieste verso l'archivio SRD online (sostituibile nei test). */
+  fetch?: FetchLike;
 }
 
 /** Indirizzi IPv4 del PC sulla rete locale (niente loopback). */
@@ -66,6 +69,7 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
   registerEventRoutes(app, bus);
   registerHistoryRoutes(app, db, [characters, scenes, dmRolls, combat, handouts, monsters, npcGroups]);
   registerUploadRoutes(app, opts.uploadsDir);
+  registerSrdImageRoutes(app, opts.uploadsDir, opts.fetch);
   registerTransferRoutes(app, { characters, scenes, dmRolls, combat, handouts, monsters, npcGroups }, opts.uploadsDir);
   // per i link dei giocatori: con che indirizzo un telefono sulla stessa rete raggiunge questo PC
   app.get("/api/server-info", async () => ({
