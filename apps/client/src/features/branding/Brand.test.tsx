@@ -28,7 +28,7 @@ describe("Brand", () => {
 
   it("uploads a new logo, saves it on the server and can go back to the default", async () => {
     render(<Brand />);
-    await userEvent.click(screen.getByRole("button", { name: /VTT/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Cambia il logo" }));
     expect(screen.queryByRole("menuitem", { name: "Torna al logo predefinito" })).toBeNull();
 
     const file = new File(["png"], "drago.png", { type: "image/png" });
@@ -38,7 +38,7 @@ describe("Brand", () => {
     await waitFor(() => expect(api.settings.put).toHaveBeenCalledWith({ logoUrl: "/uploads/drago.png" }, 0));
     expect(screen.queryByRole("menu")).toBeNull();
 
-    await userEvent.click(screen.getByRole("button", { name: /VTT/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Cambia il logo" }));
     await userEvent.click(screen.getByRole("menuitem", { name: "Torna al logo predefinito" }));
     expect(logo().getAttribute("src")).toMatch(/logo-default/);
     await waitFor(() => expect(api.settings.put).toHaveBeenLastCalledWith({ logoUrl: null }, 1));
@@ -46,7 +46,7 @@ describe("Brand", () => {
 
   it("closes the menu with Esc", async () => {
     render(<Brand />);
-    await userEvent.click(screen.getByRole("button", { name: /VTT/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Cambia il logo" }));
     expect(screen.getByRole("menu", { name: "Logo" })).toBeInTheDocument();
     await userEvent.keyboard("{Escape}");
     expect(screen.queryByRole("menu")).toBeNull();

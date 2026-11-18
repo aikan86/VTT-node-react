@@ -5,7 +5,7 @@ import { useSettingsStore } from "../../store/settingsStore";
 import { reportError } from "../../store/statusStore";
 import styles from "./Brand.module.css";
 
-/** Logo e nome nell'intestazione; un clic sul logo apre il menu per cambiarlo o tornare a quello predefinito. */
+/** Logo nell'intestazione; un clic sul logo apre il menu per cambiarlo o tornare a quello predefinito. */
 export function Brand() {
   const logoUrl = useSettingsStore((s) => s.settings.logoUrl);
   const setLogo = useSettingsStore((s) => s.setLogo);
@@ -52,10 +52,10 @@ export function Brand() {
         aria-haspopup="menu"
         aria-expanded={open}
         title="Cambia il logo"
+        aria-label="Cambia il logo"
         onClick={() => setOpen((o) => !o)}
       >
         <img src={logoUrl ?? defaultLogo} alt="Logo" className={styles.logo} />
-        <span>VTT</span>
       </button>
       {open && (
         <div role="menu" aria-label="Logo" className={styles.menu}>
