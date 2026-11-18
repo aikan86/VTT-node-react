@@ -1,4 +1,5 @@
 import type { Scene } from "@vtt/shared";
+import { editScene, redoSceneEdit, undoSceneEdit, useHistoryStore } from "../../store/historyStore";
 import { useSceneStore } from "../../store/sceneStore";
 import { reportError } from "../../store/statusStore";
 import styles from "./Battlefield.module.css";
@@ -12,6 +13,9 @@ interface Props {
 export function SceneBar({ scene, libraryOpen = false, onToggleLibrary }: Props) {
   const scenes = useSceneStore((s) => s.scenes);
   const { select, create, remove, update, showToPlayers } = useSceneStore.getState();
+  const history = useHistoryStore((h) => (h.sceneId === scene.id ? h : null));
+  const toUndo = history?.undo[history.undo.length - 1];
+  const toRedo = history?.redo[history.redo.length - 1];
 
   return (
     <div className={styles.sceneBar}>
@@ -50,6 +54,12 @@ export function SceneBar({ scene, libraryOpen = false, onToggleLibrary }: Props)
       >
         Elimina
       </button>
+      <button disabled={!toUndo} onClick={() => undoSceneEdit()} title={toUndo ? `Annulla: ${toUndo.label} (Ctrl+Z)` : "Niente da annullare"}>
+        ↶ Annulla
+      </button>
+      <button disabled={!toRedo} onClick={() => redoSceneEdit()} title={toRedo ? `Ripeti: ${toRedo.label} (Ctrl+Y)` : "Niente da ripetere"}>
+        ↷ Ripeti
+      </button>
       {onToggleLibrary && (
         <button className={libraryOpen ? "active" : ""} aria-pressed={libraryOpen} onClick={onToggleLibrary} title="Scene salvate da riusare">
           📚 Libreria
@@ -64,7 +74,7 @@ export function SceneBar({ scene, libraryOpen = false, onToggleLibrary }: Props)
               ? "Nebbia di guerra attiva: i giocatori vedono solo ciò che vede il party. Clicca per mostrare loro tutta la mappa"
               : "Nebbia di guerra spenta: i giocatori vedono tutta la mappa. Clicca per mostrare solo ciò che vede il party"
           }
-          onClick={() => update(scene.id, (s) => ({ ...s, vision: { ...s.vision, enabled: !s.vision.enabled } }))}
+          onClick={() => editScene(scene.id, (s) => ({ ...s, vision: { ...s.vision, enabled: !s.vision.enabled } }), { separate: true })}
         >
           🌫 Nebbia di guerra{scene.vision.enabled ? "" : ": spenta"}
         </button>

@@ -22,7 +22,7 @@ import {
   type Scene,
 } from "@vtt/shared";
 import { BattleStage } from "../features/battlefield/BattleStage";
-import { isTyping } from "../features/battlefield/hooks";
+import { isTyping, useUndoShortcuts } from "../features/battlefield/hooks";
 import { calibrateBackground, contentBounds, pxPointsToCells, snapTo, withBackgroundGeometry } from "../features/battlefield/geometry";
 import { usePartySight } from "../features/battlefield/vision";
 import { BackgroundPanel } from "../features/battlefield/panels/BackgroundPanel";
@@ -44,6 +44,7 @@ import { createNpcEntries, placeTokens } from "../store/actions";
 import { groupEntries } from "../features/initiative/AddNpcDialog";
 import { useCombatStore } from "../store/combatStore";
 import { sizeOfRef, useEntityResolver } from "../store/entities";
+import { editScene, type EditOptions } from "../store/historyStore";
 import { useActiveScene, useSceneStore } from "../store/sceneStore";
 import { reportError } from "../store/statusStore";
 
@@ -108,8 +109,12 @@ function Battlefield({ scene }: { scene: Scene }) {
     }
   };
 
-  const update = useCallback((fn: (s: Scene) => Scene) => useSceneStore.getState().update(scene.id, fn), [scene.id]);
+  /** Modifica del master: si può annullare. */
+  const update = useCallback((fn: (s: Scene) => Scene, opts?: EditOptions) => editScene(scene.id, fn, opts), [scene.id]);
+  /** Cambiamenti di gioco che non si annullano (nebbia esplorata, porte aperte/chiuse, token appena piazzati). */
+  const updateUntracked = useCallback((fn: (s: Scene) => Scene) => useSceneStore.getState().update(scene.id, fn), [scene.id]);
 
+  useUndoShortcuts();
   const sight = usePartySight(scene, resolve);
   const latestScene = useRef(scene);
   latestScene.current = scene;
@@ -122,11 +127,11 @@ function Battlefield({ scene }: { scene: Scene }) {
     const margin = EXPLORE_MARGIN_CELLS * s.grid.cellPx;
     const limit = { minX: b.minX - margin, minY: b.minY - margin, maxX: b.maxX + margin, maxY: b.maxY + margin };
     const cells = seenCells(sight, s.grid, limit);
-    if (addExplored(s, cells) !== s) update((current) => addExplored(current, cells));
+    if (addExplored(s, cells) !== s) updateUntracked((current) => addExplored(current, cells));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sight, update, scene.explored.length === 0]); // dopo l'azzeramento si ricorda subito ciò che si vede ora
+  }, [sight, updateUntracked, scene.explored.length === 0]); // dopo l'azzeramento si ricorda subito ciò che si vede ora
 
-  const toggleDoorById = useCallback((id: string) => update((s) => toggleDoor(s, id)), [update]);
+  const toggleDoorById = useCallback((id: string) => updateUntracked((s) => toggleDoor(s, id)), [updateUntracked]);
 
   // Cambio scena o livello: azzera selezione e strumenti in corso
   useEffect(() => {
@@ -267,7 +272,7 @@ function Battlefield({ scene }: { scene: Scene }) {
     if (scene.layers[activeLayer].locked) return;
     if (activeLayer === "tokens" && pending) {
       placeTokens(scene.id, pending, cell, sizeOfRef);
-      if (placeHidden) update((s) => ({ ...s, tokens: s.tokens.map((t) => (pending.some((r) => sameRef(r, t.ref)) ? { ...t, hidden: true } : t)) }));
+      if (placeHidden) updateUntracked((s) => ({ ...s, tokens: s.tokens.map((t) => (pending.some((r) => sameRef(r, t.ref)) ? { ...t, hidden: true } : t)) }));
       setPending(null);
     } else if (activeLayer === "elements" && elementTool === "wand") {
       void runWand(world); // lo strumento resta attivo: si possono prendere più aree di fila
@@ -343,7 +348,7 @@ function Battlefield({ scene }: { scene: Scene }) {
       reportError(new Error("Calibrazione non riuscita: l'immagine risulterebbe troppo grande o troppo piccola. Controlla i punti e la distanza."));
       return;
     }
-    update((s) => withBackgroundGeometry(s, next));
+    update((s) => withBackgroundGeometry(s, next), { label: "calibra sfondo" });
     setCalibration(null);
   };
 
