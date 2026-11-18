@@ -126,6 +126,19 @@ describe("LibraryPanel", () => {
     expect(useSceneStore.getState().scenes.find((s) => s.id === from.id)!.tokens).toHaveLength(1);
   });
 
+  it("gives the loaded scene a free name and puts it on air if the previous one was", async () => {
+    const from = { ...current(), name: "Cripta", shownToPlayers: true };
+    lib.load.mockResolvedValue({ scene: newScene("Cripta"), npcs: [] });
+    open(from);
+    await userEvent.click(within((await rows())[1]!).getByRole("button", { name: "Carica Cripta" }));
+    expect(await screen.findByRole("status")).toHaveTextContent("Caricata “Cripta (2)” come nuova scena, in onda ai giocatori.");
+    const scenes = useSceneStore.getState().scenes;
+    expect(scenes.map((s) => [s.name, s.shownToPlayers])).toEqual([
+      ["Cripta", false],
+      ["Cripta (2)", true],
+    ]);
+  });
+
   it("duplicates, renames and deletes after confirming", async () => {
     lib.duplicate.mockResolvedValue(summary("lib-4", "Cripta (copia)", "2026-11-20T10:00:00.000Z"));
     lib.rename.mockResolvedValue({ ...crypt, name: "Cripta antica" });

@@ -45,7 +45,7 @@ export function SceneBar({ scene, libraryOpen = false, onToggleLibrary }: Props)
         className="danger"
         disabled={scenes.length <= 1}
         onClick={() => {
-          if (confirm(`Eliminare la scena “${scene.name}”?`)) remove(scene.id).catch(reportError);
+          if (confirm(`Eliminare la scena “${scene.name}”? Si tolgono anche i PNG che stanno solo qui e non sono in iniziativa.`)) remove(scene.id).catch(reportError);
         }}
       >
         Elimina

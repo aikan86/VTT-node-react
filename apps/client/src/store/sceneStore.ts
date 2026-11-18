@@ -1,6 +1,7 @@
 import { create } from "zustand";
-import { newScene, type Scene, type Versioned } from "@vtt/shared";
+import { newScene, type Combat, type Scene, type Versioned } from "@vtt/shared";
 import { api, isPermanentError } from "../api/http";
+import { useCombatStore } from "./combatStore";
 import { reportError, track } from "./statusStore";
 import { CollectionSync } from "./sync/collectionSync";
 import type { Op } from "./sync/docSync";
@@ -22,6 +23,18 @@ interface SceneState {
   update: (id: string, fn: Op<Scene>) => void;
   /** Applica la trasformazione a tutte le scene che ne vengono modificate (es. per rimuovere token orfani). */
   updateAll: (fn: Op<Scene>) => void;
+}
+
+/**
+ * Dopo l'eliminazione di una scena: toglie i PNG che stavano solo lì (nessun token in altre scene) e non sono in
+ * iniziativa. Gli altri PNG, anche quelli senza token, restano.
+ */
+export function pruneSceneNpcs(combat: Combat, npcIds: readonly string[], remaining: readonly Scene[]): Combat {
+  const keep = new Set<string>();
+  for (const s of remaining) for (const t of s.tokens) if (t.ref.kind === "npc") keep.add(t.ref.id);
+  for (const c of combat.combatants) if (c.ref.kind === "npc") keep.add(c.ref.id);
+  const drop = new Set(npcIds.filter((id) => !keep.has(id)));
+  return drop.size === 0 ? combat : { ...combat, npcs: combat.npcs.filter((n) => !drop.has(n.id)) };
 }
 
 function pickActive(scenes: Scene[], preferred: string | null): string | null {
@@ -80,8 +93,13 @@ export const useSceneStore = create<SceneState>((set, get) => ({
 
   remove: async (id) => {
     if (get().scenes.length <= 1) return;
+    const removed = get().scenes.find((s) => s.id === id);
     await sceneSync.remove(id);
     if (get().activeId === id) get().select(get().scenes[0]!.id);
+    if (removed) {
+      const npcIds = removed.tokens.filter((t) => t.ref.kind === "npc").map((t) => t.ref.id);
+      if (npcIds.length > 0) useCombatStore.getState().apply((c) => pruneSceneNpcs(c, npcIds, get().scenes));
+    }
   },
 
   update: (id, fn) => sceneSync.update(id, fn),

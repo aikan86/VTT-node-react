@@ -39,19 +39,41 @@ export async function saveSceneToLibrary(scene: Scene, name: string): Promise<Sa
   return summary;
 }
 
+/** `name`, o `name (2)`, `name (3)`… se c'è già una scena con quel nome. */
+export function uniqueSceneName(name: string, taken: readonly string[]): string {
+  const used = new Set(taken.map((n) => n.toLocaleLowerCase("it")));
+  if (!used.has(name.toLocaleLowerCase("it"))) return name;
+  for (let i = 2; ; i++) {
+    const suffix = ` (${i})`;
+    const candidate = name.slice(0, 80 - suffix.length) + suffix;
+    if (!used.has(candidate.toLocaleLowerCase("it"))) return candidate;
+  }
+}
+
 /**
  * Carica una scena salvata come nuova scena attiva. L'iniziativa non si tocca: i PNG della scena si aggiungono
  * all'elenco dei PNG senza entrare in combattimento. Con `bringPcs` i PG lasciano la scena `from` e vengono piazzati
- * nel punto di partenza della nuova (o al centro); senza, restano dove sono.
+ * nel punto di partenza della nuova (o al centro); senza, restano dove sono. Se `from` era in onda ai giocatori,
+ * va in onda la nuova.
  */
 export async function loadFromLibrary(id: string, opts: { from: Scene | undefined; bringPcs: boolean }): Promise<Scene> {
   const pcRefs: Ref[] = opts.bringPcs && opts.from ? opts.from.tokens.filter((t) => t.ref.kind === "pc").map((t) => t.ref) : [];
-  const { scene, npcs } = await track(api.sceneLibrary.load(id, { pcs: pcRefs.map((ref) => ({ ref, size: sizeOfRef(ref) })) }));
-  if (npcs.length > 0) useCombatStore.getState().apply((c) => ({ ...c, npcs: [...c.npcs, ...npcs] }));
+  const loaded = await track(api.sceneLibrary.load(id, { pcs: pcRefs.map((ref) => ({ ref, size: sizeOfRef(ref) })) }));
+  const onAir = opts.from?.shownToPlayers ?? false;
+  const scene: Scene = {
+    ...loaded.scene,
+    name: uniqueSceneName(loaded.scene.name, useSceneStore.getState().scenes.map((s) => s.name)),
+    shownToPlayers: onAir,
+  };
+  if (loaded.npcs.length > 0) useCombatStore.getState().apply((c) => ({ ...c, npcs: [...c.npcs, ...loaded.npcs] }));
   const created = sceneSync.create(scene);
   useSceneStore.getState().select(scene.id);
-  if (opts.from && pcRefs.length > 0) {
-    useSceneStore.getState().update(opts.from.id, (s) => ({ ...s, tokens: s.tokens.filter((t) => !pcRefs.some((r) => sameRef(r, t.ref))) }));
+  if (opts.from && (pcRefs.length > 0 || onAir)) {
+    useSceneStore.getState().update(opts.from.id, (s) => ({
+      ...s,
+      shownToPlayers: onAir ? false : s.shownToPlayers,
+      tokens: s.tokens.filter((t) => !pcRefs.some((r) => sameRef(r, t.ref))),
+    }));
   }
   await created;
   return scene;

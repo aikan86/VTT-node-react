@@ -143,8 +143,8 @@ export function LibraryPanel({ scene, pickingStart, onPickStart, onClearStart, o
                   aria-label={`Carica ${s.name}`}
                   onClick={() =>
                     run(async () => {
-                      await loadFromLibrary(s.id, { from: scene, bringPcs });
-                      return `Caricata “${s.name}” come nuova scena.`;
+                      const created = await loadFromLibrary(s.id, { from: scene, bringPcs });
+                      return `Caricata “${created.name}” come nuova scena${created.shownToPlayers ? ", in onda ai giocatori" : ""}.`;
                     })
                   }
                 >
