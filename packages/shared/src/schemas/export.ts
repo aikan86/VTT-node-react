@@ -4,6 +4,7 @@ import { CombatSchema } from "./combat";
 import { DmRollSchema } from "./dmRoll";
 import { HandoutSchema, MonsterSchema, NpcGroupSchema } from "./library";
 import { SceneSchema } from "./scene";
+import { SavedSceneSchema } from "../sceneLibrary";
 
 export const EXPORT_FORMAT = "vtt-export";
 export const EXPORT_VERSION = 1;
@@ -39,6 +40,8 @@ export const StateExportSchema = z.object({
   handouts: z.array(HandoutSchema).optional(),
   monsters: z.array(MonsterSchema).optional(),
   npcGroups: z.array(NpcGroupSchema).optional(),
+  /** Libreria di scene (assente nei salvataggi fatti prima: resta quella attuale). */
+  sceneLibrary: z.array(SavedSceneSchema).optional(),
   uploads: z.record(UploadNameSchema, ExportedUploadSchema),
 });
 export type StateExport = z.infer<typeof StateExportSchema>;

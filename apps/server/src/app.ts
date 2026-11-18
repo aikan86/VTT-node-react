@@ -14,6 +14,8 @@ import { registerHistoryRoutes } from "./routes/history";
 import { registerUploadRoutes } from "./routes/uploads";
 import { registerSrdImageRoutes, type FetchLike } from "./routes/srdImage";
 import { registerTransferRoutes } from "./routes/transfer";
+import { registerSceneLibraryRoutes } from "./routes/sceneLibrary";
+import { SavedSceneStore } from "./savedScenes";
 
 export interface AppOptions {
   dbPath: string;
@@ -65,12 +67,14 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
   registerDocumentRoutes(app, { path: "/api/handouts", label: "Handout", repo: handouts });
   registerDocumentRoutes(app, { path: "/api/monsters", label: "Mostro", repo: monsters });
   registerDocumentRoutes(app, { path: "/api/npc-groups", label: "Gruppo", repo: npcGroups });
+  const savedScenes = new SavedSceneStore(db, bus);
+  registerSceneLibraryRoutes(app, savedScenes);
   registerCombatRoutes(app, combat);
   registerEventRoutes(app, bus);
   registerHistoryRoutes(app, db, [characters, scenes, dmRolls, combat, handouts, monsters, npcGroups]);
   registerUploadRoutes(app, opts.uploadsDir);
   registerSrdImageRoutes(app, opts.uploadsDir, opts.fetch);
-  registerTransferRoutes(app, { characters, scenes, dmRolls, combat, handouts, monsters, npcGroups }, opts.uploadsDir);
+  registerTransferRoutes(app, { characters, scenes, dmRolls, combat, handouts, monsters, npcGroups, savedScenes }, opts.uploadsDir);
   // per i link dei giocatori: con che indirizzo un telefono sulla stessa rete raggiunge questo PC
   app.get("/api/server-info", async () => ({
     listenHost: opts.listenHost ?? null,

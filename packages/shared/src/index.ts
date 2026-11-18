@@ -21,3 +21,4 @@ export * from "./sync";
 export * from "./schemas/export";
 export * from "./schemas/library";
 export * from "./bestiary";
+export * from "./sceneLibrary";

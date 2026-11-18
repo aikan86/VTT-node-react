@@ -16,6 +16,7 @@ import { TokensLayer } from "./layers/TokensLayer";
 import { LightsLayer } from "./layers/LightsLayer";
 import { MovementLayer, type MovementArea } from "./layers/MovementLayer";
 import { RulerLayer } from "./layers/RulerLayer";
+import { PcStartLayer } from "./layers/PcStartLayer";
 import { CLOSE_TRACE_SCREEN_PX, isRectTool, type DrawTool, type ElementTool, type Selection, type SketchDraft, type View } from "./types";
 import styles from "./Battlefield.module.css";
 
@@ -57,6 +58,8 @@ interface Props {
   onToggleRuler: () => void;
   /** Raggio di movimento del token selezionato, se da mostrare. */
   movement: MovementArea | null;
+  /** In attesa del clic che sceglie il punto di partenza dei PG. */
+  pickingStart?: boolean;
 }
 
 /** Sotto questa distanza sullo schermo un tratto non viene salvato e i punti a mano libera vengono scartati. */
@@ -329,6 +332,7 @@ export function BattleStage(props: Props) {
             onSelect={select("elements")}
             onChange={props.onLightChange}
           />
+          {scene.pcStart && <PcStartLayer start={scene.pcStart} grid={scene.grid} />}
           {props.movement && <MovementLayer grid={scene.grid} area={props.movement} />}
           <TokensLayer
             scene={scene}
@@ -374,7 +378,9 @@ export function BattleStage(props: Props) {
       <div className={styles.hint}>
         {props.calibration && props.calibration.length < 2
           ? `Calibrazione: clicca il punto ${props.calibration.length + 1} di 2 sull'immagine · Esc: annulla`
-          : measuring
+          : props.pickingStart
+            ? "Clicca la casella da cui partiranno i PG quando la scena viene caricata dalla libreria · Esc: annulla"
+            : measuring
             ? "Righello: trascina per misurare (dal centro delle caselle; Shift: punto libero) · R o Esc: chiudi"
             : "Rotella: zoom · Spazio o tasto centrale + trascina: sposta · R: righello · Click su una porta o O: apri/chiudi · Canc: elimina · Esc: annulla"}
       </div>

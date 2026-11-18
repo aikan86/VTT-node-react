@@ -19,6 +19,7 @@ import {
 import type { Repo } from "../repo";
 import { originOf, parseBody } from "../http";
 import type { CombatRepo } from "./combat";
+import type { SavedSceneStore } from "../savedScenes";
 
 /** Un salvataggio completo contiene le immagini in base64: può essere molto più grande di una normale richiesta. */
 export const MAX_IMPORT_BYTES = 300 * 1024 * 1024;
@@ -31,6 +32,7 @@ export interface TransferRepos {
   handouts: Repo<typeof HandoutSchema>;
   monsters: Repo<typeof MonsterSchema>;
   npcGroups: Repo<typeof NpcGroupSchema>;
+  savedScenes: SavedSceneStore;
 }
 
 const UPLOAD_URL = /\/uploads\/([\w-]{1,100}\.(?:png|jpg|webp|gif))/g;
@@ -55,6 +57,7 @@ export function registerTransferRoutes(app: FastifyInstance, repos: TransferRepo
       handouts: repos.handouts.list().map((d) => d.data),
       monsters: repos.monsters.list().map((d) => d.data),
       npcGroups: repos.npcGroups.list().map((d) => d.data),
+      sceneLibrary: repos.savedScenes.list(),
     };
 
     // solo le immagini a cui i documenti fanno riferimento (niente file orfani)
@@ -88,6 +91,7 @@ export function registerTransferRoutes(app: FastifyInstance, repos: TransferRepo
     if (file.handouts) replaceAll(repos.handouts, file.handouts, origin);
     if (file.monsters) replaceAll(repos.monsters, file.monsters, origin);
     if (file.npcGroups) replaceAll(repos.npcGroups, file.npcGroups, origin);
+    if (file.sceneLibrary) repos.savedScenes.replaceAll(file.sceneLibrary, origin);
 
     return {
       characters: file.characters.length,
@@ -96,6 +100,7 @@ export function registerTransferRoutes(app: FastifyInstance, repos: TransferRepo
       handouts: file.handouts?.length ?? 0,
       monsters: file.monsters?.length ?? 0,
       npcGroups: file.npcGroups?.length ?? 0,
+      sceneLibrary: file.sceneLibrary?.length ?? 0,
       uploads: Object.keys(file.uploads).length,
     };
   });

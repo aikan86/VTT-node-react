@@ -30,6 +30,7 @@ import { CalibrationDialog } from "../features/battlefield/panels/CalibrationDia
 import { EffectsPanel } from "../features/battlefield/panels/EffectsPanel";
 import { ElementsPanel } from "../features/battlefield/panels/ElementsPanel";
 import { LayerPanel } from "../features/battlefield/panels/LayerPanel";
+import { LibraryPanel } from "../features/battlefield/panels/LibraryPanel";
 import { TokensPanel } from "../features/battlefield/panels/TokensPanel";
 import { SceneBar } from "../features/battlefield/SceneBar";
 import { BACKGROUND_ID } from "../features/battlefield/layers/BackgroundLayer";
@@ -82,6 +83,10 @@ function Battlefield({ scene }: { scene: Scene }) {
   /** Bacchetta magica: tolleranza di colore ed esito dell'ultimo clic. */
   const [wandTolerance, setWandTolerance] = useState(32);
   const [wandStatus, setWandStatus] = useState<string | null>(null);
+  /** Pannello della libreria di scene aperto al posto di quelli dei livelli. */
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  /** Il prossimo clic sulla mappa sceglie il punto di partenza dei PG. */
+  const [pickingStart, setPickingStart] = useState(false);
 
   const runWand = async (world: Point) => {
     const bg = scene.background;
@@ -132,6 +137,7 @@ function Battlefield({ scene }: { scene: Scene }) {
     setDrawTool((t) => ({ ...t, mode: null }));
     setCalibration(null);
     setObjectTool(null);
+    setPickingStart(false);
   }, [scene.id, activeLayer]);
 
   const deleteSelection = useCallback(() => {
@@ -189,6 +195,7 @@ function Battlefield({ scene }: { scene: Scene }) {
         setDrawTool((t) => ({ ...t, mode: null }));
         setCalibration(null);
         setObjectTool(null);
+        setPickingStart(false);
       } else if ((e.key === "h" || e.key === "H") && !e.ctrlKey && !e.metaKey && !e.altKey && selection?.layer === "tokens" && !scene.layers.tokens.locked) {
         e.preventDefault();
         toggleHiddenSelected();
@@ -226,6 +233,7 @@ function Battlefield({ scene }: { scene: Scene }) {
   }, [selectedToken?.x, selectedToken?.y, selectedToken?.id, movingSize, speedFt, showMovement, activeLayer, elements, grid, sightBlockers]);
 
   const placing =
+    pickingStart ||
     (activeLayer === "tokens" && pending !== null) ||
     (activeLayer === "effects" && (effectTool.placing || drawTool.mode === "text")) ||
     (activeLayer === "background" && objectTool !== null) ||
@@ -251,6 +259,11 @@ function Battlefield({ scene }: { scene: Scene }) {
   };
 
   const onPlace = (cell: Point, world: Point) => {
+    if (pickingStart) {
+      update((s) => ({ ...s, pcStart: { x: cell.x, y: cell.y } }));
+      setPickingStart(false);
+      return;
+    }
     if (scene.layers[activeLayer].locked) return;
     if (activeLayer === "tokens" && pending) {
       placeTokens(scene.id, pending, cell, sizeOfRef);
@@ -343,6 +356,19 @@ function Battlefield({ scene }: { scene: Scene }) {
   return (
     <div className={styles.layout}>
       <aside className={styles.sidebar}>
+        {libraryOpen ? (
+          <LibraryPanel
+            scene={scene}
+            pickingStart={pickingStart}
+            onPickStart={setPickingStart}
+            onClearStart={() => update(({ pcStart: _pcStart, ...s }) => s)}
+            onClose={() => {
+              setLibraryOpen(false);
+              setPickingStart(false);
+            }}
+          />
+        ) : (
+          <>
         <LayerPanel
           scene={scene}
           active={activeLayer}
@@ -438,10 +464,12 @@ function Battlefield({ scene }: { scene: Scene }) {
             drawingCount={scene.drawings.length}
           />
         )}
+          </>
+        )}
       </aside>
 
       <div className={styles.main}>
-        <SceneBar scene={scene} />
+        <SceneBar scene={scene} libraryOpen={libraryOpen} onToggleLibrary={() => setLibraryOpen((o) => !o)} />
         <BattleStage
           scene={scene}
           resolve={resolve}
@@ -479,6 +507,7 @@ function Battlefield({ scene }: { scene: Scene }) {
           measuring={measuring}
           onToggleRuler={() => setMeasuring((m) => !m)}
           movement={movement}
+          pickingStart={pickingStart}
         />
       </div>
 

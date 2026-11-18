@@ -5,7 +5,11 @@ import {
   type Combat,
   type DmRoll,
   type Handout,
+  type LoadedScene,
+  type LoadSceneRequest,
   type Monster,
+  type SavedSceneSummary,
+  type SaveSceneRequest,
   type NpcGroup,
   type Scene,
   type Versioned,
@@ -79,6 +83,15 @@ export const api = {
   handouts: collection<Handout>("/api/handouts"),
   monsters: collection<Monster>("/api/monsters"),
   npcGroups: collection<NpcGroup>("/api/npc-groups"),
+  sceneLibrary: {
+    list: () => request<SavedSceneSummary[]>("GET", "/api/scene-library"),
+    save: (body: SaveSceneRequest) => request<SavedSceneSummary>("POST", "/api/scene-library", body),
+    load: (id: string, body: LoadSceneRequest) => request<LoadedScene>("POST", `/api/scene-library/${encodeURIComponent(id)}/load`, body),
+    duplicate: (id: string, name?: string) =>
+      request<SavedSceneSummary>("POST", `/api/scene-library/${encodeURIComponent(id)}/duplicate`, name === undefined ? {} : { name }),
+    rename: (id: string, name: string) => request<SavedSceneSummary>("PATCH", `/api/scene-library/${encodeURIComponent(id)}`, { name }),
+    remove: (id: string) => request<void>("DELETE", `/api/scene-library/${encodeURIComponent(id)}`),
+  },
   combat: {
     get: () => request<Versioned<Combat>>("GET", "/api/combat"),
     put: (combat: Combat, baseRev: number) => conditionalPut<Combat>("/api/combat", combat, baseRev),

@@ -3,7 +3,13 @@ import { useSceneStore } from "../../store/sceneStore";
 import { reportError } from "../../store/statusStore";
 import styles from "./Battlefield.module.css";
 
-export function SceneBar({ scene }: { scene: Scene }) {
+interface Props {
+  scene: Scene;
+  libraryOpen?: boolean;
+  onToggleLibrary?: () => void;
+}
+
+export function SceneBar({ scene, libraryOpen = false, onToggleLibrary }: Props) {
   const scenes = useSceneStore((s) => s.scenes);
   const { select, create, remove, update, showToPlayers } = useSceneStore.getState();
 
@@ -44,6 +50,11 @@ export function SceneBar({ scene }: { scene: Scene }) {
       >
         Elimina
       </button>
+      {onToggleLibrary && (
+        <button className={libraryOpen ? "active" : ""} aria-pressed={libraryOpen} onClick={onToggleLibrary} title="Scene salvate da riusare">
+          📚 Libreria
+        </button>
+      )}
       <span className="row" style={{ marginLeft: "auto", gap: "0.4rem" }}>
         <button
           className={scene.vision.enabled ? "active" : ""}

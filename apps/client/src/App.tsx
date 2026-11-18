@@ -16,6 +16,7 @@ import { flushLibrary, handoutSync, loadLibrary, monsterSync, npcGroupSync, resy
 import { HandoutsPage } from "./pages/HandoutsPage";
 import { flushParty, partySync, usePartyStore } from "./store/partyStore";
 import { flushScenes, sceneSync, useSceneStore } from "./store/sceneStore";
+import { receiveSceneLibrary, resyncSceneLibrary, useSceneLibraryStore } from "./store/sceneLibraryStore";
 import { reportError, useStatusStore } from "./store/statusStore";
 import styles from "./App.module.css";
 
@@ -41,6 +42,8 @@ function startLiveSync(): () => void {
     onOpen: () => {
       // eventi persi mentre la connessione era giù: riallinea tutto
       Promise.all([partySync.resync(), sceneSync.resync(), dmRollSync.resync(), resyncCombat(), resyncLibrary()]).catch(reportError);
+      // la libreria di scene si carica quando si apre il pannello: va riallineata solo se è già stata letta
+      if (useSceneLibraryStore.getState().loaded) void resyncSceneLibrary();
     },
     onChange: (change) => {
       const versioned = { id: change.id, rev: change.rev };
@@ -59,6 +62,8 @@ function startLiveSync(): () => void {
           return monsterSync.receive({ ...versioned, data: change.data as Monster | null });
         case COLLECTIONS.npcGroups:
           return npcGroupSync.receive({ ...versioned, data: change.data as NpcGroup | null });
+        case COLLECTIONS.sceneLibrary:
+          return receiveSceneLibrary(change.id, change.data);
       }
     },
   });

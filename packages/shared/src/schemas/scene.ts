@@ -279,6 +279,8 @@ export const SceneSchema = z.object({
   dark: z.boolean().default(false),
   /** I giocatori possono spostare i PG dalla loro vista (assente nelle scene salvate prima: sì). */
   playersMoveParty: z.boolean().default(true),
+  /** Punto di partenza dei PG (cella) quando la scena viene caricata dalla libreria; assente = centro della mappa. */
+  pcStart: z.object({ x: z.number().int(), y: z.number().int() }).optional(),
 });
 export type Scene = z.infer<typeof SceneSchema>;
 

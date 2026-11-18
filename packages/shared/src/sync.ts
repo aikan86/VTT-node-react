@@ -28,5 +28,7 @@ export const COLLECTIONS = {
   handouts: "handouts",
   monsters: "monsters",
   npcGroups: "npc-groups",
+  /** Libreria di scene salvate: gli eventi portano il riepilogo della voce, non la scena intera. */
+  sceneLibrary: "scene-library",
 } as const;
 export const COMBAT_DOC_ID = "current";
