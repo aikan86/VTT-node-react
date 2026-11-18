@@ -217,13 +217,13 @@ function Battlefield({ scene }: { scene: Scene }) {
   const selectedToken = selection?.layer === "tokens" ? scene.tokens.find((t) => t.id === selection.id) : undefined;
   const movingSize = selectedToken ? (resolve(selectedToken.ref)?.size ?? 1) : 1;
   const speedFt = selectedToken?.speedFt ?? DEFAULT_SPEED_FT;
-  const { elements, grid } = scene;
+  const { elements, grid, sightBlockers } = scene;
   const movement = useMemo<MovementArea | null>(() => {
     if (!selectedToken || !showMovement || activeLayer !== "tokens" || speedFt <= 0) return null;
-    const range = movementRange({ elements, grid }, selectedToken, movingSize, speedFt * 2);
+    const range = movementRange({ elements, grid, sightBlockers }, selectedToken, movingSize, speedFt * 2);
     return { cells: coveredCells(range, movingSize), speedFt };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedToken?.x, selectedToken?.y, selectedToken?.id, movingSize, speedFt, showMovement, activeLayer, elements, grid]);
+  }, [selectedToken?.x, selectedToken?.y, selectedToken?.id, movingSize, speedFt, showMovement, activeLayer, elements, grid, sightBlockers]);
 
   const placing =
     (activeLayer === "tokens" && pending !== null) ||

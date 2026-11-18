@@ -247,7 +247,7 @@ export function TokensPanel({ scene, resolve, pending, onPending, onAddNpc, sele
           </label>
           {showMovement && (
             <p className="muted" style={{ fontSize: "0.8rem", margin: 0 }}>
-              Azzurro: caselle raggiungibili con {formatMove(speedFt, scene.grid.feetPerCell)}; più chiaro: con un movimento doppio ({formatMove(speedFt * 2, scene.grid.feetPerCell)}). Le diagonali costano 5 e 10 ft alternati, il terreno difficile il doppio; muri, ostacoli e porte chiuse
+              Azzurro: caselle raggiungibili con {formatMove(speedFt, scene.grid.feetPerCell)}; più chiaro: con un movimento doppio ({formatMove(speedFt * 2, scene.grid.feetPerCell)}). Le diagonali costano 5 e 10 ft alternati, il terreno difficile il doppio; muri, ostacoli, porte chiuse e forme tracciate
               non si attraversano.
             </p>
           )}

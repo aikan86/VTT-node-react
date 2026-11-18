@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { cellKey } from "../src/fog";
 import { gridDistance } from "../src/measure";
+import { pointInPolygon } from "../src/visibility";
 import { coveredCells, DEFAULT_SPEED_FT, movementRange, stepCost, type Reachable } from "../src/movement";
 import { newScene, TokenSchema, type MapElement, type Scene } from "../src/schemas/scene";
 
@@ -89,6 +90,21 @@ describe("movementRange", () => {
     expect(at(oneStep, -1, 1)?.costFt).toBe(5);
     expect(at(oneStep, 1, 0)).toBeUndefined(); // occupato
     expect(at(movementRange(scene([pillar]), origin, 1, 10), 1, 1)?.costFt).toBe(10); // girando attorno
+  });
+
+  it("does not enter shapes traced by hand or with the magic wand", () => {
+    // roccia piena tracciata come poligono: un triangolo con il lato sinistro in x = 2 (celle)
+    const rock = { id: "rock", points: [2, -3, 4.5, 0.5, 2, 4] };
+    const s = { ...scene(), sightBlockers: [rock] };
+    const range = movementRange(s, origin, 1, 30);
+    expect(at(range, 3, 0)).toBeUndefined(); // dentro la roccia
+    const px = rock.points.map((v) => v * 10); // celle da 10 px
+    expect(range.some((r) => pointInPolygon({ x: (r.x + 0.5) * 10, y: (r.y + 0.5) * 10 }, px))).toBe(false);
+    const around = at(movementRange(s, origin, 1, 60), 5, 0); // ci si arriva girandoci attorno, ma costa di più
+    expect(around?.costFt).toBeGreaterThan(25);
+    expect(at(range, 1, 0)?.costFt).toBe(5);
+    // senza la forma si passa
+    expect(at(movementRange(scene(), origin, 1, 30), 3, 0)?.costFt).toBe(15);
   });
 
   it("closed doors block, open doors let through", () => {

@@ -51,11 +51,17 @@ const overlaps = (a: Box, b: Box) => a.minX <= b.maxX && b.minX <= a.maxX && a.m
 /**
  * Posizioni che il token (angolo in alto a sinistra `from`, `size` celle per lato) raggiunge spendendo al più `budgetFt`.
  * Si muove in 8 direzioni con le regole di D&D 3.5e: le diagonali costano alternativamente 1 e 2 caselle (5-10-5 ft),
- * entrare in terreno difficile costa il doppio (3 caselle in diagonale). Muri, ostacoli e porte chiuse non si attraversano né si occupano,
+ * entrare in terreno difficile costa il doppio (3 caselle in diagonale). Muri, ostacoli, porte chiuse e forme tracciate
+ * (a mano o con la bacchetta magica) non si attraversano né si occupano,
  * e in diagonale non si tagliano gli angoli: servono liberi entrambi i passi ortogonali.
  * Il risultato comprende la partenza (0 ft) ed è ordinato per costo.
  */
-export function movementRange(scene: Pick<Scene, "elements" | "grid">, from: Point, size: number, budgetFt: number): Reachable[] {
+export function movementRange(
+  scene: Pick<Scene, "elements" | "grid"> & Partial<Pick<Scene, "sightBlockers">>,
+  from: Point,
+  size: number,
+  budgetFt: number,
+): Reachable[] {
   const g = scene.grid;
   const maxSteps = Math.floor(budgetFt / g.feetPerCell + EPS);
   const start: Reachable = { x: from.x, y: from.y, costFt: 0 };
@@ -81,6 +87,16 @@ export function movementRange(scene: Pick<Scene, "elements" | "grid">, from: Poi
     } else if (el.type === "difficult") {
       difficult.push(polygon);
     }
+  }
+  // le forme tracciate a mano o con la bacchetta (edifici, roccia piena tra le stanze) non si attraversano
+  for (const blocker of scene.sightBlockers ?? []) {
+    const corners: Point[] = [];
+    for (let i = 0; i + 1 < blocker.points.length; i += 2) {
+      corners.push({ x: g.offsetX + blocker.points[i]! * g.cellPx, y: g.offsetY + blocker.points[i + 1]! * g.cellPx });
+    }
+    if (corners.length < 3 || !overlaps(boxOf(corners), region)) continue;
+    walls.push(corners.flatMap((p) => [p.x, p.y]));
+    corners.forEach((a, i) => wallSegments.push({ a, b: corners[(i + 1) % corners.length]! }));
   }
 
   const center = (x: number, y: number): Point => ({ x: g.offsetX + (x + 0.5) * g.cellPx, y: g.offsetY + (y + 0.5) * g.cellPx });
