@@ -12,6 +12,7 @@ import {
   type SaveSceneRequest,
   type NpcGroup,
   type Scene,
+  type Settings,
   type Versioned,
 } from "@vtt/shared";
 import type { SaveResult } from "../store/sync/docSync";
@@ -95,6 +96,10 @@ export const api = {
   combat: {
     get: () => request<Versioned<Combat>>("GET", "/api/combat"),
     put: (combat: Combat, baseRev: number) => conditionalPut<Combat>("/api/combat", combat, baseRev),
+  },
+  settings: {
+    get: () => request<Versioned<Settings>>("GET", "/api/settings"),
+    put: (settings: Settings, baseRev: number) => conditionalPut<Settings>("/api/settings", settings, baseRev),
   },
   async upload(file: File): Promise<{ url: string }> {
     const form = new FormData();

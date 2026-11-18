@@ -10,6 +10,8 @@ import { PlayerViewPage } from "./pages/PlayerViewPage";
 import { PlayerPhonePage } from "./pages/PlayerPhonePage";
 import { CombatStatus } from "./features/initiative/CombatStatus";
 import { TransferButtons } from "./features/transfer/TransferButtons";
+import { Brand } from "./features/branding/Brand";
+import { flushSettings, receiveSettings, resyncSettings, useSettingsStore } from "./store/settingsStore";
 import { flushCombat, receiveCombat, resyncCombat, useCombatStore } from "./store/combatStore";
 import { dmRollSync, useDmRollStore } from "./store/dmRollStore";
 import { flushLibrary, handoutSync, loadLibrary, monsterSync, npcGroupSync, resyncLibrary } from "./store/libraryStore";
@@ -30,6 +32,7 @@ const boot = () =>
     useSceneStore.getState().load(),
     useDmRollStore.getState().load(),
     loadLibrary(),
+    useSettingsStore.getState().load(),
   ]).catch((err: unknown) => {
     bootPromise = null;
     throw err;
@@ -41,7 +44,7 @@ function startLiveSync(): () => void {
     onStatus: (connected) => useStatusStore.getState().setLive(connected),
     onOpen: () => {
       // eventi persi mentre la connessione era giù: riallinea tutto
-      Promise.all([partySync.resync(), sceneSync.resync(), dmRollSync.resync(), resyncCombat(), resyncLibrary()]).catch(reportError);
+      Promise.all([partySync.resync(), sceneSync.resync(), dmRollSync.resync(), resyncCombat(), resyncLibrary(), resyncSettings()]).catch(reportError);
       // la libreria di scene si carica quando si apre il pannello: va riallineata solo se è già stata letta
       if (useSceneLibraryStore.getState().loaded) void resyncSceneLibrary();
     },
@@ -64,6 +67,8 @@ function startLiveSync(): () => void {
           return npcGroupSync.receive({ ...versioned, data: change.data as NpcGroup | null });
         case COLLECTIONS.sceneLibrary:
           return receiveSceneLibrary(change.id, change.data);
+        case COLLECTIONS.settings:
+          return receiveSettings(change.rev, change.data);
       }
     },
   });
@@ -94,6 +99,7 @@ export function App() {
       void flushCombat();
       void flushScenes();
       void flushLibrary();
+      void flushSettings();
     };
     // un tab che passa in background salva subito: chi lo usa dopo parte da dati aggiornati
     const onVisibility = () => {
@@ -123,7 +129,7 @@ export function App() {
   return (
     <div className={styles.shell}>
       <header className={styles.header}>
-        <span className={styles.brand}>🎲 VTT</span>
+        <Brand />
         <nav className={styles.nav}>
           <NavLink to="/mappa">Campo di battaglia</NavLink>
           <NavLink to="/party">Party</NavLink>

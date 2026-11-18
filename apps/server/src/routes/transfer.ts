@@ -7,6 +7,7 @@ import {
   EXPORT_FORMAT,
   EXPORT_VERSION,
   IMAGE_TYPES,
+  SETTINGS_DOC_ID,
   StateExportSchema,
   type CharacterSchema,
   type DmRollSchema,
@@ -20,6 +21,7 @@ import type { Repo } from "../repo";
 import { originOf, parseBody } from "../http";
 import type { CombatRepo } from "./combat";
 import type { SavedSceneStore } from "../savedScenes";
+import { toSettings, type SettingsRepo } from "./settings";
 
 /** Un salvataggio completo contiene le immagini in base64: può essere molto più grande di una normale richiesta. */
 export const MAX_IMPORT_BYTES = 300 * 1024 * 1024;
@@ -33,6 +35,7 @@ export interface TransferRepos {
   monsters: Repo<typeof MonsterSchema>;
   npcGroups: Repo<typeof NpcGroupSchema>;
   savedScenes: SavedSceneStore;
+  settings: SettingsRepo;
 }
 
 const UPLOAD_URL = /\/uploads\/([\w-]{1,100}\.(?:png|jpg|webp|gif))/g;
@@ -58,6 +61,7 @@ export function registerTransferRoutes(app: FastifyInstance, repos: TransferRepo
       monsters: repos.monsters.list().map((d) => d.data),
       npcGroups: repos.npcGroups.list().map((d) => d.data),
       sceneLibrary: repos.savedScenes.list(),
+      settings: toSettings(repos.settings.get(SETTINGS_DOC_ID)).data,
     };
 
     // solo le immagini a cui i documenti fanno riferimento (niente file orfani)
@@ -92,6 +96,7 @@ export function registerTransferRoutes(app: FastifyInstance, repos: TransferRepo
     if (file.monsters) replaceAll(repos.monsters, file.monsters, origin);
     if (file.npcGroups) replaceAll(repos.npcGroups, file.npcGroups, origin);
     if (file.sceneLibrary) repos.savedScenes.replaceAll(file.sceneLibrary, origin);
+    if (file.settings) repos.settings.put({ ...file.settings, id: SETTINGS_DOC_ID }, { origin });
 
     return {
       characters: file.characters.length,

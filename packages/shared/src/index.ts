@@ -20,5 +20,6 @@ export * from "./dmRolls";
 export * from "./sync";
 export * from "./schemas/export";
 export * from "./schemas/library";
+export * from "./schemas/settings";
 export * from "./bestiary";
 export * from "./sceneLibrary";

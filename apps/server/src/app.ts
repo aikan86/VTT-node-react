@@ -16,6 +16,7 @@ import { registerSrdImageRoutes, type FetchLike } from "./routes/srdImage";
 import { registerTransferRoutes } from "./routes/transfer";
 import { registerSceneLibraryRoutes } from "./routes/sceneLibrary";
 import { SavedSceneStore } from "./savedScenes";
+import { registerSettingsRoutes, StoredSettingsSchema } from "./routes/settings";
 
 export interface AppOptions {
   dbPath: string;
@@ -60,6 +61,7 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
   const handouts = new Repo(db, COLLECTIONS.handouts, HandoutSchema, bus, opts.history);
   const monsters = new Repo(db, COLLECTIONS.monsters, MonsterSchema, bus, opts.history);
   const npcGroups = new Repo(db, COLLECTIONS.npcGroups, NpcGroupSchema, bus, opts.history);
+  const settings = new Repo(db, COLLECTIONS.settings, StoredSettingsSchema, bus, opts.history);
 
   registerDocumentRoutes(app, { path: "/api/characters", label: "Personaggio", repo: characters });
   registerDocumentRoutes(app, { path: "/api/scenes", label: "Scena", repo: scenes });
@@ -70,11 +72,12 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
   const savedScenes = new SavedSceneStore(db, bus);
   registerSceneLibraryRoutes(app, savedScenes);
   registerCombatRoutes(app, combat);
+  registerSettingsRoutes(app, settings);
   registerEventRoutes(app, bus);
-  registerHistoryRoutes(app, db, [characters, scenes, dmRolls, combat, handouts, monsters, npcGroups]);
+  registerHistoryRoutes(app, db, [characters, scenes, dmRolls, combat, handouts, monsters, npcGroups, settings]);
   registerUploadRoutes(app, opts.uploadsDir);
   registerSrdImageRoutes(app, opts.uploadsDir, opts.fetch);
-  registerTransferRoutes(app, { characters, scenes, dmRolls, combat, handouts, monsters, npcGroups, savedScenes }, opts.uploadsDir);
+  registerTransferRoutes(app, { characters, scenes, dmRolls, combat, handouts, monsters, npcGroups, savedScenes, settings }, opts.uploadsDir);
   // per i link dei giocatori: con che indirizzo un telefono sulla stessa rete raggiunge questo PC
   app.get("/api/server-info", async () => ({
     listenHost: opts.listenHost ?? null,
