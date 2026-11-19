@@ -146,6 +146,21 @@ function Battlefield({ scene }: { scene: Scene }) {
     setPickingStart(false);
   }, [scene.id, activeLayer]);
 
+  // Cambia l'immagine di sfondo o il livello viene bloccato (anche da un'altra scheda): i punti scelti non valgono più
+  const backgroundLocked = scene.layers.background.locked;
+  useEffect(() => {
+    setCalibration(null);
+  }, [scene.background?.imageUrl]);
+  useEffect(() => {
+    if (backgroundLocked) setCalibration(null);
+  }, [backgroundLocked]);
+
+  // Livello elementi bloccato: la forma in tracciamento si scarta
+  const elementsLocked = scene.layers.elements.locked;
+  useEffect(() => {
+    if (elementsLocked) setTrace([]);
+  }, [elementsLocked]);
+
   const deleteSelection = useCallback(() => {
     if (!selection || (selection.layer === "background" && selection.id === BACKGROUND_ID)) return; // l'immagine di sfondo si rimuove dal pannello
     const keys = ({ elements: ["elements", "sightBlockers", "lights"], tokens: ["tokens"], effects: ["effects", "drawings"], background: ["objects"] } as const)[selection.layer];
@@ -167,7 +182,7 @@ function Battlefield({ scene }: { scene: Scene }) {
   }, [selection, update]);
 
   const closeTrace = useCallback(() => {
-    if (trace.length < 3) return;
+    if (trace.length < 3 || elementsLocked) return;
     const points = pxPointsToCells(
       trace.flatMap((p) => [p.x, p.y]),
       scene.grid,
@@ -176,7 +191,7 @@ function Battlefield({ scene }: { scene: Scene }) {
     const blocker = { id: createId(), points };
     update((s) => ({ ...s, sightBlockers: [...s.sightBlockers, blocker] }));
     setTrace([]);
-  }, [trace, scene.grid, update]);
+  }, [trace, elementsLocked, scene.grid, update]);
 
   const removeFromMap = useCallback(
     (ref: Ref) => {
@@ -345,6 +360,10 @@ function Battlefield({ scene }: { scene: Scene }) {
   };
 
   const applyCalibration = (cells: number, alignToGrid: boolean) => {
+    if (backgroundLocked) {
+      setCalibration(null);
+      return;
+    }
     const [p1, p2] = calibration ?? [];
     const next = p1 && p2 && scene.background ? calibrateBackground(scene.background, p1, p2, cells, scene.grid, alignToGrid) : null;
     if (!next) {
