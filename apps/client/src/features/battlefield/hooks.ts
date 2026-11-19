@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
+import { redoSceneEdit, undoSceneEdit } from "../../store/historyStore";
 
 export function useImage(url: string | null | undefined): HTMLImageElement | null {
   const [image, setImage] = useState<HTMLImageElement | null>(null);
@@ -61,4 +62,38 @@ export function useKeyHeld(code: string): boolean {
 export function isTyping(e: KeyboardEvent): boolean {
   const t = e.target as HTMLElement | null;
   return !!t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable);
+}
+
+const NON_TEXT_INPUTS = new Set(["checkbox", "radio", "range", "button", "submit", "reset", "color", "file"]);
+
+/** Il focus è in un campo dove si scrive testo (lì Ctrl+Z annulla la digitazione, non la mappa). */
+export function isTextEntry(e: KeyboardEvent): boolean {
+  const t = e.target as HTMLElement | null;
+  if (!t) return false;
+  if (t.tagName === "INPUT") return !NON_TEXT_INPUTS.has((t as HTMLInputElement).type);
+  return t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable;
+}
+
+/** Ctrl/Cmd+Z annulla; Ctrl+Y e Ctrl/Cmd+Shift+Z ripetono. */
+export function historyShortcut(e: KeyboardEvent): "undo" | "redo" | null {
+  if (!(e.ctrlKey || e.metaKey) || e.altKey) return null;
+  const key = e.key.toLowerCase();
+  if (key === "z") return e.shiftKey ? "redo" : "undo";
+  if (key === "y" && !e.shiftKey) return "redo";
+  return null;
+}
+
+/** Scorciatoie di annulla/ripeti per la mappa del master; tacciono mentre si scrive in un campo o con una finestra aperta. */
+export function useUndoShortcuts(): void {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const action = historyShortcut(e);
+      if (!action || isTextEntry(e) || document.querySelector('[role="dialog"]')) return;
+      e.preventDefault();
+      if (action === "undo") undoSceneEdit();
+      else redoSceneEdit();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 }

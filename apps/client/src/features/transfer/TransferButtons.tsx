@@ -3,11 +3,12 @@ import { api } from "../../api/http";
 import { flushCombat } from "../../store/combatStore";
 import { flushParty } from "../../store/partyStore";
 import { flushScenes } from "../../store/sceneStore";
+import { flushSettings } from "../../store/settingsStore";
 import { reportError } from "../../store/statusStore";
 import styles from "./TransferButtons.module.css";
 
 /** Salva subito le modifiche in coda, così il file esportato (o lo stato sostituito) è aggiornato. */
-const flushAll = () => Promise.all([flushParty(), flushCombat(), flushScenes()]);
+const flushAll = () => Promise.all([flushParty(), flushCombat(), flushScenes(), flushSettings()]);
 
 const CONFIRM_IMPORT = (name: string) =>
   `Importare "${name}"?\n\nTutto lo stato attuale (PG, scene, combattimento, tiri del DM) verrà sostituito.\n` +

@@ -7,15 +7,16 @@ const dataDir = resolve(process.env.VTT_DATA_DIR ?? join(root, "data"));
 mkdirSync(dataDir, { recursive: true });
 
 const production = process.env.NODE_ENV === "production";
+const port = Number(process.env.PORT ?? 3001);
+// Solo locale di default: per far collegare i telefoni dei giocatori HOST=0.0.0.0
+const host = process.env.HOST ?? "127.0.0.1";
+
 const app = await buildApp({
   dbPath: join(dataDir, "vtt.sqlite"),
   uploadsDir: join(dataDir, "uploads"),
   clientDist: production ? join(root, "apps/client/dist") : undefined,
+  listenHost: host,
 });
-
-const port = Number(process.env.PORT ?? 3001);
-// Solo locale per ora: per il multiplayer basterà HOST=0.0.0.0
-const host = process.env.HOST ?? "127.0.0.1";
 
 try {
   await app.listen({ port, host });

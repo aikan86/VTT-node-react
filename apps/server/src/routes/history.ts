@@ -17,8 +17,9 @@ const RestoreBody = z.object({ rev: z.number().int().min(1) });
 /** Etichetta leggibile per un documento (nome, o round per il combattimento). */
 function labelOf(data: unknown): string {
   if (data && typeof data === "object") {
-    const d = data as { name?: unknown; round?: unknown; value?: unknown };
+    const d = data as { name?: unknown; title?: unknown; round?: unknown; value?: unknown };
     if (typeof d.name === "string") return d.name;
+    if (typeof d.title === "string") return d.title;
     if (typeof d.round === "number") return `Round ${d.round}`;
     if (typeof d.value === "number") return `d20: ${d.value}`;
   }

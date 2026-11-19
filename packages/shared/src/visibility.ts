@@ -1,15 +1,23 @@
 import { cellToPx, feetToPx, type Point } from "./grid";
-import type { Scene } from "./schemas/scene";
+import type { MapElement, Scene } from "./schemas/scene";
 
 export interface Segment {
   a: Point;
   b: Point;
 }
 
-/** Elementi rettangolari che bloccano la vista (le porte solo se chiuse). */
-const SIGHT_BLOCKING_ELEMENTS: ReadonlySet<string> = new Set(["wall", "door", "obstacle"]);
+/** Muri e ostacoli bloccano sempre la vista; le porte solo se chiuse; il terreno difficile mai. */
+export function elementBlocksSight(el: Pick<MapElement, "type" | "open">): boolean {
+  if (el.type === "door") return !el.open;
+  return el.type === "wall" || el.type === "obstacle";
+}
 
-const blocksSight = (el: Scene["elements"][number]) => SIGHT_BLOCKING_ELEMENTS.has(el.type) && !(el.type === "door" && el.open);
+/** Apre o chiude la porta `id`; la scena resta identica se l'elemento non esiste o non è una porta. */
+export function toggleDoor(scene: Scene, id: string): Scene {
+  const door = scene.elements.find((el) => el.id === id);
+  if (!door || door.type !== "door") return scene;
+  return { ...scene, elements: scene.elements.map((el) => (el === door ? { ...el, open: !el.open } : el)) };
+}
 
 /** Raggio di calcolo quando la visione non ha limite, in pixel del mondo. */
 export const UNLIMITED_VISION_PX = 20_000;
@@ -19,11 +27,14 @@ export function visionRadiusPx(vision: { radiusFt: number }, grid: { feetPerCell
   return vision.radiusFt > 0 ? feetToPx(vision.radiusFt, grid) : UNLIMITED_VISION_PX;
 }
 
+type SightScene = Pick<Scene, "elements" | "sightBlockers" | "objects" | "grid">;
+
 /**
  * Forme che bloccano la vista, come vertici in pixel del mondo: gli elementi rettangolari (muri, porte chiuse,
- * ostacoli, ruotati attorno al loro angolo in alto a sinistra come sulla mappa) e i poligoni tracciati a mano.
+ * ostacoli), gli oggetti dello sfondo che la bloccano (ruotati attorno al loro angolo in alto a sinistra come
+ * sulla mappa) e i poligoni tracciati a mano.
  */
-export function sightPolygons(scene: Pick<Scene, "elements" | "sightBlockers" | "grid">): Point[][] {
+export function sightPolygons(scene: SightScene): Point[][] {
   const g = scene.grid;
   const polygons: Point[][] = [];
 
@@ -36,14 +47,10 @@ export function sightPolygons(scene: Pick<Scene, "elements" | "sightBlockers" | 
   }
 
   for (const el of scene.elements) {
-    if (!blocksSight(el)) continue;
-    const rad = (el.rotation * Math.PI) / 180;
-    const cos = Math.cos(rad);
-    const sin = Math.sin(rad);
-    const origin = cellToPx(el, g);
-    const u = { x: cos * el.w * g.cellPx, y: sin * el.w * g.cellPx };
-    const v = { x: -sin * el.h * g.cellPx, y: cos * el.h * g.cellPx };
-    polygons.push([origin, { x: origin.x + u.x, y: origin.y + u.y }, { x: origin.x + u.x + v.x, y: origin.y + u.y + v.y }, { x: origin.x + v.x, y: origin.y + v.y }]);
+    if (elementBlocksSight(el)) polygons.push(rectCorners(el, g));
+  }
+  for (const o of scene.objects) {
+    if (o.blocksSight) polygons.push(rectCorners(o, g));
   }
   return polygons;
 }
@@ -62,8 +69,22 @@ export function polygonSegments(polygons: Point[][], viewer?: Point): Segment[] 
 }
 
 /** Segmenti che bloccano la vista (vedi `sightPolygons` e `polygonSegments`). */
-export function sightSegments(scene: Pick<Scene, "elements" | "sightBlockers" | "grid">, viewer?: Point): Segment[] {
+export function sightSegments(scene: SightScene, viewer?: Point): Segment[] {
   return polygonSegments(sightPolygons(scene), viewer);
+}
+
+/** Vertici in pixel del mondo di un rettangolo in celle, ruotato attorno al suo angolo in alto a sinistra (come sulla mappa). */
+export function rectCorners(
+  r: { x: number; y: number; w: number; h: number; rotation: number },
+  g: Pick<Scene["grid"], "cellPx" | "offsetX" | "offsetY">,
+): Point[] {
+  const rad = (r.rotation * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  const origin = cellToPx(r, g);
+  const u = { x: cos * r.w * g.cellPx, y: sin * r.w * g.cellPx };
+  const v = { x: -sin * r.h * g.cellPx, y: cos * r.h * g.cellPx };
+  return [origin, { x: origin.x + u.x, y: origin.y + u.y }, { x: origin.x + u.x + v.x, y: origin.y + u.y + v.y }, { x: origin.x + v.x, y: origin.y + v.y }];
 }
 
 /** Sotto questa distanza (pixel del mondo) un incontro col segmento si considera alla partenza del raggio e si ignora. */

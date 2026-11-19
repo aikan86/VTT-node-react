@@ -4,7 +4,11 @@
 .name { flex: 1; font-size: 1.1rem; font-weight: 600; }
 .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.6rem; }
 .stats input, .stats select { width: 100% !important; }
-.saves { display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.4rem; border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem 0.6rem 0.6rem; margin: 0; }
+.saves { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.4rem; border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem 0.6rem 0.6rem; margin: 0; }
 .saves legend { font-size: 0.8rem; color: var(--muted); padding: 0 0.3rem; }
 .saves input { text-align: center; padding: 0.3rem 0.2rem; }
 textarea { resize: vertical; }
+.link { display: grid; gap: 0.3rem; padding-top: 0.6rem; border-top: 1px solid var(--border); font-size: 0.85rem; }
+.linkLabel { color: var(--muted); }
+.link input { flex: 1; min-width: 0; font-size: 0.85rem; }
+.note { margin: 0 0 1rem; padding: 0.6rem 0.75rem; border-radius: 6px; background: #2a2414; border: 1px solid var(--accent); font-size: 0.9rem; }

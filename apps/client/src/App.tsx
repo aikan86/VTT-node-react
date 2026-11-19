@@ -1,22 +1,26 @@
 import { useEffect, useState } from "react";
-import { COLLECTIONS, type Character, type DmRoll, type Scene } from "@vtt/shared";
+import { COLLECTIONS, type Character, type DmRoll, type Handout, type Monster, type NpcGroup, type Scene } from "@vtt/shared";
 import { connectLive } from "./api/live";
-import { Navigate, NavLink, Route, Routes } from "react-router";
+import { Navigate, NavLink, Route, Routes, useMatch } from "react-router";
 import { BattlefieldPage } from "./pages/BattlefieldPage";
 import { DmRollsPage } from "./pages/DmRollsPage";
 import { InitiativePage } from "./pages/InitiativePage";
 import { PartyPage } from "./pages/PartyPage";
+import { PlayerViewPage } from "./pages/PlayerViewPage";
+import { PlayerPhonePage } from "./pages/PlayerPhonePage";
 import { CombatStatus } from "./features/initiative/CombatStatus";
 import { TransferButtons } from "./features/transfer/TransferButtons";
+import { Brand } from "./features/branding/Brand";
+import { flushSettings, receiveSettings, resyncSettings, useSettingsStore } from "./store/settingsStore";
 import { flushCombat, receiveCombat, resyncCombat, useCombatStore } from "./store/combatStore";
 import { dmRollSync, useDmRollStore } from "./store/dmRollStore";
+import { flushLibrary, handoutSync, loadLibrary, monsterSync, npcGroupSync, resyncLibrary } from "./store/libraryStore";
+import { HandoutsPage } from "./pages/HandoutsPage";
 import { flushParty, partySync, usePartyStore } from "./store/partyStore";
 import { flushScenes, sceneSync, useSceneStore } from "./store/sceneStore";
+import { receiveSceneLibrary, resyncSceneLibrary, useSceneLibraryStore } from "./store/sceneLibraryStore";
 import { reportError, useStatusStore } from "./store/statusStore";
 import styles from "./App.module.css";
-
-/** Commit della release, iniettato da scripts/release.sh al momento della build. */
-const RELEASE = `rel_${import.meta.env.VITE_RELEASE ?? "dev"}`;
 
 // Caricamento iniziale condiviso: la StrictMode esegue gli effetti due volte e due `load()` concorrenti
 // creerebbero ciascuno una scena di default.
@@ -27,6 +31,8 @@ const boot = () =>
     useCombatStore.getState().load(),
     useSceneStore.getState().load(),
     useDmRollStore.getState().load(),
+    loadLibrary(),
+    useSettingsStore.getState().load(),
   ]).catch((err: unknown) => {
     bootPromise = null;
     throw err;
@@ -38,7 +44,9 @@ function startLiveSync(): () => void {
     onStatus: (connected) => useStatusStore.getState().setLive(connected),
     onOpen: () => {
       // eventi persi mentre la connessione era giù: riallinea tutto
-      Promise.all([partySync.resync(), sceneSync.resync(), dmRollSync.resync(), resyncCombat()]).catch(reportError);
+      Promise.all([partySync.resync(), sceneSync.resync(), dmRollSync.resync(), resyncCombat(), resyncLibrary(), resyncSettings()]).catch(reportError);
+      // la libreria di scene si carica quando si apre il pannello: va riallineata solo se è già stata letta
+      if (useSceneLibraryStore.getState().loaded) void resyncSceneLibrary();
     },
     onChange: (change) => {
       const versioned = { id: change.id, rev: change.rev };
@@ -51,6 +59,16 @@ function startLiveSync(): () => void {
           return dmRollSync.receive({ ...versioned, data: change.data as DmRoll | null });
         case COLLECTIONS.combat:
           return receiveCombat(change.rev, change.data);
+        case COLLECTIONS.handouts:
+          return handoutSync.receive({ ...versioned, data: change.data as Handout | null });
+        case COLLECTIONS.monsters:
+          return monsterSync.receive({ ...versioned, data: change.data as Monster | null });
+        case COLLECTIONS.npcGroups:
+          return npcGroupSync.receive({ ...versioned, data: change.data as NpcGroup | null });
+        case COLLECTIONS.sceneLibrary:
+          return receiveSceneLibrary(change.id, change.data);
+        case COLLECTIONS.settings:
+          return receiveSettings(change.rev, change.data);
       }
     },
   });
@@ -80,6 +98,8 @@ export function App() {
       void flushParty();
       void flushCombat();
       void flushScenes();
+      void flushLibrary();
+      void flushSettings();
     };
     // un tab che passa in background salva subito: chi lo usa dopo parte da dati aggiornati
     const onVisibility = () => {
@@ -95,18 +115,27 @@ export function App() {
     };
   }, []);
 
+  // Vista giocatori: a schermo intero, senza intestazione né controlli del master (i dati arrivano dagli stessi aggiornamenti in tempo reale)
+  const playerRoute = useMatch("/giocatori");
+  // vista del singolo giocatore (telefono): /giocatori/:pgId
+  const phoneRoute = useMatch("/giocatori/:pgId");
+  if (playerRoute || phoneRoute) {
+    if (state !== "ready") {
+      return <div style={{ height: "100%", display: "grid", placeItems: "center" }}>{state === "failed" ? "Impossibile contattare il server. È avviato?" : "Caricamento…"}</div>;
+    }
+    return phoneRoute?.params.pgId ? <PlayerPhonePage pcId={phoneRoute.params.pgId} /> : <PlayerViewPage />;
+  }
+
   return (
     <div className={styles.shell}>
       <header className={styles.header}>
-        <div className={styles.brand}>
-          <span>🎲 VTT</span>
-          <small className={styles.release}>{RELEASE}</small>
-        </div>
+        <Brand />
         <nav className={styles.nav}>
           <NavLink to="/mappa">Campo di battaglia</NavLink>
           <NavLink to="/party">Party</NavLink>
           <NavLink to="/iniziativa">Iniziativa</NavLink>
           <NavLink to="/tiri-dm">Tiri DM</NavLink>
+          <NavLink to="/handout">Handout</NavLink>
         </nav>
         <div className={styles.status}>
           {state === "ready" && <CombatStatus />}
@@ -137,6 +166,7 @@ export function App() {
             <Route path="/party" element={<PartyPage />} />
             <Route path="/iniziativa" element={<InitiativePage />} />
             <Route path="/tiri-dm" element={<DmRollsPage />} />
+            <Route path="/handout" element={<HandoutsPage />} />
             <Route path="*" element={<Navigate to="/mappa" replace />} />
           </Routes>
         )}

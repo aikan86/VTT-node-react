@@ -1,4 +1,5 @@
 import { Group, Layer, Rect, Text, Transformer } from "react-konva";
+import type Konva from "konva";
 import { cellToPx, snapPxToCell, type MapElement, type Scene } from "@vtt/shared";
 import { snapTo } from "../geometry";
 import { useTransformer } from "./useTransformer";
@@ -11,7 +12,15 @@ interface Props {
   draft: { x: number; y: number; w: number; h: number; color: string } | null;
   onSelect: (id: string) => void;
   onChange: (element: MapElement) => void;
+  /** Le porte si aprono/chiudono con un click anche quando il livello non è quello attivo (master in gioco). */
+  doorsClickable?: boolean;
+  onToggleDoor?: (id: string) => void;
 }
+
+const setCursor = (e: Konva.KonvaEventObject<MouseEvent>, cursor: string) => {
+  const stage = e.target.getStage();
+  if (stage) stage.container().style.cursor = cursor;
+};
 
 function styleOf(el: MapElement) {
   switch (el.type) {
@@ -26,16 +35,18 @@ function styleOf(el: MapElement) {
   }
 }
 
-export function ElementsLayer({ scene, listening, editable, selectedId, draft, onSelect, onChange }: Props) {
+export function ElementsLayer({ scene, listening, editable, selectedId, draft, onSelect, onChange, doorsClickable = false, onToggleDoor }: Props) {
   const g = scene.grid;
   const { transformer, register } = useTransformer(selectedId, editable);
+  const doorClicks = doorsClickable && !listening && onToggleDoor !== undefined;
 
   return (
-    <Layer listening={listening} visible={scene.layers.elements.visible}>
+    <Layer listening={listening || doorClicks} visible={scene.layers.elements.visible}>
       {scene.elements.map((el) => {
         const pos = cellToPx(el, g);
         const w = el.w * g.cellPx;
         const h = el.h * g.cellPx;
+        const clickableDoor = doorClicks && el.type === "door";
         return (
           <Group
             key={el.id}
@@ -43,9 +54,15 @@ export function ElementsLayer({ scene, listening, editable, selectedId, draft, o
             x={pos.x}
             y={pos.y}
             rotation={el.rotation}
+            listening={listening || clickableDoor}
             draggable={editable}
-            onMouseDown={() => onSelect(el.id)}
-            onTap={() => onSelect(el.id)}
+            onMouseDown={() => listening && onSelect(el.id)}
+            onTap={() => (clickableDoor ? onToggleDoor?.(el.id) : listening && onSelect(el.id))}
+            onClick={(e) => {
+              if (clickableDoor && e.evt.button === 0) onToggleDoor?.(el.id);
+            }}
+            onMouseEnter={(e) => clickableDoor && setCursor(e, "pointer")}
+            onMouseLeave={(e) => clickableDoor && setCursor(e, "")}
             onDragEnd={(e) => {
               const cell = snapPxToCell(e.target.position(), g);
               e.target.position(cellToPx(cell, g));

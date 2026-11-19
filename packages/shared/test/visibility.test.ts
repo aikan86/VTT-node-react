@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAX_SIGHT_BLOCKER_VERTICES, SceneSchema, newScene } from "../src/schemas/scene";
+import { MAP_OBJECT_KINDS, MAX_SIGHT_BLOCKER_VERTICES, OBJECT_DEFAULTS, SceneSchema, newScene } from "../src/schemas/scene";
 import { pointInPolygon, sightSegments, visibilityPolygon, visionRadiusPx, type Segment } from "../src/visibility";
 
 const origin = { x: 0, y: 0 };
@@ -158,6 +158,15 @@ describe("sightSegments", () => {
     expect(pointInPolygon({ x: 300, y: 25 }, poly)).toBe(false); // dietro al muro
   });
 
+  it("skips traced shapes and scenery objects that contain the viewer", () => {
+    const s = scene();
+    s.sightBlockers = [{ id: "b", points: [0, 0, 2, 0, 2, 2, 0, 2] }];
+    s.objects = [{ id: "o", kind: "house", x: 5, y: 0, w: 2, h: 2, rotation: 0, color: "#9b3b2e", blocksSight: true }];
+    expect(sightSegments(s)).toHaveLength(8);
+    expect(sightSegments(s, { x: 50, y: 50 })).toHaveLength(4); // dentro il tracciato
+    expect(sightSegments(s, { x: 300, y: 50 })).toHaveLength(4); // dentro la casa
+  });
+
   it("rotates rectangles around their top-left corner", () => {
     const s = scene();
     s.elements = [{ id: "w", type: "wall", x: 2, y: 2, w: 2, h: 1, rotation: 90, color: "#000000" }];
@@ -209,5 +218,56 @@ describe("visionRadiusPx", () => {
     const grid = { feetPerCell: 5, cellPx: 50 };
     expect(visionRadiusPx({ radiusFt: 60 }, grid)).toBe(600);
     expect(visionRadiusPx({ radiusFt: 0 }, grid)).toBeGreaterThan(10_000);
+  });
+});
+
+describe("sightSegments with scenery objects", () => {
+  const scene = () => {
+    const s = newScene();
+    s.grid = { ...s.grid, cellPx: 50, offsetX: 0, offsetY: 0 };
+    return s;
+  };
+  const object = (blocksSight: boolean, extra = {}) => ({ id: "o", kind: "house" as const, x: 2, y: 2, w: 2, h: 1, rotation: 0, color: "#9b3b2e", blocksSight, ...extra });
+
+  it("only objects that block the view contribute their sides", () => {
+    const s = scene();
+    s.objects = [object(true), object(false, { id: "o2" })];
+    expect(sightSegments(s)).toHaveLength(4);
+  });
+
+  it("uses the same rotation pivot as elements (top-left corner)", () => {
+    const s = scene();
+    s.objects = [object(true, { rotation: 90 })];
+    const corners = sightSegments(s).map((seg) => seg.a);
+    expect(corners[0]).toEqual({ x: 100, y: 100 });
+    expect(corners[1]!.y).toBeCloseTo(200);
+  });
+
+  it("makes the party unable to see behind a house", () => {
+    const s = scene();
+    s.objects = [object(true, { x: 2, y: -1, w: 2, h: 2 })]; // da (100,-50) a (200,50)
+    const poly = visibilityPolygon({ x: 0, y: 0 }, sightSegments(s), 1000);
+    expect(pointInPolygon({ x: 150, y: 0 }, poly)).toBe(false); // dentro il tetto
+    expect(pointInPolygon({ x: 400, y: 0 }, poly)).toBe(false); // dietro
+    expect(pointInPolygon({ x: 400, y: 300 }, poly)).toBe(true); // di lato
+  });
+});
+
+describe("scene schema: objects", () => {
+  it("defaults to no objects for scenes saved before", () => {
+    const { objects, ...old } = newScene();
+    expect(objects).toEqual([]);
+    expect(SceneSchema.parse(old).objects).toEqual([]);
+  });
+
+  it("validates objects and has defaults for every built-in kind", () => {
+    const s = newScene();
+    const ok = { id: "o", kind: "fountain", x: 1, y: 1, w: 3, h: 3, rotation: 0, color: "#3d7ea6", blocksSight: false };
+    expect(SceneSchema.safeParse({ ...s, objects: [ok] }).success).toBe(true);
+    expect(SceneSchema.safeParse({ ...s, objects: [{ ...ok, kind: "dragon" }] }).success).toBe(false);
+    expect(SceneSchema.safeParse({ ...s, objects: [{ ...ok, w: 0 }] }).success).toBe(false);
+    for (const kind of MAP_OBJECT_KINDS) {
+      if (kind !== "image") expect(OBJECT_DEFAULTS[kind].w).toBeGreaterThan(0);
+    }
   });
 });

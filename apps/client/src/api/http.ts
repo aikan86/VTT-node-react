@@ -4,7 +4,15 @@ import {
   type Character,
   type Combat,
   type DmRoll,
+  type Handout,
+  type LoadedScene,
+  type LoadSceneRequest,
+  type Monster,
+  type SavedSceneSummary,
+  type SaveSceneRequest,
+  type NpcGroup,
   type Scene,
+  type Settings,
   type Versioned,
 } from "@vtt/shared";
 import type { SaveResult } from "../store/sync/docSync";
@@ -73,9 +81,25 @@ export const api = {
   characters: collection<Character>("/api/characters"),
   scenes: collection<Scene>("/api/scenes"),
   dmRolls: collection<DmRoll>("/api/dm-rolls"),
+  handouts: collection<Handout>("/api/handouts"),
+  monsters: collection<Monster>("/api/monsters"),
+  npcGroups: collection<NpcGroup>("/api/npc-groups"),
+  sceneLibrary: {
+    list: () => request<SavedSceneSummary[]>("GET", "/api/scene-library"),
+    save: (body: SaveSceneRequest) => request<SavedSceneSummary>("POST", "/api/scene-library", body),
+    load: (id: string, body: LoadSceneRequest) => request<LoadedScene>("POST", `/api/scene-library/${encodeURIComponent(id)}/load`, body),
+    duplicate: (id: string, name?: string) =>
+      request<SavedSceneSummary>("POST", `/api/scene-library/${encodeURIComponent(id)}/duplicate`, name === undefined ? {} : { name }),
+    rename: (id: string, name: string) => request<SavedSceneSummary>("PATCH", `/api/scene-library/${encodeURIComponent(id)}`, { name }),
+    remove: (id: string) => request<void>("DELETE", `/api/scene-library/${encodeURIComponent(id)}`),
+  },
   combat: {
     get: () => request<Versioned<Combat>>("GET", "/api/combat"),
     put: (combat: Combat, baseRev: number) => conditionalPut<Combat>("/api/combat", combat, baseRev),
+  },
+  settings: {
+    get: () => request<Versioned<Settings>>("GET", "/api/settings"),
+    put: (settings: Settings, baseRev: number) => conditionalPut<Settings>("/api/settings", settings, baseRev),
   },
   async upload(file: File): Promise<{ url: string }> {
     const form = new FormData();
@@ -87,6 +111,8 @@ export const api = {
     }
     return (await res.json()) as { url: string };
   },
+  /** Illustrazione di un mostro dall'SRD 5e online, scaricata dal server tra le immagini del VTT. */
+  srdImage: (index: string) => request<{ url: string; cached: boolean }>("GET", `/api/srd-image/${encodeURIComponent(index)}`),
   /** Indirizzo che scarica l'intero stato come file JSON. */
   exportUrl: "/api/export",
   /** Sostituisce l'intero stato con quello del file esportato (inviato così com'è, senza rielaborarlo). */

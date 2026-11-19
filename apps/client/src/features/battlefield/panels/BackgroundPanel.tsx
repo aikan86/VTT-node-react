@@ -1,10 +1,11 @@
 import { useRef, useState } from "react";
-import type { Background, Grid, Scene } from "@vtt/shared";
+import { MAP_OBJECT_KINDS, OBJECT_LABELS, type Background, type Grid, type MapObject, type Scene } from "@vtt/shared";
 import { api } from "../../../api/http";
 import { NumberInput } from "../../../components/NumberInput";
 import { reportError } from "../../../store/statusStore";
 import styles from "../Battlefield.module.css";
 import { withBackgroundGeometry } from "../geometry";
+import { OBJECT_ICONS, type ObjectTool } from "../types";
 
 interface Props {
   scene: Scene;
@@ -13,6 +14,13 @@ interface Props {
   calibrationStep: number | null;
   onStartCalibration: () => void;
   onCancelCalibration: () => void;
+  selectedObject: MapObject | undefined;
+  /** Oggetto in attesa di essere piazzato con un click sulla mappa. */
+  objectTool: ObjectTool | null;
+  onObjectTool: (tool: ObjectTool | null) => void;
+  onChangeObject: (object: MapObject) => void;
+  onDeleteObject: (id: string) => void;
+  onDuplicateObject: (object: MapObject) => void;
 }
 
 function loadImageSize(url: string): Promise<{ width: number; height: number }> {
@@ -24,8 +32,10 @@ function loadImageSize(url: string): Promise<{ width: number; height: number }> 
   });
 }
 
-export function BackgroundPanel({ scene, onUpdate, calibrationStep, onStartCalibration, onCancelCalibration }: Props) {
+export function BackgroundPanel({ scene, onUpdate, calibrationStep, onStartCalibration, onCancelCalibration, selectedObject, objectTool, onObjectTool, onChangeObject, onDeleteObject, onDuplicateObject }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
+  const objectFileRef = useRef<HTMLInputElement>(null);
+  const locked = scene.layers.background.locked;
   const [uploading, setUploading] = useState(false);
   const g = scene.grid;
   const setGrid = (patch: Partial<Grid>) => onUpdate((s) => ({ ...s, grid: { ...s.grid, ...patch } }));
@@ -67,6 +77,20 @@ export function BackgroundPanel({ scene, onUpdate, calibrationStep, onStartCalib
     }
   };
 
+  const uploadObject = async (file: File) => {
+    setUploading(true);
+    try {
+      const { url } = await api.upload(file);
+      const { width, height } = await loadImageSize(url);
+      onObjectTool({ kind: "image", imageUrl: url, aspect: width / height });
+    } catch (err) {
+      reportError(err);
+    } finally {
+      setUploading(false);
+      if (objectFileRef.current) objectFileRef.current.value = "";
+    }
+  };
+
   return (
     <>
       <section className={styles.section}>
@@ -92,6 +116,77 @@ export function BackgroundPanel({ scene, onUpdate, calibrationStep, onStartCalib
           )}
         </div>
       </section>
+
+      <section className={styles.section} aria-label="Oggetti">
+        <h3>Oggetti</h3>
+        <div className={styles.tools}>
+          {MAP_OBJECT_KINDS.filter((kind) => kind !== "image").map((kind) => (
+            <button
+              key={kind}
+              className={objectTool?.kind === kind ? "active" : ""}
+              aria-pressed={objectTool?.kind === kind}
+              disabled={locked}
+              onClick={() => onObjectTool(objectTool?.kind === kind ? null : { kind })}
+            >
+              <span aria-hidden="true" style={{ marginRight: 4 }}>
+                {OBJECT_ICONS[kind]}
+              </span>
+              {OBJECT_LABELS[kind]}
+            </button>
+          ))}
+        </div>
+        <input
+          ref={objectFileRef}
+          type="file"
+          accept="image/png,image/jpeg,image/webp,image/gif"
+          hidden
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) void uploadObject(file);
+          }}
+        />
+        <button disabled={locked || uploading} onClick={() => objectFileRef.current?.click()}>
+          {uploading ? "Caricamento…" : "🖼️ Carica un'immagine tua…"}
+        </button>
+        {objectTool && (
+          <p className={styles.callout} role="status">
+            Clicca sulla mappa per piazzare: {OBJECT_LABELS[objectTool.kind].toLowerCase()}. <kbd>Esc</kbd> per annullare.
+          </p>
+        )}
+      </section>
+
+      {selectedObject && (
+        <section className={styles.selected} aria-label="Oggetto selezionato">
+          <h3 style={{ margin: 0 }}>{OBJECT_LABELS[selectedObject.kind]}</h3>
+          <div className={styles.grid2}>
+            {selectedObject.kind !== "image" && (
+              <label className="field">
+                Colore
+                <input type="color" disabled={locked} value={selectedObject.color} onChange={(e) => onChangeObject({ ...selectedObject, color: e.target.value })} />
+              </label>
+            )}
+            <label className="field">
+              Etichetta
+              <input disabled={locked} value={selectedObject.label ?? ""} maxLength={80} onChange={(e) => onChangeObject({ ...selectedObject, label: e.target.value || undefined })} />
+            </label>
+          </div>
+          <label className="row" style={{ flexWrap: "nowrap" }}>
+            <input type="checkbox" disabled={locked} checked={selectedObject.blocksSight} onChange={(e) => onChangeObject({ ...selectedObject, blocksSight: e.target.checked })} />
+            Blocca la vista dei personaggi
+          </label>
+          <span className="muted" style={{ fontSize: "0.8rem" }}>
+            {selectedObject.w} × {selectedObject.h} celle · trascina per spostare, maniglie per ridimensionare o ruotare. La vista è bloccata dal suo rettangolo.
+          </span>
+          <div className="row">
+            <button disabled={locked} onClick={() => onDuplicateObject(selectedObject)}>
+              Duplica
+            </button>
+            <button className="danger" disabled={locked} onClick={() => onDeleteObject(selectedObject.id)}>
+              Elimina
+            </button>
+          </div>
+        </section>
+      )}
 
       {bg && (
         <section className={styles.section} aria-label="Posizione immagine">

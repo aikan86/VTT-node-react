@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ColorSchema, IdSchema, RefSchema, createId } from "./common";
+import { ColorSchema, IdSchema, RefSchema, UploadedImageUrlSchema, createId } from "./common";
 
 export const LAYER_KEYS = ["background", "elements", "tokens", "effects"] as const;
 export type LayerKey = (typeof LAYER_KEYS)[number];
@@ -68,7 +68,7 @@ export const MapElementSchema = z.object({
   rotation: z.number(),
   color: ColorSchema,
   label: z.string().max(80).optional(),
-  /** Solo per le porte: aperta non blocca la vista. Assente = chiusa. */
+  /** Solo per le porte: aperta non blocca la vista (assente = chiusa). */
   open: z.boolean().optional(),
 });
 export type MapElement = z.infer<typeof MapElementSchema>;
@@ -79,6 +79,12 @@ export const TokenSchema = z.object({
   ref: RefSchema,
   x: z.number().int(),
   y: z.number().int(),
+  /** Nascosto ai giocatori: il master lo vede (attenuato), la vista giocatori no. */
+  hidden: z.boolean().optional(),
+  /** Scurovisione in piedi: in una scena buia il personaggio vede entro questo raggio anche senza luce. */
+  darkvisionFt: z.number().int().min(0).max(1000).optional(),
+  /** Velocità di movimento in piedi (assente = `DEFAULT_SPEED_FT`). */
+  speedFt: z.number().int().min(0).max(1000).optional(),
 });
 export type Token = z.infer<typeof TokenSchema>;
 
@@ -162,6 +168,22 @@ export const SightBlockerSchema = z.object({
 });
 export type SightBlocker = z.infer<typeof SightBlockerSchema>;
 
+/**
+ * Luce posizionata sulla mappa: illumina a 360° fino a `brightFt` (luce piena) e per altri `dimFt` (penombra),
+ * fermata da muri, porte chiuse e ostacoli come la vista. Origine in celle (frazionaria).
+ */
+export const LightSchema = z.object({
+  id: IdSchema,
+  x: CellCoord,
+  y: CellCoord,
+  brightFt: z.number().int().min(0).max(1000),
+  dimFt: z.number().int().min(0).max(1000),
+  color: ColorSchema,
+});
+export type Light = z.infer<typeof LightSchema>;
+
+export const DEFAULT_LIGHT = { brightFt: 20, dimFt: 20, color: "#fbbf24" } as const;
+
 /** Visione del party: i personaggi sulla mappa vedono a 360°, fino a `radiusFt` (0 = senza limite), ostacolati da muri e ostacoli. */
 export const VisionSchema = z.object({
   enabled: z.boolean(),
@@ -172,6 +194,61 @@ export const VisionSchema = z.object({
 export type Vision = z.infer<typeof VisionSchema>;
 
 export const DEFAULT_VISION: Vision = { enabled: false, radiusFt: 60, darkness: 0.7 };
+
+/** Oggetti che il master aggiunge allo sfondo (disegnati dall'app, vista dall'alto) o immagini sue. */
+export const MAP_OBJECT_KINDS = ["fountain", "house", "tent", "wall", "tree", "rock", "well", "table", "crate", "campfire", "image"] as const;
+export type ObjectKind = (typeof MAP_OBJECT_KINDS)[number];
+
+export const OBJECT_LABELS: Record<ObjectKind, string> = {
+  fountain: "Fontana",
+  house: "Casa",
+  tent: "Tenda",
+  wall: "Muro",
+  tree: "Albero",
+  rock: "Roccia",
+  well: "Pozzo",
+  table: "Tavolo",
+  crate: "Cassa",
+  campfire: "Falò",
+  image: "Immagine",
+};
+
+/** Misure in celle, colore principale e se di norma blocca la vista. */
+export const OBJECT_DEFAULTS: Record<Exclude<ObjectKind, "image">, { w: number; h: number; color: string; blocksSight: boolean }> = {
+  fountain: { w: 3, h: 3, color: "#3d7ea6", blocksSight: false },
+  house: { w: 6, h: 5, color: "#9b3b2e", blocksSight: true },
+  tent: { w: 3, h: 3, color: "#c9b27c", blocksSight: true },
+  wall: { w: 4, h: 1, color: "#7b7d82", blocksSight: true },
+  tree: { w: 3, h: 3, color: "#3f7d3a", blocksSight: true },
+  rock: { w: 2, h: 2, color: "#8a8d93", blocksSight: true },
+  well: { w: 2, h: 2, color: "#8d9096", blocksSight: false },
+  table: { w: 2, h: 1, color: "#8a5a2b", blocksSight: false },
+  crate: { w: 1, h: 1, color: "#a0702f", blocksSight: false },
+  campfire: { w: 1, h: 1, color: "#f97316", blocksSight: false },
+};
+
+/** Coordinate e dimensioni in celle; ruota attorno all'angolo in alto a sinistra, come gli elementi. */
+export const MapObjectSchema = z.object({
+  id: IdSchema,
+  kind: z.enum(MAP_OBJECT_KINDS),
+  x: z.number(),
+  y: z.number(),
+  w: z.number().positive(),
+  h: z.number().positive(),
+  rotation: z.number(),
+  /** Colore principale (tetto, tela, pietra, chioma…); ignorato dalle immagini. */
+  color: ColorSchema,
+  /** Solo per `kind: "image"`: immagine caricata nel VTT. */
+  imageUrl: UploadedImageUrlSchema.optional(),
+  /** Ostacola la vista dei personaggi (approssimato al suo rettangolo). */
+  blocksSight: z.boolean(),
+  label: z.string().max(80).optional(),
+});
+export type MapObject = z.infer<typeof MapObjectSchema>;
+
+/** Tetto delle celle esplorate salvate in una scena (≈ 2 MB nel peggiore dei casi). */
+export const MAX_EXPLORED_CELLS = 200_000;
+const ExploredCellSchema = z.string().regex(/^-?\d+,-?\d+$/, "Cella come \"x,y\"");
 
 export const SceneSchema = z.object({
   id: IdSchema,
@@ -192,6 +269,20 @@ export const SceneSchema = z.object({
   /** Assenti nelle scene salvate prima della visione del party. */
   sightBlockers: z.array(SightBlockerSchema).default([]),
   vision: VisionSchema.default(DEFAULT_VISION),
+  /** La vista giocatori mostra questa scena (al massimo una alla volta). */
+  shownToPlayers: z.boolean().default(false),
+  /** Oggetti dello sfondo: seguono il livello Sfondo (visibilità e blocco). */
+  objects: z.array(MapObjectSchema).default([]),
+  /** Nebbia con memoria: celle già viste dal party, come chiavi "x,y" (vedi `cellKey`). */
+  explored: z.array(ExploredCellSchema).max(MAX_EXPLORED_CELLS).default([]),
+  /** Luci sulla mappa (livello Elementi). */
+  lights: z.array(LightSchema).max(500).default([]),
+  /** Scena buia (con la visione attiva): il party vede solo dentro le luci o entro la scurovisione dei propri token. */
+  dark: z.boolean().default(false),
+  /** I giocatori possono spostare i PG dalla loro vista (assente nelle scene salvate prima: sì). */
+  playersMoveParty: z.boolean().default(true),
+  /** Punto di partenza dei PG (cella) quando la scena viene caricata dalla libreria; assente = centro della mappa. */
+  pcStart: z.object({ x: z.number().int(), y: z.number().int() }).optional(),
 });
 export type Scene = z.infer<typeof SceneSchema>;
 
@@ -217,6 +308,12 @@ export function newScene(name = "Nuova scena"): Scene {
     drawings: [],
     sightBlockers: [],
     vision: { ...DEFAULT_VISION },
+    shownToPlayers: false,
+    objects: [],
+    explored: [],
+    lights: [],
+    dark: false,
+    playersMoveParty: true,
   };
 }
 

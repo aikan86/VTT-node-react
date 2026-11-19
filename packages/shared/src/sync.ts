@@ -25,5 +25,12 @@ export const COLLECTIONS = {
   scenes: "scenes",
   combat: "combat",
   dmRolls: "dm-rolls",
+  handouts: "handouts",
+  monsters: "monsters",
+  npcGroups: "npc-groups",
+  /** Libreria di scene salvate: gli eventi portano il riepilogo della voce, non la scena intera. */
+  sceneLibrary: "scene-library",
+  /** Impostazioni generali (logo): documento singleton con id "current". */
+  settings: "settings",
 } as const;
 export const COMBAT_DOC_ID = "current";

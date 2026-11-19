@@ -43,15 +43,15 @@ describe("InitiativePage", () => {
     const name = within(dialog).getByLabelText("Nome");
     await user.clear(name);
     await user.type(name, "Orco");
-    await user.click(within(dialog).getByRole("button", { name: "Aggiungi" }));
+    await user.click(within(dialog).getByRole("button", { name: "Aggiungi PNG" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 
-    // Tiri manuali: Aria 10+3=13, Borin 18+0=18, Orco (mod +2) 5+2=7
+    // Tiri manuali: Aria 10+3=13, Borin 18+0=18, Orco (mod +1 del goblin di partenza) 5+1=6
     await user.type(screen.getByLabelText("d20 di Aria"), "10");
     await user.type(screen.getByLabelText("d20 di Borin"), "18");
     await user.type(screen.getByLabelText("d20 di Orco"), "5");
     expect(rowNames()).toEqual(["Borin", "Aria", "Orco"]);
-    expect(screen.getAllByTestId("total").map((t) => t.textContent)).toEqual(["18", "13", "7"]);
+    expect(screen.getAllByTestId("total").map((t) => t.textContent)).toEqual(["18", "13", "6"]);
     expect(screen.getByRole("button", { name: "🎲 Tira tutti" })).toBeDisabled();
 
     await user.click(screen.getByRole("button", { name: "⚔ Inizia combattimento" }));
@@ -101,7 +101,7 @@ describe("InitiativePage", () => {
     const dialog = screen.getByRole("dialog", { name: "Aggiungi PNG" });
     await user.clear(within(dialog).getByLabelText("Nome"));
     await user.type(within(dialog).getByLabelText("Nome"), "Orco");
-    await user.click(within(dialog).getByRole("button", { name: "Aggiungi" }));
+    await user.click(within(dialog).getByRole("button", { name: "Aggiungi PNG" }));
 
     // PG non rinominabili dal tracker
     expect(screen.queryByRole("button", { name: "Rinomina Aria" })).not.toBeInTheDocument();
@@ -145,7 +145,7 @@ describe("InitiativePage", () => {
     const dialog = screen.getByRole("dialog", { name: "Aggiungi PNG" });
     await user.clear(within(dialog).getByLabelText("Nome"));
     await user.type(within(dialog).getByLabelText("Nome"), "Orco");
-    await user.click(within(dialog).getByRole("button", { name: "Aggiungi" }));
+    await user.click(within(dialog).getByRole("button", { name: "Aggiungi PNG" }));
 
     fireEvent.change(screen.getByLabelText("Colore di Aria"), { target: { value: "#123456" } });
     expect(usePartyStore.getState().characters.find((c) => c.id === "pc-a")!.color).toBe("#123456");
@@ -165,5 +165,28 @@ describe("InitiativePage", () => {
     await act(async () => {});
     expect(screen.getByTestId("round")).toHaveTextContent("—");
     expect(useCombatStore.getState().combat.combatants.every((c) => c.roll === null)).toBe(true);
+  });
+});
+
+describe("InitiativePage: conditions", () => {
+  it("toggles conditions on a combatant and shows their icons in the row", async () => {
+    const user = userEvent.setup();
+    render(<InitiativePage />);
+    await user.click(screen.getByRole("button", { name: "+ Aggiungi party" }));
+
+    const aria = () => screen.getAllByTestId("combatant-row").find((row) => within(row).queryByText("Aria"))!;
+    expect(within(aria()).queryByRole("img", { name: "Prono" })).not.toBeInTheDocument();
+
+    await user.click(within(aria()).getByRole("button", { name: "Modifica condizioni di Aria" }));
+    const picker = screen.getByRole("group", { name: "Condizioni di Aria" });
+    await user.click(within(picker).getByRole("button", { name: /Prono/ }));
+    await user.click(within(picker).getByRole("button", { name: /Stordito/ }));
+
+    expect(within(aria()).getByRole("img", { name: "Prono" })).toHaveTextContent("🛌");
+    expect(within(aria()).getByRole("img", { name: "Stordito" })).toBeInTheDocument();
+    expect(usePartyStore.getState().characters.find((c) => c.id === "pc-a")?.conditions).toEqual(["prone", "stunned"]);
+
+    await user.click(within(picker).getByRole("button", { name: /Prono/ }));
+    expect(within(aria()).queryByRole("img", { name: "Prono" })).not.toBeInTheDocument();
   });
 });

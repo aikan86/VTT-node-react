@@ -1,18 +1,23 @@
 import { useEffect, useRef, useState } from "react";
 import { Stage } from "react-konva";
 import type Konva from "konva";
-import { ELEMENT_COLORS, pxToCell, type Background, type Drawing, type Effect, type LayerKey, type MapElement, type Point, type Ref, type Scene, type SightBlocker, type Token } from "@vtt/shared";
+import { cellCenter, ELEMENT_COLORS, pxToCell, type Light, type PartySight, type Background, type Drawing, type Effect, type LayerKey, type MapElement, type MapObject, type Point, type Ref, type Scene, type SightBlocker, type Token } from "@vtt/shared";
 import type { EntityResolver } from "../../store/entities";
 import { appendPoint, clamp, closesTrace, contentBounds, snapAngle } from "./geometry";
 import { useElementSize, useKeyHeld } from "./hooks";
 import { BACKGROUND_ID, BackgroundLayer, GridLayer } from "./layers/BackgroundLayer";
 import { EffectsLayer } from "./layers/EffectsLayer";
 import { ElementsLayer } from "./layers/ElementsLayer";
+import { ObjectsLayer } from "./layers/ObjectsLayer";
 import { CalibrationLayer } from "./layers/CalibrationLayer";
 import { createHoverStore, SightBlockersLayer } from "./layers/SightBlockersLayer";
 import { VisionLayer } from "./layers/VisionLayer";
 import { TokensLayer } from "./layers/TokensLayer";
-import { type DrawTool, type ElementTool, type Selection, type SketchDraft, type View } from "./types";
+import { LightsLayer } from "./layers/LightsLayer";
+import { MovementLayer, type MovementArea } from "./layers/MovementLayer";
+import { RulerLayer } from "./layers/RulerLayer";
+import { PcStartLayer } from "./layers/PcStartLayer";
+import { isRectTool, type DrawTool, type ElementTool, type Selection, type SketchDraft, type View } from "./types";
 import styles from "./Battlefield.module.css";
 
 interface Props {
@@ -37,12 +42,24 @@ interface Props {
   onBlockerChange: (blocker: SightBlocker) => void;
   onDrawElement: (rect: { x: number; y: number; w: number; h: number }) => void;
   onElementChange: (element: MapElement) => void;
+  onObjectChange: (object: MapObject) => void;
   onBackgroundChange: (background: Background) => void;
   onTokenMove: (token: Token) => void;
   onEffectChange: (effect: Effect) => void;
   onSketch: (sketch: SketchDraft) => void;
   onDrawingChange: (drawing: Drawing) => void;
   onEraseDrawing: (id: string) => void;
+  /** Ciò che il party vede ora (da `usePartySight`). */
+  sight: PartySight;
+  onToggleDoor: (id: string) => void;
+  onLightChange: (light: Light) => void;
+  /** Righello attivo (tasto R): trascinando si misura, gli altri strumenti sono sospesi. */
+  measuring: boolean;
+  onToggleRuler: () => void;
+  /** Raggio di movimento del token selezionato, se da mostrare. */
+  movement: MovementArea | null;
+  /** In attesa del clic che sceglie il punto di partenza dei PG. */
+  pickingStart?: boolean;
 }
 
 /** Sotto questa distanza sullo schermo un tratto non viene salvato e i punti a mano libera vengono scartati. */
@@ -62,7 +79,14 @@ export function BattleStage(props: Props) {
   const [draw, setDraw] = useState<{ start: Point; end: Point } | null>(null);
   const [sketch, setSketch] = useState<SketchDraft | null>(null);
   const [hover] = useState(createHoverStore);
+  /** Misura del righello (pixel del mondo); `dragging` mentre il tasto è premuto. */
+  const [ruler, setRuler] = useState<{ start: Point; end: Point; dragging: boolean } | null>(null);
   const fittedScene = useRef<string | null>(null);
+  const measuring = props.measuring;
+
+  useEffect(() => {
+    if (!measuring) setRuler(null);
+  }, [measuring]);
 
   const fit = () => {
     if (!size.width || !size.height) return;
@@ -92,13 +116,19 @@ export function BattleStage(props: Props) {
   };
 
   const locked = scene.layers[activeLayer].locked;
-  const drawing = activeLayer === "elements" && elementTool !== "select" && elementTool !== "sight" && !locked;
-  const tracing = activeLayer === "elements" && elementTool === "sight" && !locked;
-  const sketchKind = activeLayer === "effects" && !locked && (drawTool.mode === "line" || drawTool.mode === "freehand") ? drawTool.mode : null;
-  const erasing = activeLayer === "effects" && !locked && drawTool.mode === "eraser";
-  const editable = (layer: LayerKey) => activeLayer === layer && !locked && !spaceHeld && !drawing && !placing && !sketchKind && !erasing && !calibrating && !tracing;
-  // mentre si traccia, i click passano allo Stage anche sopra gli effetti esistenti
-  const listening = (layer: LayerKey) => activeLayer === layer && !spaceHeld && !sketchKind && !calibrating && !tracing;
+  // col righello attivo gli strumenti dei livelli sono sospesi
+  const tools = !measuring && !locked;
+  const drawing = activeLayer === "elements" && isRectTool(elementTool) && tools;
+  const tracing = activeLayer === "elements" && elementTool === "sight" && tools;
+  const sketchKind = activeLayer === "effects" && tools && (drawTool.mode === "line" || drawTool.mode === "freehand") ? drawTool.mode : null;
+  const erasing = activeLayer === "effects" && tools && drawTool.mode === "eraser";
+  const editable = (layer: LayerKey) => activeLayer === layer && tools && !spaceHeld && !drawing && !placing && !sketchKind && !erasing && !calibrating && !tracing;
+  // mentre si traccia o si misura, i click passano allo Stage anche sopra gli oggetti esistenti
+  const listening = (layer: LayerKey) => activeLayer === layer && !measuring && !spaceHeld && !sketchKind && !calibrating && !tracing;
+  // fuori dal livello Elementi un click su una porta la apre o la chiude (anche a livello bloccato: è gioco, non modifica)
+  const doorsClickable = activeLayer !== "elements" && !measuring && !spaceHeld && !placing && !sketchKind && !erasing && !calibrating;
+  /** Punto del righello: centro della casella, oppure il punto esatto con Shift. */
+  const rulerPoint = (world: Point, free: boolean) => (free ? world : cellCenter(world, scene.grid));
   const minStroke = MIN_STROKE_SCREEN_PX / view.scale;
 
   const worldPointer = (stage: Konva.Stage): Point | null => stage.getRelativePointerPosition();
@@ -112,6 +142,13 @@ export function BattleStage(props: Props) {
       e.evt.preventDefault();
       pan.current = { pointer, view, moved: false };
       setPanning(true);
+      return;
+    }
+    if (e.evt.button === 0 && measuring) {
+      const world = worldPointer(stage);
+      if (!world) return;
+      const p = rulerPoint(world, e.evt.shiftKey);
+      setRuler({ start: p, end: p, dragging: true });
       return;
     }
     if (e.evt.button === 0 && drawing) {
@@ -136,6 +173,11 @@ export function BattleStage(props: Props) {
       const start = pan.current;
       start.moved = true;
       setView({ ...start.view, x: start.view.x + pointer.x - start.pointer.x, y: start.view.y + pointer.y - start.pointer.y });
+      return;
+    }
+    if (ruler?.dragging) {
+      const world = worldPointer(stage);
+      if (world) setRuler({ ...ruler, end: rulerPoint(world, e.evt.shiftKey) });
       return;
     }
     if (tracing) {
@@ -174,6 +216,7 @@ export function BattleStage(props: Props) {
       setPanning(false);
       return;
     }
+    if (ruler?.dragging) setRuler({ ...ruler, dragging: false }); // la misura resta finché non se ne inizia un'altra
     if (draftRect) {
       props.onDrawElement(draftRect);
       setDraw(null);
@@ -187,7 +230,7 @@ export function BattleStage(props: Props) {
   };
 
   const handleClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
-    if (e.evt.button !== 0 || spaceHeld || drawing || sketchKind || erasing) return;
+    if (e.evt.button !== 0 || spaceHeld || measuring || drawing || sketchKind || erasing) return;
     const stage = e.target.getStage();
     if (!stage) return;
     if (calibrating) {
@@ -214,8 +257,8 @@ export function BattleStage(props: Props) {
   const select = (layer: LayerKey) => (id: string) => props.onSelect({ layer, id });
 
   const textMode = activeLayer === "effects" && drawTool.mode === "text";
-  const cursor = panning ? "grabbing" : spaceHeld ? "grab" : erasing ? "cell" : textMode && placing ? "text" : drawing || placing || sketchKind || calibrating || tracing ? "crosshair" : "default";
-  const elementColor = elementTool === "select" || elementTool === "sight" ? "#ffffff" : ELEMENT_COLORS[elementTool];
+  const cursor = panning ? "grabbing" : spaceHeld ? "grab" : erasing ? "cell" : textMode && placing ? "text" : measuring || drawing || placing || sketchKind || calibrating || tracing ? "crosshair" : "default";
+  const elementColor = isRectTool(elementTool) ? ELEMENT_COLORS[elementTool] : "#ffffff";
 
   return (
     <div ref={containerRef} className={styles.stageWrap} style={{ cursor }} onContextMenu={(e) => e.preventDefault()}>
@@ -242,9 +285,17 @@ export function BattleStage(props: Props) {
             scene={scene}
             listening={listening("background")}
             editable={editable("background")}
-            selected={selection?.layer === "background"}
+            selected={selection?.layer === "background" && selection.id === BACKGROUND_ID}
             onSelect={() => props.onSelect({ layer: "background", id: BACKGROUND_ID })}
             onChange={props.onBackgroundChange}
+          />
+          <ObjectsLayer
+            scene={scene}
+            listening={listening("background")}
+            editable={editable("background")}
+            selectedId={selectedIn("background")}
+            onSelect={select("background")}
+            onChange={props.onObjectChange}
           />
           <GridLayer scene={scene} view={view} size={size} />
           <ElementsLayer
@@ -255,6 +306,8 @@ export function BattleStage(props: Props) {
             draft={draftRect && { ...draftRect, color: elementColor }}
             onSelect={select("elements")}
             onChange={props.onElementChange}
+            doorsClickable={doorsClickable}
+            onToggleDoor={props.onToggleDoor}
           />
           <SightBlockersLayer
             scene={scene}
@@ -268,6 +321,17 @@ export function BattleStage(props: Props) {
             onSelect={select("elements")}
             onChange={props.onBlockerChange}
           />
+          <LightsLayer
+            scene={scene}
+            markers
+            listening={listening("elements")}
+            editable={editable("elements")}
+            selectedId={selectedIn("elements")}
+            onSelect={select("elements")}
+            onChange={props.onLightChange}
+          />
+          {scene.pcStart && <PcStartLayer start={scene.pcStart} grid={scene.grid} />}
+          {props.movement && <MovementLayer grid={scene.grid} area={props.movement} />}
           <TokensLayer
             scene={scene}
             resolve={props.resolve}
@@ -278,8 +342,7 @@ export function BattleStage(props: Props) {
             onSelect={select("tokens")}
             onMove={props.onTokenMove}
           />
-          {/* la visione si ricalcola solo quando la scena cambia, cioè al rilascio di un trascinamento */}
-          <VisionLayer scene={scene} resolve={props.resolve} view={view} size={size} />
+          <VisionLayer scene={scene} sight={props.sight} view={view} size={size} />
           <EffectsLayer
             scene={scene}
             listening={listening("effects")}
@@ -294,6 +357,7 @@ export function BattleStage(props: Props) {
             onErase={props.onEraseDrawing}
           />
           {props.calibration && <CalibrationLayer points={props.calibration} viewScale={view.scale} />}
+          {ruler && <RulerLayer start={ruler.start} end={ruler.end} grid={scene.grid} viewScale={view.scale} />}
         </Stage>
       )}
       <div className={styles.zoom}>
@@ -305,11 +369,18 @@ export function BattleStage(props: Props) {
           +
         </button>
         <button onClick={fit}>Adatta</button>
+        <button className={measuring ? "active" : ""} aria-pressed={measuring} onClick={props.onToggleRuler} title="Misura distanze (R)">
+          📏 Righello
+        </button>
       </div>
       <div className={styles.hint}>
         {props.calibration && props.calibration.length < 2
           ? `Calibrazione: clicca il punto ${props.calibration.length + 1} di 2 sull'immagine · Esc: annulla`
-          : "Rotella: zoom · Spazio o tasto centrale + trascina: sposta · Canc: elimina · Esc: annulla"}
+          : props.pickingStart
+            ? "Clicca la casella da cui partiranno i PG quando la scena viene caricata dalla libreria · Esc: annulla"
+            : measuring
+            ? "Righello: trascina per misurare (dal centro delle caselle; Shift: punto libero) · R o Esc: chiudi"
+            : "Rotella: zoom · Spazio o tasto centrale + trascina: sposta · R: righello · Click su una porta o O: apri/chiudi · Canc: elimina · Esc: annulla"}
       </div>
     </div>
   );

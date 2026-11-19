@@ -1,8 +1,9 @@
 import { useRef, useState } from "react";
 import { rollD20 } from "@vtt/shared";
+import { ConditionIcons, ConditionPicker } from "../../components/Conditions";
 import { HpEditor } from "../../components/HpEditor";
 import { NumberInput } from "../../components/NumberInput";
-import { removeFromInitiative, renameNpc, setEntityColor, setEntityHp } from "../../store/actions";
+import { removeFromInitiative, renameNpc, setEntityColor, setEntityConditions, setEntityHp } from "../../store/actions";
 import type { CombatantRowData } from "./useInitiative";
 import styles from "./Initiative.module.css";
 
@@ -21,11 +22,13 @@ export function CombatantRow({ row, active, onSetRoll, onSetNotes, onToggleActed
   const { combatant: c, entity, total, current } = row;
   const isNpc = entity.ref.kind === "npc";
   const [editing, setEditing] = useState(false);
+  const [pickConditions, setPickConditions] = useState(false);
   const className = [styles.row, current && styles.current, c.acted && styles.acted, entity.hp.current <= 0 && styles.down]
     .filter(Boolean)
     .join(" ");
 
   return (
+    <>
     <tr className={className} aria-current={current ? "step" : undefined} data-testid="combatant-row">
       <td>
         <input
@@ -61,8 +64,18 @@ export function CombatantRow({ row, active, onSetRoll, onSetNotes, onToggleActed
           ) : (
             <span className={styles.name}>{entity.name}</span>
           )}
+          <ConditionIcons conditions={entity.conditions} />
           {isNpc && <span className="badge">PNG</span>}
           {current && <span className={styles.turn}>◀ turno</span>}
+          <button
+            className="icon"
+            aria-expanded={pickConditions}
+            aria-label={`Modifica condizioni di ${entity.name}`}
+            title="Condizioni (accecato, prono…)"
+            onClick={() => setPickConditions((v) => !v)}
+          >
+            🏷
+          </button>
         </div>
       </td>
       <td>
@@ -120,6 +133,15 @@ export function CombatantRow({ row, active, onSetRoll, onSetNotes, onToggleActed
         </div>
       </td>
     </tr>
+    {pickConditions && (
+      <tr className={styles.pickerRow}>
+        <td />
+        <td colSpan={8}>
+          <ConditionPicker name={entity.name} conditions={entity.conditions} onChange={(list) => setEntityConditions(entity.ref, list)} />
+        </td>
+      </tr>
+    )}
+    </>
   );
 }
 

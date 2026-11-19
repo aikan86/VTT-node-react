@@ -1,11 +1,18 @@
-import type { EffectShape, ElementType, LayerKey, Ref } from "@vtt/shared";
+import type { EffectShape, ElementType, LayerKey, ObjectKind, Ref } from "@vtt/shared";
 
 export interface Selection {
   layer: LayerKey;
   id: string;
 }
 
-export type ElementTool = "select" | "sight" | ElementType;
+/**
+ * "light" piazza una luce con un click; "sight" traccia un ostacolo alla vista; "wand" lo ricava dal contorno di un'area
+ * di colore uniforme dell'immagine (bacchetta magica); gli altri disegnano elementi.
+ */
+export type ElementTool = "select" | "sight" | "light" | "wand" | ElementType;
+
+/** Gli strumenti che disegnano un rettangolo trascinando. */
+export const isRectTool = (tool: ElementTool): tool is ElementType => tool !== "select" && tool !== "sight" && tool !== "light" && tool !== "wand";
 
 /** Colore degli ostacoli alla vista tracciati a mano. */
 export const SIGHT_COLOR = "#a855f7";
@@ -45,3 +52,25 @@ export interface View {
 
 /** Token in attesa di essere piazzati con un click sulla mappa. */
 export type PendingPlacement = Ref[] | null;
+
+/** Oggetto dello sfondo in attesa di essere piazzato con un click sulla mappa. */
+export interface ObjectTool {
+  kind: ObjectKind;
+  /** Per le immagini caricate: indirizzo e proporzioni (larghezza / altezza). */
+  imageUrl?: string;
+  aspect?: number;
+}
+
+export const OBJECT_ICONS: Record<ObjectKind, string> = {
+  fountain: "⛲",
+  house: "🏠",
+  tent: "⛺",
+  wall: "🧱",
+  tree: "🌳",
+  rock: "🪨",
+  well: "🪣",
+  table: "🍽️",
+  crate: "📦",
+  campfire: "🔥",
+  image: "🖼️",
+};

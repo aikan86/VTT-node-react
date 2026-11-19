@@ -4,7 +4,7 @@ import { AddNpcDialog } from "../features/initiative/AddNpcDialog";
 import { CombatantRow } from "../features/initiative/CombatantRow";
 import { useInitiative } from "../features/initiative/useInitiative";
 import styles from "../features/initiative/Initiative.module.css";
-import { createNpcs, placeTokens } from "../store/actions";
+import { createNpcEntries, placeTokens } from "../store/actions";
 import { sizeOfRef } from "../store/entities";
 import { useSceneStore } from "../store/sceneStore";
 
@@ -102,8 +102,8 @@ export function InitiativePage() {
         <AddNpcDialog
           showPlaceOption
           onClose={() => setNpcDialog(false)}
-          onSubmit={({ template, quantity, placeOnMap }) => {
-            const refs = createNpcs(template, quantity);
+          onSubmit={({ entries, placeOnMap }) => {
+            const refs = createNpcEntries(entries);
             const { activeId, scenes } = useSceneStore.getState();
             const scene = scenes.find((s) => s.id === activeId);
             // i nuovi PNG partono dall'angolo in alto a destra del contenuto della scena

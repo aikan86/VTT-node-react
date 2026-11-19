@@ -198,6 +198,18 @@ describe("cellLengthIn", () => {
   });
 });
 
+describe("contentBounds with scenery objects", () => {
+  it("includes the objects of the background layer", () => {
+    const scene = newScene();
+    scene.objects = [{ id: "o", kind: "house", x: 10, y: 4, w: 6, h: 5, rotation: 0, color: "#9b3b2e", blocksSight: true }];
+    const b = contentBounds(scene);
+    const g = scene.grid;
+    expect(b.minX).toBe(g.offsetX + 10 * g.cellPx);
+    expect(b.maxX).toBe(g.offsetX + 16 * g.cellPx);
+    expect(b.maxY).toBe(g.offsetY + 9 * g.cellPx);
+  });
+});
+
 describe("trace helpers", () => {
   const square = [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }];
 

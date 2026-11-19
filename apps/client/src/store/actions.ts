@@ -5,6 +5,7 @@ import {
   removeRef,
   sameRef,
   updateNpc,
+  type Condition,
   type Hp,
   type NpcTemplate,
   type Point,
@@ -56,6 +57,31 @@ export function setEntityHp(ref: Ref, hp: Hp) {
   }
 }
 
+/** Condizioni di un PG o PNG (lista vuota = nessuna: il campo viene tolto). */
+export function setEntityConditions(ref: Ref, list: Condition[]) {
+  const conditions = list.length ? list : undefined;
+  if (ref.kind === "pc") {
+    usePartyStore.getState().update(ref.id, (c) => ({ ...c, conditions }));
+  } else {
+    useCombatStore.getState().apply((combat) => ({
+      ...combat,
+      npcs: combat.npcs.map((n) => (n.id === ref.id ? { ...n, conditions } : n)),
+    }));
+  }
+}
+
+/** Immagine del token di un PG o PNG (undefined = nessuna, tornano le iniziali). */
+export function setEntityImage(ref: Ref, imageUrl: string | undefined) {
+  if (ref.kind === "pc") {
+    usePartyStore.getState().update(ref.id, (c) => ({ ...c, imageUrl }));
+  } else {
+    useCombatStore.getState().apply((combat) => ({
+      ...combat,
+      npcs: combat.npcs.map((n) => (n.id === ref.id ? { ...n, imageUrl } : n)),
+    }));
+  }
+}
+
 /** Rinomina un PNG; i nomi vuoti vengono ignorati. */
 export function renameNpc(npcId: string, name: string) {
   const trimmed = name.trim();
@@ -70,6 +96,22 @@ export function createNpcs(template: NpcTemplate, quantity: number): Ref[] {
     const result = addNpcs(combat, template, quantity, ctx.id);
     refs = result.npcs.map((n) => ({ kind: "npc", id: n.id }));
     return result.combat;
+  });
+  return refs;
+}
+
+/** Crea i PNG di più modelli (un gruppo) in un'unica modifica del combattimento; restituisce i riferimenti creati. */
+export function createNpcEntries(entries: readonly { template: NpcTemplate; quantity: number }[]): Ref[] {
+  let refs: Ref[] = [];
+  useCombatStore.getState().apply((combat, _getMod, ctx) => {
+    refs = [];
+    let next = combat;
+    for (const { template, quantity } of entries) {
+      const result = addNpcs(next, template, quantity, ctx.id);
+      refs.push(...result.npcs.map((n): Ref => ({ kind: "npc", id: n.id })));
+      next = result.combat;
+    }
+    return next;
   });
   return refs;
 }

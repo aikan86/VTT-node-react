@@ -1,4 +1,4 @@
-import { cellToPx, pxToCell, snapPxToCell, type Background, type Grid, type Point, type Ref, type Scene } from "@vtt/shared";
+import { cellToPx, METERS_PER_FOOT, pxToCell, snapPxToCell, type Background, type Grid, type Point, type Ref, type Scene } from "@vtt/shared";
 import { CLOSE_TRACE_SCREEN_PX } from "./types";
 
 export interface Bounds {
@@ -22,7 +22,7 @@ export function backgroundBounds(bg: Background): Bounds {
 
 const EMPTY_AREA_CELLS = { cols: 30, rows: 20 };
 
-/** Area occupata dal contenuto della scena (immagine, token, elementi, ostacoli alla vista, effetti, disegni), per "Adatta". */
+/** Area occupata dal contenuto della scena (immagine, token, elementi, oggetti, ostacoli alla vista, effetti, disegni), per "Adatta". */
 export function contentBounds(scene: Scene, sizeOf: (ref: Ref) => number = () => 1): Bounds {
   const g = scene.grid;
   const boxes: Bounds[] = [];
@@ -38,6 +38,7 @@ export function contentBounds(scene: Scene, sizeOf: (ref: Ref) => number = () =>
     boxes.push(cellBox(t.x, t.y, size, size));
   }
   for (const el of scene.elements) boxes.push(cellBox(el.x, el.y, el.w, el.h));
+  for (const o of scene.objects) boxes.push(cellBox(o.x, o.y, o.w, o.h));
   const pointsBox = (points: number[]) => {
     const xs = points.filter((_, i) => i % 2 === 0);
     const ys = points.filter((_, i) => i % 2 === 1);
@@ -176,8 +177,7 @@ export function withBackgroundGeometry(scene: Scene, next: Pick<Background, "ima
   return { ...scene, background: { ...bg, x, y, widthPx, heightPx, rotation } };
 }
 
-/** Metri per piede secondo la convenzione di D&D: 5 ft = 1,5 m. */
-export const METERS_PER_FOOT = 0.3;
+export { METERS_PER_FOOT };
 
 export type DistanceUnit = "cells" | "m" | "ft";
 

@@ -1,4 +1,5 @@
 import { CharacterCard } from "../features/party/CharacterCard";
+import { usePlayerLinkBase } from "../features/party/playerLinks";
 import styles from "../features/party/Party.module.css";
 import { usePartyStore } from "../store/partyStore";
 import { reportError } from "../store/statusStore";
@@ -6,6 +7,7 @@ import { reportError } from "../store/statusStore";
 export function PartyPage() {
   const characters = usePartyStore((s) => s.characters);
   const add = usePartyStore((s) => s.add);
+  const links = usePlayerLinkBase();
 
   return (
     <div className="page">
@@ -15,12 +17,17 @@ export function PartyPage() {
           + Nuovo PG
         </button>
       </div>
+      {characters.length > 0 && links.note && (
+        <p className={styles.note} role="note">
+          📱 {links.note}
+        </p>
+      )}
       {characters.length === 0 ? (
         <p className="empty">Nessun personaggio. Crea il primo membro del party con “Nuovo PG”.</p>
       ) : (
         <div className={styles.grid}>
           {characters.map((c) => (
-            <CharacterCard key={c.id} character={c} />
+            <CharacterCard key={c.id} character={c} linkBase={links.base} />
           ))}
         </div>
       )}
