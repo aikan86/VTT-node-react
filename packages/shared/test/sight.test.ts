@@ -170,3 +170,34 @@ describe("scene schema: lights and darkness", () => {
     expect(SceneSchema.safeParse({ ...s, tokens: [{ ...pc(0, 0), darkvisionFt: -10 }] }).success).toBe(false);
   });
 });
+
+describe("viewers and lights inside a shape that blocks the view", () => {
+  /** Porta chiusa nella cella (0, 0) e muro più in là (x = 20). */
+  const door = { id: "d", type: "door" as const, x: 0, y: 0, w: 1, h: 1, rotation: 0, color: "#000000" };
+
+  it("a PC standing in a closed doorway sees around it, still not through other walls", () => {
+    const sight = partySight(scene({ tokens: [pc(0, 0)], elements: [door, wall] }), size);
+    const [los] = sight.los;
+    expect(pointInPolygon({ x: 100, y: 5 }, los!)).toBe(true); // oltre la porta
+    expect(pointInPolygon({ x: 5, y: -100 }, los!)).toBe(true);
+    expect(pointInPolygon({ x: 300, y: 5 }, los!)).toBe(false); // dietro al muro
+  });
+
+  it("a PC centred on the edge of a wall is not blinded", () => {
+    // centro del PG (205, 5): sul bordo tra le celle 20 e 21, cioè dentro il muro largo 1
+    const edge = { ...wall, x: 20.5 };
+    const sight = partySight(scene({ tokens: [pc(20, 0)], elements: [edge] }), size);
+    expect(pointInPolygon({ x: 150, y: 5 }, sight.los[0]!)).toBe(true);
+  });
+
+  it("a light inside an obstacle lights its surroundings", () => {
+    const pillar = { id: "p", type: "obstacle" as const, x: 0, y: 0, w: 1, h: 1, rotation: 0, color: "#000000" };
+    const [area] = lightAreas(scene({ elements: [pillar], lights: [light(0.5, 0.5, 20, 0)] }));
+    expect(pointInPolygon({ x: 30, y: 5 }, area!.bright!)).toBe(true);
+  });
+
+  it("darkvision from a doorway is not blocked by the door itself", () => {
+    const sight = partySight(scene({ dark: true, tokens: [pc(0, 0, 60)], elements: [door] }), size);
+    expect(pointSeen({ x: 60, y: 5 }, sight)).toBe(true);
+  });
+});

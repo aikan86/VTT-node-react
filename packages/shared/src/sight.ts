@@ -1,8 +1,8 @@
 import { visibleCells, type PxBounds } from "./fog";
-import { feetToPx, type Point } from "./grid";
+import { cellToPx, feetToPx, type Point } from "./grid";
 import type { Ref } from "./schemas/common";
 import type { Grid, Light, Scene } from "./schemas/scene";
-import { pointInPolygon, sightSegments, visibilityPolygon, visionRadiusPx, type Segment } from "./visibility";
+import { pointInPolygon, polygonSegments, sightPolygons, visibilityPolygon, visionRadiusPx, type Segment } from "./visibility";
 
 /** Personaggio giocante che guarda: centro del token in pixel del mondo e scurovisione in piedi. */
 export interface Viewer {
@@ -35,7 +35,7 @@ export interface LightArea {
 }
 
 export function lightArea(light: Light, segments: Segment[], g: Pick<Grid, "cellPx" | "offsetX" | "offsetY" | "feetPerCell">): LightArea {
-  const center = { x: g.offsetX + light.x * g.cellPx, y: g.offsetY + light.y * g.cellPx };
+  const center = cellToPx(light, g);
   const brightPx = feetToPx(light.brightFt, g);
   const outerPx = feetToPx(light.brightFt + light.dimFt, g);
   return {
@@ -47,9 +47,15 @@ export function lightArea(light: Light, segments: Segment[], g: Pick<Grid, "cell
   };
 }
 
-/** Le aree di tutte le luci della scena che illuminano qualcosa. */
-export function lightAreas(scene: Pick<Scene, "lights" | "grid" | "elements" | "sightBlockers" | "objects">, segments = sightSegments(scene)): LightArea[] {
-  return scene.lights.filter((l) => l.brightFt + l.dimFt > 0).map((l) => lightArea(l, segments, scene.grid));
+/**
+ * Le aree di tutte le luci della scena che illuminano qualcosa. Come per i PG, una luce dentro una forma che blocca
+ * la vista (una torcia su una porta, un braciere in un ostacolo) ignora quella forma invece di restarci chiusa.
+ */
+export function lightAreas(scene: Pick<Scene, "lights" | "grid" | "elements" | "sightBlockers" | "objects">, polygons = sightPolygons(scene)): LightArea[] {
+  const g = scene.grid;
+  return scene.lights
+    .filter((l) => l.brightFt + l.dimFt > 0)
+    .map((l) => lightArea(l, polygonSegments(polygons, cellToPx(l, g)), g));
 }
 
 /**
@@ -72,15 +78,17 @@ export function partySight(scene: Scene, sizeOf: (ref: Ref) => number | undefine
   if (!scene.vision.enabled) return NO_SIGHT;
   const viewers = partyViewers(scene, sizeOf);
   if (viewers.length === 0) return NO_SIGHT;
-  const segments = sightSegments(scene);
+  const polygons = sightPolygons(scene);
+  // chi sta su una porta o dentro un ostacolo non resta chiuso nella forma: ogni PG ha i suoi segmenti
+  const segments = viewers.map((v) => polygonSegments(polygons, v.origin));
   const radius = visionRadiusPx(scene.vision, scene.grid);
-  const los = viewers.map((v) => visibilityPolygon(v.origin, segments, radius));
+  const los = viewers.map((v, i) => visibilityPolygon(v.origin, segments[i]!, radius));
   if (!scene.dark) return { los, dark: null };
 
-  const areas = lightAreas(scene, segments);
-  const darkvision = viewers
-    .filter((v) => v.darkvisionFt > 0)
-    .map((v) => visibilityPolygon(v.origin, segments, Math.min(radius, feetToPx(v.darkvisionFt, scene.grid))));
+  const areas = lightAreas(scene, polygons);
+  const darkvision = viewers.flatMap((v, i) =>
+    v.darkvisionFt > 0 ? [visibilityPolygon(v.origin, segments[i]!, Math.min(radius, feetToPx(v.darkvisionFt, scene.grid)))] : [],
+  );
   return {
     los,
     dark: {

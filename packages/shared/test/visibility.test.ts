@@ -30,6 +30,13 @@ describe("visibilityPolygon", () => {
     expect(pointInPolygon({ x: -160, y: 0 }, poly)).toBe(false);
   });
 
+  it("is not blinded when the origin lies exactly on a segment", () => {
+    const poly = visibilityPolygon({ x: 100, y: 0 }, [wall], 200);
+    expect(pointInPolygon({ x: 50, y: 0 }, poly)).toBe(true);
+    expect(pointInPolygon({ x: 100, y: -150 }, poly)).toBe(true);
+    expect(pointInPolygon({ x: 100, y: 150 }, poly)).toBe(true);
+  });
+
   it("ignores segments that are out of range", () => {
     const far: Segment = { a: { x: 1000, y: -50 }, b: { x: 1000, y: 50 } };
     const poly = visibilityPolygon(origin, [far], 200);
@@ -70,6 +77,34 @@ describe("sightSegments", () => {
       { id: "t", type: "difficult", x: 10, y: 0, w: 3, h: 3, ...base },
     ];
     expect(sightSegments(s)).toHaveLength(12);
+  });
+
+  it("lets the view through open doors", () => {
+    const s = scene();
+    s.elements = [{ id: "d", type: "door", x: 0, y: 0, w: 1, h: 1, rotation: 0, color: "#000000", open: true }];
+    expect(sightSegments(s)).toHaveLength(0);
+  });
+
+  it("skips the shapes that contain the viewer", () => {
+    const s = scene();
+    const base = { rotation: 0, color: "#000000" };
+    s.elements = [
+      { id: "d", type: "door", x: 0, y: 0, w: 1, h: 1, ...base },
+      { id: "w", type: "wall", x: 3, y: 0, w: 1, h: 1, ...base },
+    ];
+    expect(sightSegments(s, { x: 25, y: 25 })).toHaveLength(4); // solo il muro
+    const poly = visibilityPolygon({ x: 25, y: 25 }, sightSegments(s, { x: 25, y: 25 }), 500);
+    expect(pointInPolygon({ x: 25, y: 120 }, poly)).toBe(true); // fuori dalla porta
+    expect(pointInPolygon({ x: 300, y: 25 }, poly)).toBe(false); // dietro al muro
+  });
+
+  it("skips traced shapes and scenery objects that contain the viewer", () => {
+    const s = scene();
+    s.sightBlockers = [{ id: "b", points: [0, 0, 2, 0, 2, 2, 0, 2] }];
+    s.objects = [{ id: "o", kind: "house", x: 5, y: 0, w: 2, h: 2, rotation: 0, color: "#9b3b2e", blocksSight: true }];
+    expect(sightSegments(s)).toHaveLength(8);
+    expect(sightSegments(s, { x: 50, y: 50 })).toHaveLength(4); // dentro il tracciato
+    expect(sightSegments(s, { x: 300, y: 50 })).toHaveLength(4); // dentro la casa
   });
 
   it("rotates rectangles around their top-left corner", () => {

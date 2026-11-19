@@ -1,4 +1,4 @@
-import { feetToPx, type Point } from "./grid";
+import { cellToPx, feetToPx, type Point } from "./grid";
 import type { MapElement, Scene } from "./schemas/scene";
 
 export interface Segment {
@@ -27,33 +27,50 @@ export function visionRadiusPx(vision: { radiusFt: number }, grid: { feetPerCell
   return vision.radiusFt > 0 ? feetToPx(vision.radiusFt, grid) : UNLIMITED_VISION_PX;
 }
 
+type SightScene = Pick<Scene, "elements" | "sightBlockers" | "objects" | "grid">;
+
 /**
- * Segmenti che bloccano la vista, in pixel del mondo: i lati degli elementi rettangolari (muri, porte chiuse, ostacoli),
- * degli oggetti dello sfondo che la bloccano (ruotati attorno al loro angolo in alto a sinistra come sulla mappa)
- * e i poligoni tracciati a mano.
+ * Forme che bloccano la vista, come vertici in pixel del mondo: gli elementi rettangolari (muri, porte chiuse,
+ * ostacoli), gli oggetti dello sfondo che la bloccano (ruotati attorno al loro angolo in alto a sinistra come
+ * sulla mappa) e i poligoni tracciati a mano.
  */
-export function sightSegments(scene: Pick<Scene, "elements" | "sightBlockers" | "objects" | "grid">): Segment[] {
+export function sightPolygons(scene: SightScene): Point[][] {
   const g = scene.grid;
-  const segments: Segment[] = [];
-  const addPolygon = (corners: Point[]) => {
-    corners.forEach((a, i) => segments.push({ a, b: corners[(i + 1) % corners.length]! }));
-  };
+  const polygons: Point[][] = [];
 
   for (const blocker of scene.sightBlockers) {
     const corners: Point[] = [];
     for (let i = 0; i + 1 < blocker.points.length; i += 2) {
-      corners.push({ x: g.offsetX + blocker.points[i]! * g.cellPx, y: g.offsetY + blocker.points[i + 1]! * g.cellPx });
+      corners.push(cellToPx({ x: blocker.points[i]!, y: blocker.points[i + 1]! }, g));
     }
-    if (corners.length >= 3) addPolygon(corners);
+    if (corners.length >= 3) polygons.push(corners);
   }
 
   for (const el of scene.elements) {
-    if (elementBlocksSight(el)) addPolygon(rectCorners(el, g));
+    if (elementBlocksSight(el)) polygons.push(rectCorners(el, g));
   }
   for (const o of scene.objects) {
-    if (o.blocksSight) addPolygon(rectCorners(o, g));
+    if (o.blocksSight) polygons.push(rectCorners(o, g));
+  }
+  return polygons;
+}
+
+/**
+ * Lati delle forme come segmenti. Con `viewer`, le forme che lo contengono vengono saltate: un personaggio
+ * fermo su una porta o dentro un ostacolo vede intorno a sé invece di restare chiuso nel rettangolo.
+ */
+export function polygonSegments(polygons: Point[][], viewer?: Point): Segment[] {
+  const segments: Segment[] = [];
+  for (const corners of polygons) {
+    if (viewer && pointInPolygon(viewer, corners.flatMap((c) => [c.x, c.y]))) continue;
+    corners.forEach((a, i) => segments.push({ a, b: corners[(i + 1) % corners.length]! }));
   }
   return segments;
+}
+
+/** Segmenti che bloccano la vista (vedi `sightPolygons` e `polygonSegments`). */
+export function sightSegments(scene: SightScene, viewer?: Point): Segment[] {
+  return polygonSegments(sightPolygons(scene), viewer);
 }
 
 /** Vertici in pixel del mondo di un rettangolo in celle, ruotato attorno al suo angolo in alto a sinistra (come sulla mappa). */
@@ -64,11 +81,14 @@ export function rectCorners(
   const rad = (r.rotation * Math.PI) / 180;
   const cos = Math.cos(rad);
   const sin = Math.sin(rad);
-  const origin = { x: g.offsetX + r.x * g.cellPx, y: g.offsetY + r.y * g.cellPx };
+  const origin = cellToPx(r, g);
   const u = { x: cos * r.w * g.cellPx, y: sin * r.w * g.cellPx };
   const v = { x: -sin * r.h * g.cellPx, y: cos * r.h * g.cellPx };
   return [origin, { x: origin.x + u.x, y: origin.y + u.y }, { x: origin.x + u.x + v.x, y: origin.y + u.y + v.y }, { x: origin.x + v.x, y: origin.y + v.y }];
 }
+
+/** Sotto questa distanza (pixel del mondo) un incontro col segmento si considera alla partenza del raggio e si ignora. */
+const MIN_HIT_DISTANCE = 1e-6;
 
 /** Distanza lungo il raggio (origine `o`, direzione `dx, dy`) a cui incontra il segmento; null se non lo incontra. */
 function rayHit(o: Point, dx: number, dy: number, s: Segment): number | null {
@@ -80,7 +100,8 @@ function rayHit(o: Point, dx: number, dy: number, s: Segment): number | null {
   const ay = s.a.y - o.y;
   const t = (ax * sy - ay * sx) / denom;
   const u = (ax * dy - ay * dx) / denom;
-  if (t < 0 || u < -1e-9 || u > 1 + 1e-9) return null;
+  // t ≈ 0: l'origine sta sul segmento (es. un token centrato sul bordo di un muro); non deve accecare il raggio
+  if (t <= MIN_HIT_DISTANCE || u < -1e-9 || u > 1 + 1e-9) return null;
   return t;
 }
 
