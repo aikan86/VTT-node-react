@@ -1,4 +1,4 @@
-import { DEFAULT_LIGHT, ELEMENT_COLORS, ELEMENT_LABELS, ELEMENT_TYPES, type Light, type MapElement, type SightBlocker, type Vision } from "@vtt/shared";
+import { DEFAULT_LIGHT, ELEMENT_COLORS, ELEMENT_LABELS, ELEMENT_TYPES, MAX_SIGHT_BLOCKER_VERTICES, type Light, type MapElement, type SightBlocker, type Vision } from "@vtt/shared";
 import { NumberInput } from "../../../components/NumberInput";
 import { SIGHT_COLOR, type ElementTool } from "../types";
 import styles from "../Battlefield.module.css";
@@ -120,6 +120,9 @@ export function ElementsPanel({
                 </button>
                 <button onClick={onCancelTrace}>Annulla forma</button>
               </div>
+            )}
+            {tracePoints >= MAX_SIGHT_BLOCKER_VERTICES && (
+              <p className={styles.callout}>Raggiunto il massimo di {MAX_SIGHT_BLOCKER_VERTICES} punti: chiudi la forma.</p>
             )}
           </>
         ) : (

@@ -7,6 +7,7 @@ import {
   DEFAULT_SPEED_FT,
   movementRange,
   ELEMENT_COLORS,
+  MAX_SIGHT_BLOCKER_VERTICES,
   OBJECT_DEFAULTS,
   resetExplored,
   sameRef,
@@ -23,7 +24,7 @@ import {
 } from "@vtt/shared";
 import { BattleStage } from "../features/battlefield/BattleStage";
 import { isTyping, useUndoShortcuts } from "../features/battlefield/hooks";
-import { calibrateBackground, contentBounds, pxPointsToCells, snapTo, withBackgroundGeometry } from "../features/battlefield/geometry";
+import { appendVertex, calibrateBackground, contentBounds, pxPointsToCells, snapTo, withBackgroundGeometry } from "../features/battlefield/geometry";
 import { usePartySight } from "../features/battlefield/vision";
 import { BackgroundPanel } from "../features/battlefield/panels/BackgroundPanel";
 import { CalibrationDialog } from "../features/battlefield/panels/CalibrationDialog";
@@ -499,7 +500,7 @@ function Battlefield({ scene }: { scene: Scene }) {
           onElementChange={(el) => replace("elements", el)}
           onObjectChange={(o) => replace("objects", o)}
           tracePoints={trace}
-          onTracePoint={(p) => setTrace((t) => (t.length > 0 && Math.hypot(p.x - t[t.length - 1]!.x, p.y - t[t.length - 1]!.y) < 1 ? t : [...t, p]))}
+          onTracePoint={(p) => setTrace((t) => appendVertex(t, p, 1, MAX_SIGHT_BLOCKER_VERTICES))}
           onTraceClose={closeTrace}
           onBlockerChange={(b) => replace("sightBlockers", b)}
           onBackgroundChange={(bg) => update((s) => withBackgroundGeometry(s, bg))}

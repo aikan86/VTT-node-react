@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BackgroundSchema, GridSchema, SceneSchema, newScene } from "@vtt/shared";
-import { appendPoint, backgroundBounds, backgroundFromNode, calibrateBackground, cellLengthIn, cellPointsToPx, closesTrace, contentBounds, gridLines, pxPointsToCells, snapAngle, translatePoints } from "./geometry";
+import { appendPoint, appendVertex, backgroundBounds, backgroundFromNode, calibrateBackground, cellLengthIn, cellPointsToPx, closesTrace, contentBounds, gridLines, pxPointsToCells, snapAngle, translatePoints } from "./geometry";
 
 const bg = (patch = {}) => BackgroundSchema.parse({ imageUrl: "/uploads/a.png", widthPx: 200, heightPx: 100, ...patch });
 
@@ -207,6 +207,13 @@ describe("contentBounds with scenery objects", () => {
 
 describe("trace helpers", () => {
   const square = [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }];
+
+  it("appends vertices that are far enough from the last one, up to a maximum", () => {
+    expect(appendVertex([], { x: 0, y: 0 }, 1, 3)).toEqual([{ x: 0, y: 0 }]);
+    const near = [{ x: 0, y: 0 }];
+    expect(appendVertex(near, { x: 0.5, y: 0 }, 1, 3)).toBe(near);
+    expect(appendVertex(square, { x: 0, y: 100 }, 1, 3)).toBe(square);
+  });
 
   it("closes the shape near the first vertex (in screen pixels) once it has three vertices", () => {
     expect(closesTrace(square, { x: 8, y: 0 }, 1)).toBe(true);
