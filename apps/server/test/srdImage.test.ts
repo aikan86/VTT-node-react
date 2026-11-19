@@ -90,4 +90,48 @@ describe("/api/srd-image/:index", () => {
     expect((await app.inject({ method: "GET", url: "/api/srd-image/Goblin" })).statusCode).toBe(400);
     expect(html).not.toHaveBeenCalled();
   });
+
+  it("stops downloading an illustration as soon as it exceeds the size limit", async () => {
+    const MiB = 1024 * 1024;
+    let pulled = 0;
+    /** Immagine da 50 MiB servita a pezzi da 1 MiB, senza dichiararne la dimensione. */
+    const huge = () =>
+      new ReadableStream<Uint8Array>({
+        pull(controller) {
+          if (pulled >= 50) return controller.close();
+          pulled++;
+          controller.enqueue(new Uint8Array(MiB));
+        },
+      });
+    const big = vi.fn<FetchLike>(async (url) =>
+      url.includes("/images/") ? new Response(huge(), { headers: { "content-type": "image/png" } }) : Response.json({ image: "/api/images/monsters/x.png" }),
+    );
+    await start(big);
+    const res = await app.inject({ method: "GET", url: "/api/srd-image/goblin" });
+    expect(res.statusCode).toBe(502);
+    expect(res.json().error).toMatch(/troppo grande/);
+    expect(pulled).toBeLessThanOrEqual(8); // 5 MiB di limite + qualche pezzo già in coda
+    expect(existsSync(join(uploadsDir, "srd-goblin.png"))).toBe(false);
+  });
+
+  it("refuses an illustration that declares a size over the limit without reading it", async () => {
+    let read = false;
+    const body = new ReadableStream<Uint8Array>(
+      {
+        pull() {
+          read = true;
+        },
+      },
+      { highWaterMark: 0 }, // niente lettura anticipata: pull solo se qualcuno legge
+    );
+    await start(async (url) =>
+      url.includes("/images/")
+        ? new Response(body, { headers: { "content-type": "image/png", "content-length": String(100 * 1024 * 1024) } })
+        : Response.json({ image: "/api/images/monsters/x.png" }),
+    );
+    const res = await app.inject({ method: "GET", url: "/api/srd-image/goblin" });
+    expect(res.statusCode).toBe(502);
+    expect(res.json().error).toMatch(/troppo grande/);
+    expect(read).toBe(false);
+  });
 });
