@@ -162,4 +162,19 @@ describe("/api/export + /api/import", () => {
     expect(res.statusCode).toBe(400);
     expect(existsSync(join(uploadsDir, "..", "evil.png"))).toBe(false);
   });
+
+  it("rejects handouts and scenery objects whose image is not an upload", async () => {
+    const { app } = source;
+    const exported = (await app.inject({ method: "GET", url: "/api/export" })).json();
+    const beacon = "https://tracker.example/pixel.png";
+    const handout = newHandout("Lettera", beacon);
+    const object = { id: "o", kind: "image", x: 0, y: 0, w: 2, h: 2, rotation: 0, color: "#ffffff", imageUrl: beacon, blocksSight: false };
+
+    for (const payload of [{ ...exported, handouts: [handout] }, { ...exported, scenes: [{ ...newScene("Cripta"), objects: [object] }] }]) {
+      expect((await app.inject({ method: "POST", url: "/api/import", payload })).statusCode).toBe(400);
+    }
+    expect((await app.inject({ method: "POST", url: "/api/handouts", payload: handout })).statusCode).toBe(400);
+    const ok = newHandout("Lettera", "/uploads/letter.png");
+    expect((await app.inject({ method: "POST", url: "/api/handouts", payload: ok })).statusCode).toBe(201);
+  });
 });

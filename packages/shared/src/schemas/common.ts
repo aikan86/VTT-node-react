@@ -18,11 +18,14 @@ export type Ref = z.infer<typeof RefSchema>;
 /** Taglia in celle occupate per lato (1 = Media/Piccola, 2 = Grande, 3 = Enorme, 4 = Mastodontica). */
 export const SizeSchema = z.number().int().min(1).max(4);
 
-/** Immagine del token: un file caricato nel VTT (`/uploads/...`), mai un indirizzo esterno. */
-export const TokenImageSchema = z
-  .string()
-  .regex(/^\/uploads\/[\w-]{1,100}\.(png|jpg|webp|gif)$/, "Immagine caricata nel VTT")
-  .optional();
+/**
+ * Indirizzo di un'immagine caricata nel VTT (`/uploads/...`), mai un indirizzo esterno: i documenti arrivano anche
+ * da file d'importazione, e un URL arbitrario in `<img src>` caricherebbe risorse remote (beacon di tracciamento).
+ */
+export const UploadedImageUrlSchema = z.string().regex(/^\/uploads\/[\w-]{1,100}\.(png|jpg|webp|gif)$/, "Immagine caricata nel VTT");
+
+/** Immagine del token (facoltativa). */
+export const TokenImageSchema = UploadedImageUrlSchema.optional();
 
 export const ColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/, "Colore esadecimale #rrggbb");
 

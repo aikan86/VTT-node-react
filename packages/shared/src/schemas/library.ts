@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ColorSchema, IdSchema, SizeSchema, TokenImageSchema, createId } from "./common";
+import { ColorSchema, IdSchema, SizeSchema, TokenImageSchema, UploadedImageUrlSchema, createId } from "./common";
 
 /** Identificativo di un mostro nell'SRD 5e online: minuscole, cifre e trattini. */
 export const SrdIndexSchema = z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/).max(80);
@@ -9,7 +9,7 @@ export const HandoutSchema = z.object({
   id: IdSchema,
   title: z.string().trim().min(1).max(120),
   /** Indirizzo dell'immagine caricata (`/uploads/...`). */
-  imageUrl: z.string().min(1).max(500),
+  imageUrl: UploadedImageUrlSchema,
   /** Quando è stato mostrato ai giocatori; null = non mostrato. Se più d'uno, vale il più recente. */
   shownAt: z.iso.datetime().nullable(),
   createdAt: z.iso.datetime(),

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ColorSchema, IdSchema, RefSchema, createId } from "./common";
+import { ColorSchema, IdSchema, RefSchema, UploadedImageUrlSchema, createId } from "./common";
 
 export const LAYER_KEYS = ["background", "elements", "tokens", "effects"] as const;
 export type LayerKey = (typeof LAYER_KEYS)[number];
@@ -236,8 +236,8 @@ export const MapObjectSchema = z.object({
   rotation: z.number(),
   /** Colore principale (tetto, tela, pietra, chioma…); ignorato dalle immagini. */
   color: ColorSchema,
-  /** Solo per `kind: "image"`. */
-  imageUrl: z.string().min(1).optional(),
+  /** Solo per `kind: "image"`: immagine caricata nel VTT. */
+  imageUrl: UploadedImageUrlSchema.optional(),
   /** Ostacola la vista dei personaggi (approssimato al suo rettangolo). */
   blocksSight: z.boolean(),
   label: z.string().max(80).optional(),
