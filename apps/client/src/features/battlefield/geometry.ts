@@ -1,4 +1,5 @@
 import { cellToPx, METERS_PER_FOOT, pxToCell, snapPxToCell, type Background, type Grid, type Point, type Ref, type Scene } from "@vtt/shared";
+import { CLOSE_TRACE_SCREEN_PX } from "./types";
 
 export interface Bounds {
   minX: number;
@@ -143,6 +144,12 @@ export function appendPoint(points: number[], p: Point, minDist: number): number
   const [lastX, lastY] = points.slice(-2);
   if (lastX !== undefined && lastY !== undefined && Math.hypot(p.x - lastX, p.y - lastY) < minDist) return points;
   return [...points, p.x, p.y];
+}
+
+/** Un clic in `p` chiuderebbe la forma in tracciamento? (almeno 3 vertici e vicino al primo, in px sullo schermo) */
+export function closesTrace(trace: Point[], p: Point | null, viewScale: number): boolean {
+  const first = trace[0];
+  return trace.length >= 3 && p !== null && first !== undefined && Math.hypot(p.x - first.x, p.y - first.y) <= CLOSE_TRACE_SCREEN_PX / viewScale;
 }
 
 /** Arrotonda al multiplo di `step` più vicino. */

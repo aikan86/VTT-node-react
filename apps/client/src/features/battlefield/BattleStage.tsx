@@ -3,21 +3,21 @@ import { Stage } from "react-konva";
 import type Konva from "konva";
 import { cellCenter, ELEMENT_COLORS, pxToCell, type Light, type PartySight, type Background, type Drawing, type Effect, type LayerKey, type MapElement, type MapObject, type Point, type Ref, type Scene, type SightBlocker, type Token } from "@vtt/shared";
 import type { EntityResolver } from "../../store/entities";
-import { appendPoint, clamp, contentBounds, snapAngle } from "./geometry";
+import { appendPoint, clamp, closesTrace, contentBounds, snapAngle } from "./geometry";
 import { useElementSize, useKeyHeld } from "./hooks";
 import { BACKGROUND_ID, BackgroundLayer, GridLayer } from "./layers/BackgroundLayer";
 import { EffectsLayer } from "./layers/EffectsLayer";
 import { ElementsLayer } from "./layers/ElementsLayer";
 import { ObjectsLayer } from "./layers/ObjectsLayer";
 import { CalibrationLayer } from "./layers/CalibrationLayer";
-import { SightBlockersLayer } from "./layers/SightBlockersLayer";
+import { createHoverStore, SightBlockersLayer } from "./layers/SightBlockersLayer";
 import { VisionLayer } from "./layers/VisionLayer";
 import { TokensLayer } from "./layers/TokensLayer";
 import { LightsLayer } from "./layers/LightsLayer";
 import { MovementLayer, type MovementArea } from "./layers/MovementLayer";
 import { RulerLayer } from "./layers/RulerLayer";
 import { PcStartLayer } from "./layers/PcStartLayer";
-import { CLOSE_TRACE_SCREEN_PX, isRectTool, type DrawTool, type ElementTool, type Selection, type SketchDraft, type View } from "./types";
+import { isRectTool, type DrawTool, type ElementTool, type Selection, type SketchDraft, type View } from "./types";
 import styles from "./Battlefield.module.css";
 
 interface Props {
@@ -78,7 +78,7 @@ export function BattleStage(props: Props) {
   const [panning, setPanning] = useState(false);
   const [draw, setDraw] = useState<{ start: Point; end: Point } | null>(null);
   const [sketch, setSketch] = useState<SketchDraft | null>(null);
-  const [hover, setHover] = useState<Point | null>(null);
+  const [hover] = useState(createHoverStore);
   /** Misura del righello (pixel del mondo); `dragging` mentre il tasto è premuto. */
   const [ruler, setRuler] = useState<{ start: Point; end: Point; dragging: boolean } | null>(null);
   const fittedScene = useRef<string | null>(null);
@@ -182,7 +182,7 @@ export function BattleStage(props: Props) {
     }
     if (tracing) {
       const world = worldPointer(stage);
-      if (world) setHover(world);
+      if (world) hover.set(world);
     }
     if (draw) {
       const world = worldPointer(stage);
@@ -241,9 +241,7 @@ export function BattleStage(props: Props) {
     if (tracing) {
       const world = worldPointer(stage);
       if (!world) return;
-      const first = props.tracePoints[0];
-      const closing = first !== undefined && props.tracePoints.length >= 3 && Math.hypot(world.x - first.x, world.y - first.y) <= CLOSE_TRACE_SCREEN_PX / view.scale;
-      if (closing) props.onTraceClose();
+      if (closesTrace(props.tracePoints, world, view.scale)) props.onTraceClose();
       else props.onTracePoint(world);
       return;
     }
