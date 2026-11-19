@@ -201,3 +201,19 @@ describe("viewers and lights inside a shape that blocks the view", () => {
     expect(pointSeen({ x: 60, y: 5 }, sight)).toBe(true);
   });
 });
+
+describe("partySight performance", () => {
+  it("stays fast in a dark scene with many obstacles, lights and PCs with darkvision", () => {
+    let seed = 7;
+    const rnd = () => ((seed = (seed * 1664525 + 1013904223) % 2 ** 32), seed / 2 ** 32);
+    const s = scene({ dark: true });
+    s.grid = { ...s.grid, cellPx: 50 };
+    s.elements = Array.from({ length: 150 }, (_, i) => ({ id: `o${i}`, type: "obstacle" as const, x: Math.floor(rnd() * 80 - 40), y: Math.floor(rnd() * 80 - 40), w: 1, h: 1, rotation: 0, color: "#000000" }));
+    s.lights = Array.from({ length: 10 }, () => light(rnd() * 40 - 20, rnd() * 40 - 20, 20, 20));
+    s.tokens = Array.from({ length: 6 }, (_, i) => pc(i * 2 + 0.3, 0.3, 60));
+    // per ogni calcolo: 6 linee di vista + 6 scurovisioni + 2 poligoni per luce = 32 visibilityPolygon
+    const start = performance.now();
+    for (let k = 0; k < 5; k++) partySight(s, size);
+    expect(performance.now() - start).toBeLessThan(400);
+  });
+});

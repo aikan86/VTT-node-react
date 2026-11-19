@@ -124,18 +124,63 @@ const wrapAngle = (a: number) => {
   return r;
 };
 
+/** Spicchi angolari in cui si indicizzano i segmenti: ogni raggio controlla solo quelli del suo spicchio. */
+const ANGLE_BINS = 360;
+const BIN_WIDTH = (2 * Math.PI) / ANGLE_BINS;
+const binOf = (angle: number) => Math.min(ANGLE_BINS - 1, Math.max(0, Math.floor((angle + Math.PI) / BIN_WIDTH)));
+
+interface IndexedSegment {
+  segment: Segment;
+  /** Distanza minima dall'origine: nessun raggio può incontrarlo più vicino di così. */
+  distance: number;
+}
+
+/**
+ * Indice angolare dei segmenti visti da `origin`: per ogni spicchio, i segmenti che lo attraversano in ordine
+ * di distanza. Un segmento che non contiene l'origine la vede sotto un angolo minore di 180°, quindi
+ * occupa solo gli spicchi dell'arco più corto tra i suoi estremi (più uno di margine per lato).
+ */
+function angularIndex(origin: Point, near: IndexedSegment[]): IndexedSegment[][] {
+  const bins: IndexedSegment[][] = Array.from({ length: ANGLE_BINS }, () => []);
+  for (const item of near) {
+    const { a, b } = item.segment;
+    const a1 = Math.atan2(a.y - origin.y, a.x - origin.x);
+    const span = wrapAngle(Math.atan2(b.y - origin.y, b.x - origin.x) - a1);
+    const from = wrapAngle(span >= 0 ? a1 : a1 + span);
+    const first = binOf(from) - 1;
+    const count = Math.ceil(Math.abs(span) / BIN_WIDTH) + 3;
+    for (let k = 0; k < Math.min(count, ANGLE_BINS); k++) bins[(((first + k) % ANGLE_BINS) + ANGLE_BINS) % ANGLE_BINS]!.push(item);
+  }
+  return bins;
+}
+
 /**
  * Poligono visibile da `origin` a 360°, entro `radius`, ostacolato dai segmenti.
  * Si lanciano raggi verso gli estremi di ogni segmento (e poco prima/dopo, per vedere "oltre lo spigolo")
  * e a passo regolare; ogni raggio si ferma sul primo segmento o al raggio massimo.
+ * Per restare veloce con molti ostacoli, ogni raggio controlla solo i segmenti del suo spicchio angolare,
+ * dal più vicino, e si ferma appena i successivi non possono essere più vicini del punto già trovato.
  * Restituisce [x1, y1, x2, y2, ...] in ordine d'angolo.
  */
 export function visibilityPolygon(origin: Point, segments: Segment[], radius: number): number[] {
-  const near = segments.filter((s) => distanceToSegment(origin, s) <= radius);
+  const near: IndexedSegment[] = [];
+  for (const segment of segments) {
+    const distance = distanceToSegment(origin, segment);
+    // sul segmento (distanza ≈ 0) nessun raggio lo incontra a t > 0: si salta
+    if (distance <= radius && distance > MIN_HIT_DISTANCE) near.push({ segment, distance });
+  }
+  near.sort((x, y) => x.distance - y.distance);
+  const bins = angularIndex(origin, near);
+
   const angles: number[] = [];
   for (let i = 0; i < ARC_RAYS; i++) angles.push(wrapAngle((i / ARC_RAYS) * 2 * Math.PI));
-  for (const s of near) {
-    for (const p of [s.a, s.b]) {
+  // i vertici condivisi da più segmenti (gli spigoli delle forme) generano raggi una sola volta
+  const corners = new Set<string>();
+  for (const { segment } of near) {
+    for (const p of [segment.a, segment.b]) {
+      const key = `${p.x},${p.y}`;
+      if (corners.has(key)) continue;
+      corners.add(key);
       const angle = Math.atan2(p.y - origin.y, p.x - origin.x);
       angles.push(wrapAngle(angle - EPSILON_RAD), angle, wrapAngle(angle + EPSILON_RAD));
     }
@@ -147,8 +192,9 @@ export function visibilityPolygon(origin: Point, segments: Segment[], radius: nu
     const dx = Math.cos(angle);
     const dy = Math.sin(angle);
     let reach = radius;
-    for (const s of near) {
-      const hit = rayHit(origin, dx, dy, s);
+    for (const { segment, distance } of bins[binOf(angle)]!) {
+      if (distance >= reach) break;
+      const hit = rayHit(origin, dx, dy, segment);
       if (hit !== null && hit < reach) reach = hit;
     }
     points.push(origin.x + dx * reach, origin.y + dy * reach);
