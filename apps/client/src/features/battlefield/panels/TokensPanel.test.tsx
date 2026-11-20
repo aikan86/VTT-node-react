@@ -128,6 +128,31 @@ describe("TokensPanel", () => {
     expect(items[0]).not.toHaveAttribute("aria-current");
   });
 
+  it("shows the initiative notes in a tooltip while hovering the row", async () => {
+    const combatants = [
+      { id: "c1", ref: { kind: "pc" as const, id: "pc-a" }, roll: 15, acted: false, order: 0, notes: "2 round di velocità" },
+      { id: "c2", ref: { kind: "pc" as const, id: "pc-b" }, roll: 10, acted: false, order: 1, notes: "  " },
+    ];
+    useCombatStore.getState().hydrate({ rev: 1, data: { ...emptyCombat(), combatants } });
+    renderPanel(sceneWithAria());
+    const [ariaRow, borinRow] = within(screen.getByRole("list", { name: "Personaggi" })).getAllByRole("listitem");
+    const user = userEvent.setup();
+
+    await user.hover(ariaRow!);
+    const tip = screen.getByRole("tooltip");
+    expect(tip).toHaveTextContent("Aria");
+    expect(tip).toHaveTextContent("2 round di velocità");
+    expect(ariaRow).toHaveAttribute("aria-describedby", tip.id);
+
+    await user.unhover(ariaRow!);
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+
+    // note vuote: nessun tooltip, resta il title nativo col nome
+    await user.hover(borinRow!);
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+    expect(within(borinRow!).getByTestId("entity-name")).toHaveAttribute("title", "Borin");
+  });
+
   it("highlights nobody when combat is not running", () => {
     const combatants = [{ id: "c1", ref: { kind: "pc" as const, id: "pc-a" }, roll: 15, acted: false, order: 0, notes: "" }];
     useCombatStore.getState().hydrate({ rev: 1, data: { ...emptyCombat(), currentId: "c1", combatants } });
