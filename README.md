@@ -28,7 +28,7 @@ Altre variabili: `PORT` (3001), `HOST` (127.0.0.1).
 
 ## Deploy locale (separato dallo sviluppo)
 
-Un'istanza "stabile" su **http://127.0.0.1:8080**, indipendente da `pnpm dev` (3001/5173): codice e dati propri.
+Un'istanza "stabile" sulla porta **8080**, indipendente da `pnpm dev` (3001/5173): codice e dati propri. È raggiungibile da questo Mac (http://127.0.0.1:8080) e dai dispositivi della rete locale: `start` e `status` stampano gli indirizzi da dare ai giocatori.
 
 ```bash
 pnpm release        # pubblica l'ULTIMO COMMIT: test + build, sostituisce la release e riavvia
@@ -39,7 +39,8 @@ pnpm prod logs      # segue il log
 
 - Si pubblica solo ciò che è committato: le modifiche in corso in sviluppo non finiscono nel deploy.
 - Tutto sta in `~/Library/Application Support/VTT/`: `app/` (release attuale), `app.prev/` (precedente, ripristinata in automatico se l'avvio fallisce), `data/` (database e immagini, mai toccati dalle release), `vtt.log`.
-- Variabili opzionali: `VTT_PORT`, `VTT_HOST`, `VTT_HOME`.
+- Variabili opzionali: `VTT_PORT`, `VTT_HOST` (default `0.0.0.0`, tutta la rete locale; `127.0.0.1` per tenerla solo su questo Mac), `VTT_HOME`.
+- Al primo avvio macOS può chiedere se consentire a `node` le connessioni in entrata: va accettato, altrimenti il firewall blocca i dispositivi in rete.
 - L'istanza non riparte da sola dopo un riavvio del Mac: `pnpm prod start`.
 
 ## Più tab, sincronizzazione e cronologia

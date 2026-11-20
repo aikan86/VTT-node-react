@@ -9,8 +9,24 @@ DATA_DIR="$VTT_HOME/data"
 LOG_FILE="$VTT_HOME/vtt.log"
 PID_FILE="$VTT_HOME/vtt.pid"
 PORT="${VTT_PORT:-8080}"
-HOST="${VTT_HOST:-127.0.0.1}"
-URL="http://$HOST:$PORT"
+# In ascolto su tutte le interfacce: i dispositivi della rete locale (telefoni, tablet dei giocatori) si collegano.
+# VTT_HOST=127.0.0.1 per tenerla solo su questo Mac.
+HOST="${VTT_HOST:-0.0.0.0}"
+# I controlli di salute passano sempre dal loopback, qualunque sia l'interfaccia di ascolto.
+URL="http://127.0.0.1:$PORT"
+
+# Indirizzi da cui la raggiungono gli altri dispositivi (vuoto se ascolta solo in locale o il Mac non è in rete).
+lan_urls() {
+  [[ "$HOST" == "127.0.0.1" || "$HOST" == "localhost" || "$HOST" == "::1" ]] && return 0
+  if [[ "$HOST" != "0.0.0.0" && "$HOST" != "::" ]]; then echo "http://$HOST:$PORT"; return 0; fi
+  ifconfig 2>/dev/null | awk '/inet / && $2 != "127.0.0.1" && $2 !~ /^169\.254\./ { print "http://" $2 ":'"$PORT"'" }'
+}
+
+print_lan_urls() {
+  local urls
+  urls="$(lan_urls)"
+  if [[ -n "$urls" ]]; then echo "In rete locale:"; sed 's/^/  /' <<<"$urls"; fi
+}
 
 running_pid() {
   [[ -f "$PID_FILE" ]] || return 1
@@ -34,7 +50,7 @@ start() {
     echo $! >"$PID_FILE"
   )
   for _ in $(seq 1 40); do
-    if curl -sf "$URL/api/combat" >/dev/null 2>&1; then echo "VTT avviato su $URL (pid $(cat "$PID_FILE"))"; return 0; fi
+    if curl -sf "$URL/api/combat" >/dev/null 2>&1; then echo "VTT avviato su $URL (pid $(cat "$PID_FILE"))"; print_lan_urls; return 0; fi
     if ! running_pid >/dev/null; then break; fi
     sleep 0.25
   done
@@ -60,7 +76,7 @@ stop() {
 status() {
   local pid
   if pid="$(running_pid)"; then
-    if curl -sf "$URL/api/combat" >/dev/null 2>&1; then echo "In esecuzione (pid $pid) su $URL"; else echo "Processo attivo (pid $pid) ma $URL non risponde"; fi
+    if curl -sf "$URL/api/combat" >/dev/null 2>&1; then echo "In esecuzione (pid $pid) su $URL"; print_lan_urls; else echo "Processo attivo (pid $pid) ma $URL non risponde"; fi
   else
     echo "Fermo."
   fi
