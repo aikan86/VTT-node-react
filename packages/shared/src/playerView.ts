@@ -1,12 +1,34 @@
 import { sameRef, type Ref } from "./schemas/common";
 import type { Combat, Combatant } from "./schemas/combat";
-import type { Scene, Token } from "./schemas/scene";
+import type { MapElement, Scene, Token } from "./schemas/scene";
 import type { Point } from "./grid";
 import { sortCombatants, type ModLookup } from "./initiative";
 
-/** La scena come la vedono i giocatori: senza i token nascosti dal master. */
+/** Una trappola non ancora scoperta: la vede solo il master. */
+export function isHiddenTrap(el: Pick<MapElement, "type" | "revealed">): boolean {
+  return el.type === "trap" && !el.revealed;
+}
+
+/** Trappola come la vedono i giocatori: senza CD e note del master. */
+function playerTrap(el: MapElement): MapElement {
+  if (el.dc === undefined && el.notes === undefined) return el;
+  const { dc: _dc, notes: _notes, ...rest } = el;
+  return rest;
+}
+
+/**
+ * La scena come la vedono i giocatori: senza i token nascosti dal master e senza le trappole non ancora scoperte
+ * (di quelle scoperte non vedono CD e note).
+ */
 export function playerScene(scene: Scene): Scene {
-  return scene.tokens.some((t) => t.hidden) ? { ...scene, tokens: scene.tokens.filter((t) => !t.hidden) } : scene;
+  const hiddenTokens = scene.tokens.some((t) => t.hidden);
+  const traps = scene.elements.some((el) => el.type === "trap");
+  if (!hiddenTokens && !traps) return scene;
+  return {
+    ...scene,
+    tokens: hiddenTokens ? scene.tokens.filter((t) => !t.hidden) : scene.tokens,
+    elements: traps ? scene.elements.filter((el) => !isHiddenTrap(el)).map((el) => (el.type === "trap" ? playerTrap(el) : el)) : scene.elements,
+  };
 }
 
 /**

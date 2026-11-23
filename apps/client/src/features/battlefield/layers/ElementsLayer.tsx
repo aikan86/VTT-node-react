@@ -24,6 +24,11 @@ const setCursor = (e: Konva.KonvaEventObject<MouseEvent>, cursor: string) => {
 
 function styleOf(el: MapElement) {
   switch (el.type) {
+    case "trap":
+      // nascosta: tratteggiata e tenue (la vede solo il master); scoperta: bordo pieno
+      return el.revealed
+        ? { fill: el.color, opacity: 0.45, stroke: el.color, strokeWidth: 3 }
+        : { fill: el.color, opacity: 0.2, stroke: el.color, dash: [4, 4], strokeWidth: 2 };
     case "difficult":
       return { fill: el.color, opacity: 0.35, stroke: el.color, dash: [6, 4], strokeWidth: 2 };
     case "door":
@@ -84,9 +89,9 @@ export function ElementsLayer({ scene, listening, editable, selectedId, draft, o
             }}
           >
             <Rect width={w} height={h} {...styleOf(el)} />
-            {el.label && (
+            {(el.label || el.type === "trap") && (
               <Text
-                text={el.label}
+                text={el.type === "trap" ? `⚠${el.label ? ` ${el.label}` : ""}` : el.label!}
                 width={w}
                 height={h}
                 align="center"

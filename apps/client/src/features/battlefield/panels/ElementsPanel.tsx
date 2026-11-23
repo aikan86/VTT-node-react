@@ -125,6 +125,10 @@ export function ElementsPanel({
               <p className={styles.callout}>Raggiunto il massimo di {MAX_SIGHT_BLOCKER_VERTICES} punti: chiudi la forma.</p>
             )}
           </>
+        ) : tool === "trap" ? (
+          <p className={styles.callout}>
+            Trascina sulla mappa per piazzare una trappola. Resta nascosta ai giocatori finché non la segni come scoperta; CD e note le vedi solo tu.
+          </p>
         ) : (
           tool !== "select" && <p className={styles.callout}>Trascina sulla mappa per disegnare: {ELEMENT_LABELS[tool].toLowerCase()}.</p>
         )}
@@ -140,7 +144,15 @@ export function ElementsPanel({
                 value={selected.type}
                 onChange={(e) => {
                   const type = e.target.value as MapElement["type"];
-                  onChange({ ...selected, type, color: ELEMENT_COLORS[type], open: type === "door" ? selected.open : undefined });
+                  onChange({
+                    ...selected,
+                    type,
+                    color: ELEMENT_COLORS[type],
+                    open: type === "door" ? selected.open : undefined,
+                    revealed: type === "trap" ? selected.revealed : undefined,
+                    dc: type === "trap" ? selected.dc : undefined,
+                    notes: type === "trap" ? selected.notes : undefined,
+                  });
                 }}
               >
                 {ELEMENT_TYPES.map((t) => (
@@ -167,6 +179,30 @@ export function ElementsPanel({
               <span className="muted" style={{ fontSize: "0.8rem" }}>
                 {selected.open ? "Aperta: non blocca la vista." : "Chiusa: blocca la vista."} Dagli altri livelli basta un click sulla porta.
               </span>
+            </>
+          )}
+          {selected.type === "trap" && (
+            <>
+              <label className="row" style={{ flexWrap: "nowrap" }}>
+                <input type="checkbox" checked={!!selected.revealed} onChange={(e) => onChange({ ...selected, revealed: e.target.checked || undefined })} />
+                Scoperta: visibile ai giocatori
+              </label>
+              <span className="muted" style={{ fontSize: "0.8rem" }}>
+                {selected.revealed ? "I giocatori la vedono sulla mappa (senza CD e note)." : "Nascosta: la vedi solo tu, tratteggiata."}
+              </span>
+              <label className="field">
+                CD
+                <NumberInput value={selected.dc ?? null} min={0} max={40} allowEmpty onChange={(v) => onChange({ ...selected, dc: v ?? undefined })} />
+              </label>
+              <label className="field">
+                Note (effetto, danni, innesco)
+                <textarea
+                  rows={3}
+                  maxLength={500}
+                  value={selected.notes ?? ""}
+                  onChange={(e) => onChange({ ...selected, notes: e.target.value || undefined })}
+                />
+              </label>
             </>
           )}
           <span className="muted" style={{ fontSize: "0.8rem" }}>

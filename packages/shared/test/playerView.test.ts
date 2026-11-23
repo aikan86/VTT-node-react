@@ -41,6 +41,26 @@ describe("playerScene", () => {
   });
 });
 
+describe("playerScene traps", () => {
+  const trap = (id: string, extra: Record<string, unknown> = {}) => ({ id, type: "trap" as const, x: 0, y: 0, w: 1, h: 1, rotation: 0, color: "#dc2626", ...extra });
+
+  it("hides traps until they are revealed and strips the master's DC and notes", () => {
+    const scene = newScene();
+    const wall = { id: "w", type: "wall" as const, x: 0, y: 0, w: 1, h: 1, rotation: 0, color: "#4b5563" };
+    scene.elements = [wall, trap("hidden", { dc: 15, notes: "2d10 perforanti" }), trap("found", { revealed: true, dc: 12, notes: "fossa", label: "Fossa" })];
+    const shown = playerScene(scene).elements;
+    expect(shown.map((el) => el.id)).toEqual(["w", "found"]);
+    expect(shown[1]).toEqual(trap("found", { revealed: true, label: "Fossa" }));
+    expect(scene.elements).toHaveLength(3);
+  });
+
+  it("validates trap fields", () => {
+    const scene = { ...newScene(), elements: [trap("t", { dc: 14, notes: "Dardo avvelenato", revealed: false })] };
+    expect(SceneSchema.safeParse(scene).success).toBe(true);
+    expect(SceneSchema.safeParse({ ...scene, elements: [trap("t", { dc: 99 })] }).success).toBe(false);
+  });
+});
+
 describe("playerCombatants", () => {
   it("lists only combatants on the map with a visible token, in initiative order", () => {
     const { scene, combat } = setup();

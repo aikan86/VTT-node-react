@@ -42,19 +42,21 @@ export const BackgroundSchema = z.object({
 });
 export type Background = z.infer<typeof BackgroundSchema>;
 
-export const ELEMENT_TYPES = ["wall", "door", "obstacle", "difficult"] as const;
+export const ELEMENT_TYPES = ["wall", "door", "obstacle", "difficult", "trap"] as const;
 export type ElementType = (typeof ELEMENT_TYPES)[number];
 export const ELEMENT_LABELS: Record<ElementType, string> = {
   wall: "Muro",
   door: "Porta",
   obstacle: "Ostacolo",
   difficult: "Terreno difficile",
+  trap: "Trappola",
 };
 export const ELEMENT_COLORS: Record<ElementType, string> = {
   wall: "#4b5563",
   door: "#92400e",
   obstacle: "#57534e",
   difficult: "#65a30d",
+  trap: "#dc2626",
 };
 
 /** Coordinate e dimensioni in celle. */
@@ -70,6 +72,12 @@ export const MapElementSchema = z.object({
   label: z.string().max(80).optional(),
   /** Solo per le porte: aperta non blocca la vista (assente = chiusa). */
   open: z.boolean().optional(),
+  /** Solo per le trappole: scoperta, quindi visibile ai giocatori (assente = nascosta, la vede solo il master). */
+  revealed: z.boolean().optional(),
+  /** Solo per le trappole: CD per individuarla / disinnescarla. Riservata al master. */
+  dc: z.number().int().min(0).max(40).optional(),
+  /** Solo per le trappole: effetto, danni, innesco… Riservate al master. */
+  notes: z.string().max(500).optional(),
 });
 export type MapElement = z.infer<typeof MapElementSchema>;
 
