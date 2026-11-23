@@ -14,8 +14,8 @@ interface Props {
   currentRef: Ref | null;
   onSelect: (id: string) => void;
   onMove: (token: Token) => void;
-  /** Non mostra le barre dei PF (vista giocatori). */
-  hideHp?: boolean;
+  /** Quali token mostrano la barra dei PF (vista giocatori: secondo le impostazioni); di default tutti. */
+  showHp?: (token: Token) => boolean;
   /** Token trascinabili anche se il livello non è modificabile (i PG nella vista giocatori). */
   movable?: (token: Token) => boolean;
   /** Inizio del trascinamento di un token. */
@@ -116,7 +116,7 @@ function ConditionBadges({ conditions, size }: { conditions: readonly Condition[
   );
 }
 
-export function TokensLayer({ scene, resolve, listening, editable, selectedId, currentRef, onSelect, onMove, hideHp = false, movable, onDragStart, snapBack = false }: Props) {
+export function TokensLayer({ scene, resolve, listening, editable, selectedId, currentRef, onSelect, onMove, showHp, movable, onDragStart, snapBack = false }: Props) {
   const g = scene.grid;
 
   return (
@@ -178,7 +178,7 @@ export function TokensLayer({ scene, resolve, listening, editable, selectedId, c
             {down && (
               <Line points={[s * 0.25, s * 0.25, s * 0.75, s * 0.75, s * 0.5, s * 0.5, s * 0.75, s * 0.25, s * 0.25, s * 0.75]} stroke="#ef4444" strokeWidth={4} listening={false} />
             )}
-            {!hideHp && (
+            {(showHp?.(token) ?? true) && (
               <>
                 <Rect x={4} y={s - 9} width={barW} height={5} fill="#111827" cornerRadius={2} listening={false} />
                 <Rect x={4} y={s - 9} width={barW * ratio} height={5} fill={hpFill(ratio)} cornerRadius={2} listening={false} />

@@ -11,6 +11,7 @@ import {
   DEFAULT_SPEED_FT,
   movementRange,
   playerScene,
+  playerSeesHp,
   sameRef,
   withoutUnseenTokens,
   type Point,
@@ -23,6 +24,7 @@ import { MovementLayer, type MovementArea } from "./layers/MovementLayer";
 import { RulerLayer } from "./layers/RulerLayer";
 import styles from "./Battlefield.module.css";
 import type { EntityResolver } from "../../store/entities";
+import { useSettingsStore } from "../../store/settingsStore";
 import { clamp, contentBounds } from "./geometry";
 import { useElementSize } from "./hooks";
 import { BackgroundLayer, GridLayer } from "./layers/BackgroundLayer";
@@ -86,6 +88,8 @@ const noop = () => {};
  */
 export function PlayerStage({ scene, resolve, currentRef, onMoveToken, mover = "any", viewer, focus }: Props) {
   const [containerRef, size] = useElementSize<HTMLDivElement>();
+  /** Barre dei PF: il master sceglie nelle impostazioni se i giocatori le vedono (PG e PNG separati). */
+  const playerView = useSettingsStore((s) => s.settings.playerView);
   const [view, setView] = useState<View>({ x: 0, y: 0, scale: 1 });
   /** Righello (tasto R o pulsante): trascinando si misura invece di spostare la mappa. */
   const [measuring, setMeasuring] = useState(false);
@@ -290,7 +294,7 @@ export function PlayerStage({ scene, resolve, currentRef, onMoveToken, mover = "
             onDragStart={startDrag}
             onMove={proposeMove}
             snapBack
-            hideHp
+            showHp={(token) => playerSeesHp(playerView, token.ref)}
           />
           <VisionLayer scene={shown} sight={sight} view={view} size={size} darkness={1} />
           <EffectsLayer

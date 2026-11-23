@@ -6,6 +6,7 @@ import { useEntityResolver } from "../store/entities";
 import { useLibraryStore } from "../store/libraryStore";
 import { usePartyStore } from "../store/partyStore";
 import { useSceneStore } from "../store/sceneStore";
+import { useSettingsStore } from "../store/settingsStore";
 import { useStatusStore } from "../store/statusStore";
 import styles from "./PlayerPhone.module.css";
 import viewStyles from "./PlayerView.module.css";
@@ -22,6 +23,7 @@ export function PlayerPhonePage({ pcId }: { pcId: string }) {
   const handout = useLibraryStore((s) => currentHandout(s.handouts));
   const live = useStatusStore((s) => s.live);
   const resolve = useEntityResolver();
+  const showInitiative = useSettingsStore((s) => s.settings.playerView.showInitiative);
 
   if (!character) {
     return (
@@ -37,7 +39,8 @@ export function PlayerPhonePage({ pcId }: { pcId: string }) {
   const me: Ref = { kind: "pc", id: character.id };
   const self = resolve(me);
   const getMod = modLookupFrom(characters, combat.npcs);
-  const order = scene ? playerCombatants(combat, scene, getMod) : [];
+  // l'ordine di iniziativa si vede solo se il master lo permette nelle impostazioni
+  const order = scene && showInitiative ? playerCombatants(combat, scene, getMod) : [];
   const current = combat.active ? combat.combatants.find((c) => c.id === combat.currentId) : undefined;
   const myTurn = !!current && sameRef(current.ref, me);
   const currentName = current ? resolve(current.ref)?.name : undefined;

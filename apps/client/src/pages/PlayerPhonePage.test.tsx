@@ -1,10 +1,11 @@
 import { render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { emptyCombat, newCharacter, newScene } from "@vtt/shared";
+import { defaultSettings, emptyCombat, newCharacter, newScene } from "@vtt/shared";
 import { useCombatStore } from "../store/combatStore";
 import { handoutSync } from "../store/libraryStore";
 import { usePartyStore } from "../store/partyStore";
 import { useSceneStore } from "../store/sceneStore";
+import { useSettingsStore } from "../store/settingsStore";
 import { PlayerPhonePage } from "./PlayerPhonePage";
 
 vi.mock("../api/http", async (importOriginal) => ({ ...(await importOriginal<typeof import("../api/http")>()), api: {} }));
@@ -19,7 +20,11 @@ beforeEach(() => {
   useCombatStore.getState().hydrate({ rev: 0, data: emptyCombat() });
   useSceneStore.getState().hydrate([{ rev: 1, data: scene }]);
   handoutSync.hydrate([]);
+  useSettingsStore.getState().hydrate({ rev: 0, data: defaultSettings() });
 });
+
+const showInitiative = () =>
+  useSettingsStore.getState().hydrate({ rev: 1, data: { ...defaultSettings(), playerView: { showInitiative: true, showNpcHp: false, showPartyHp: false } } });
 
 const combatWithTurn = (currentId: string) => ({
   ...emptyCombat(),
@@ -54,6 +59,20 @@ describe("PlayerPhonePage", () => {
     useSceneStore.getState().hydrate([{ rev: 1, data: { ...scene, tokens: [...scene.tokens, { id: "t2", ref: { kind: "pc", id: "pc-b" }, x: 1, y: 0 }] } }]);
     render(<PlayerPhonePage pcId="pc-a" />);
     expect(screen.getByRole("status")).toHaveTextContent("Round 2 · turno di Borin");
+  });
+
+  it("hides the initiative order unless the master shows it in the settings", () => {
+    useCombatStore.getState().hydrate({ rev: 1, data: combatWithTurn("c2") });
+    useSceneStore.getState().hydrate([{ rev: 1, data: { ...scene, shownToPlayers: true, tokens: [...scene.tokens, { id: "t2", ref: { kind: "pc", id: "pc-b" }, x: 1, y: 0 }] } }]);
+    const { unmount } = render(<PlayerPhonePage pcId="pc-a" />);
+    expect(screen.queryByText(/Iniziativa/)).toBeNull();
+    expect(screen.getByRole("status")).not.toHaveTextContent("tu sei");
+    unmount();
+
+    showInitiative();
+    render(<PlayerPhonePage pcId="pc-a" />);
+    expect(screen.getByText("Iniziativa · round 2")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Round 2 · turno di Borin · tu sei 1°");
   });
 
   it("explains a wrong link", () => {

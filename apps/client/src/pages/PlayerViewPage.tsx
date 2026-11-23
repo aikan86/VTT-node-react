@@ -7,6 +7,7 @@ import { useCombatStore } from "../store/combatStore";
 import { useEntityResolver } from "../store/entities";
 import { usePartyStore } from "../store/partyStore";
 import { useSceneStore } from "../store/sceneStore";
+import { useSettingsStore } from "../store/settingsStore";
 import { useStatusStore } from "../store/statusStore";
 import styles from "./PlayerView.module.css";
 
@@ -61,7 +62,7 @@ function InitiativeOrder({ combat, scene }: { combat: Combat; scene: Scene }) {
   );
 }
 
-/** Pagina a schermo intero per i giocatori: la scena "in onda" scelta dal master e l'ordine di iniziativa. */
+/** Pagina a schermo intero per i giocatori: la scena "in onda" scelta dal master e (se il master lo permette) l'ordine di iniziativa. */
 export function PlayerViewPage() {
   const scene = useSceneStore((s) => s.scenes.find((sc) => sc.shownToPlayers));
   const combat = useCombatStore((s) => s.combat);
@@ -69,6 +70,7 @@ export function PlayerViewPage() {
   const live = useStatusStore((s) => s.live);
   const { full, toggle } = useFullscreen();
   const handout = useLibraryStore((s) => currentHandout(s.handouts));
+  const showInitiative = useSettingsStore((s) => s.settings.playerView.showInitiative);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -92,7 +94,7 @@ export function PlayerViewPage() {
             // ricontrolla il turno al momento del salvataggio (potrebbe essere cambiato nel frattempo)
             onMoveToken={(token) => useSceneStore.getState().update(scene.id, (s) => movePartyToken(s, token.id, token, partyMover(useCombatStore.getState().combat)))}
           />
-          <InitiativeOrder combat={combat} scene={scene} />
+          {showInitiative && <InitiativeOrder combat={combat} scene={scene} />}
         </>
       ) : (
         <div className={styles.waiting}>

@@ -1,0 +1,6 @@
+.card { max-width: 40rem; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem 1.1rem; margin: 0 0 1rem; }
+.card legend { padding: 0 0.3rem; font-size: 0.95rem; font-weight: 600; }
+.intro { margin: 0 0 0.75rem; font-size: 0.85rem; }
+.toggle { display: grid; grid-template-columns: auto 1fr; gap: 0.15rem 0.7rem; align-items: center; padding: 0.6rem 0; border-top: 1px solid var(--border); cursor: pointer; }
+.toggle:first-of-type { border-top: none; }
+.toggle small { grid-column: 2; color: var(--muted); font-size: 0.8rem; }
