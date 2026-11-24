@@ -65,7 +65,8 @@ describe("ElementsPanel doors", () => {
   it("drops the open flag when a door becomes something else", async () => {
     const { onChange } = renderPanel({ selected: { ...door, open: true } });
     await userEvent.selectOptions(screen.getByRole("combobox", { name: /tipo/i }), "wall");
-    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ type: "wall", open: undefined }));
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ type: "wall" }));
+    expect(onChange.mock.calls[0]?.[0]).not.toHaveProperty("open");
   });
 });
 
@@ -177,5 +178,35 @@ describe("ElementsPanel fog memory", () => {
   it("disables the reset when nothing was explored", () => {
     renderPanel({ exploredCount: 0 });
     expect(screen.getByRole("button", { name: /azzera zone esplorate/i })).toBeDisabled();
+  });
+});
+
+describe("ElementsPanel traps", () => {
+  const trap: MapElement = { id: "tr", type: "trap", x: 0, y: 0, w: 1, h: 1, rotation: 0, color: "#dc2626" };
+
+  it("offers the trap tool", async () => {
+    const { onTool } = renderPanel();
+    await userEvent.click(screen.getByRole("button", { name: /trappola/i }));
+    expect(onTool).toHaveBeenCalledWith("trap");
+  });
+
+  it("reveals a hidden trap to the players", async () => {
+    const { onChange } = renderPanel({ selected: trap });
+    expect(screen.getByText(/nascosta: la vedi solo tu/i)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("checkbox", { name: /scoperta/i }));
+    expect(onChange).toHaveBeenCalledWith({ ...trap, revealed: true });
+  });
+
+  it("edits the trap notes", () => {
+    const { onChange } = renderPanel({ selected: trap });
+    fireEvent.change(screen.getByRole("textbox", { name: /note/i }), { target: { value: "2d10 perforanti" } });
+    expect(onChange).toHaveBeenCalledWith({ ...trap, notes: "2d10 perforanti" });
+  });
+
+  it("drops trap fields when turned into another element", () => {
+    const { onChange } = renderPanel({ selected: { ...trap, revealed: true, dc: 15, notes: "x" } });
+    fireEvent.change(screen.getByRole("combobox", { name: /tipo/i }), { target: { value: "wall" } });
+    const { revealed: _r, dc: _dc, notes: _n, ...base } = { ...trap, revealed: true, dc: 15, notes: "x" };
+    expect(onChange).toHaveBeenCalledWith({ ...base, type: "wall", color: "#4b5563" });
   });
 });

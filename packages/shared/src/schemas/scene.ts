@@ -42,23 +42,25 @@ export const BackgroundSchema = z.object({
 });
 export type Background = z.infer<typeof BackgroundSchema>;
 
-export const ELEMENT_TYPES = ["wall", "door", "obstacle", "difficult"] as const;
+export const ELEMENT_TYPES = ["wall", "door", "obstacle", "difficult", "trap"] as const;
 export type ElementType = (typeof ELEMENT_TYPES)[number];
 export const ELEMENT_LABELS: Record<ElementType, string> = {
   wall: "Muro",
   door: "Porta",
   obstacle: "Ostacolo",
   difficult: "Terreno difficile",
+  trap: "Trappola",
 };
 export const ELEMENT_COLORS: Record<ElementType, string> = {
   wall: "#4b5563",
   door: "#92400e",
   obstacle: "#57534e",
   difficult: "#65a30d",
+  trap: "#dc2626",
 };
 
 /** Coordinate e dimensioni in celle. */
-export const MapElementSchema = z.object({
+const MapElementShape = z.object({
   id: IdSchema,
   type: z.enum(ELEMENT_TYPES),
   x: z.number(),
@@ -70,8 +72,42 @@ export const MapElementSchema = z.object({
   label: z.string().max(80).optional(),
   /** Solo per le porte: aperta non blocca la vista (assente = chiusa). */
   open: z.boolean().optional(),
+  /** Solo per le trappole: scoperta, quindi visibile ai giocatori (assente = nascosta, la vede solo il master). */
+  revealed: z.boolean().optional(),
+  /** Solo per le trappole: CD per individuarla / disinnescarla. Riservata al master. */
+  dc: z.number().int().min(0).max(40).optional(),
+  /** Solo per le trappole: effetto, danni, innesco… Riservate al master. */
+  notes: z.string().max(500).optional(),
 });
+
+/** Campi che valgono per un solo tipo di elemento: unico elenco da aggiornare quando un tipo ne aggiunge di propri. */
+const TYPE_SPECIFIC_FIELDS = {
+  open: "door",
+  revealed: "trap",
+  dc: "trap",
+  notes: "trap",
+} as const satisfies Partial<Record<keyof z.infer<typeof MapElementShape>, ElementType>>;
+
+/** Toglie i campi che non appartengono al tipo dell'elemento (es. CD e note rimasti su un muro). */
+export function dropForeignFields<T extends { type: ElementType }>(el: T): T {
+  let out = el;
+  for (const [field, owner] of Object.entries(TYPE_SPECIFIC_FIELDS)) {
+    if (owner !== el.type && field in out) {
+      const { [field]: _dropped, ...rest } = out as Record<string, unknown>;
+      out = rest as T;
+    }
+  }
+  return out;
+}
+
+/** In lettura i campi di un altro tipo vengono scartati, così non arrivano mai dove non servono. */
+export const MapElementSchema = MapElementShape.transform(dropForeignFields);
 export type MapElement = z.infer<typeof MapElementSchema>;
+
+/** Lo stesso elemento con un altro tipo: colore di default del nuovo tipo, senza i campi del tipo precedente. */
+export function withElementType(el: MapElement, type: ElementType): MapElement {
+  return dropForeignFields({ ...el, type, color: ELEMENT_COLORS[type] });
+}
 
 /** Posizione (angolo in alto a sinistra) in celle intere. */
 export const TokenSchema = z.object({

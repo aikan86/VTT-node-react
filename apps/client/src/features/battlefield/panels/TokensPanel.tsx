@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { DEFAULT_SPEED_FT, formatMove, groupSummary, srdIndexFor, modLookupFrom, sameRef, sortCombatants, type NpcGroup, type Ref, type Scene, type Token } from "@vtt/shared";
 import { useLibraryStore } from "../../../store/libraryStore";
 import { ConditionIcons, ConditionPicker } from "../../../components/Conditions";
@@ -66,6 +67,17 @@ export function TokensPanel({ scene, resolve, pending, onPending, onAddNpc, sele
   const entity = selected && resolve(selected.ref);
   const inInitiative = selected && combat.combatants.some((c) => sameRef(c.ref, selected.ref));
   const speedFt = selected?.speedFt ?? DEFAULT_SPEED_FT;
+  /** Note dell'iniziativa (le stesse del tracker), vuote se l'entità non è in iniziativa. */
+  const notesOf = (ref: Ref) => combat.combatants.find((c) => sameRef(c.ref, ref))?.notes?.trim() ?? "";
+  // tooltip con le note: fixed perché la sidebar scorre e lo taglierebbe; il testo si legge a ogni render, così segue le modifiche
+  const [noteTip, setNoteTip] = useState<{ ref: Ref; left: number; width: number; top?: number; bottom?: number } | null>(null);
+  const showNoteTip = (ref: Ref, row: HTMLElement) => {
+    const r = row.getBoundingClientRect();
+    const below = window.innerHeight - r.bottom >= 160 || r.top < 160;
+    setNoteTip({ ref, left: r.left, width: r.width, ...(below ? { top: r.bottom + 4 } : { bottom: window.innerHeight - r.top + 4 }) });
+  };
+  const tipEntity = noteTip && resolve(noteTip.ref);
+  const tipNotes = noteTip ? notesOf(noteTip.ref) : "";
 
   const list = (refs: Ref[], empty: string) =>
     refs.length === 0 ? (
@@ -79,11 +91,21 @@ export function TokensPanel({ scene, resolve, pending, onPending, onAddNpc, sele
           if (!e) return null;
           const placed = onMap(ref);
           const current = currentRef !== undefined && sameRef(currentRef, ref);
+          const notes = notesOf(ref);
+          const tipShown = notes !== "" && noteTip !== null && sameRef(noteTip.ref, ref);
           return (
-            <li key={ref.id} className={current ? styles.current : undefined} aria-current={current ? "step" : undefined}>
+            <li
+              key={ref.id}
+              className={current ? styles.current : undefined}
+              aria-current={current ? "step" : undefined}
+              aria-describedby={tipShown ? "note-tooltip" : undefined}
+              onMouseEnter={notes ? (ev) => showNoteTip(ref, ev.currentTarget) : undefined}
+              onMouseLeave={() => setNoteTip(null)}
+            >
               <span>
                 <span className="swatch" style={{ background: e.color }} />
-                <span className={styles.entityName} data-testid="entity-name" title={e.name}>
+                {/* con le note il nome intero sta già nel tooltip: niente title nativo sovrapposto */}
+                <span className={styles.entityName} data-testid="entity-name" title={notes ? undefined : e.name}>
                   {e.name}
                 </span>
                 <ConditionIcons conditions={e.conditions} max={3} />
@@ -132,6 +154,17 @@ export function TokensPanel({ scene, resolve, pending, onPending, onAddNpc, sele
 
   return (
     <>
+      {noteTip && tipEntity && tipNotes && (
+        <div
+          id="note-tooltip"
+          role="tooltip"
+          className={styles.noteTip}
+          style={{ left: noteTip.left, width: noteTip.width, top: noteTip.top, bottom: noteTip.bottom }}
+        >
+          <strong>{tipEntity.name}</strong>
+          <span>{tipNotes}</span>
+        </div>
+      )}
       {pending && (
         <p className={styles.callout} role="status">
           Clicca sulla mappa per piazzare {pending.length === 1 ? "il token" : `${pending.length} token`}. <kbd>Esc</kbd> per annullare.
