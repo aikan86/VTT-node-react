@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { useLibraryStore } from "../store/libraryStore";
-import { currentHandout, getTotal, modLookupFrom, movePartyToken, partyMover, playerCombatants, sameRef, type Combat, type Scene } from "@vtt/shared";
+import { currentHandout, getTotal, modLookupFrom, movePartyToken, partyMover, playerCombatants, playerCurrentRef, type Combat, type Scene } from "@vtt/shared";
 import { ConditionIcons } from "../components/Conditions";
 import { PlayerStage } from "../features/battlefield/PlayerStage";
 import { useCombatStore } from "../store/combatStore";
 import { useEntityResolver } from "../store/entities";
 import { usePartyStore } from "../store/partyStore";
 import { useSceneStore } from "../store/sceneStore";
+import { useSettingsStore } from "../store/settingsStore";
 import { useStatusStore } from "../store/statusStore";
 import styles from "./PlayerView.module.css";
 
@@ -61,7 +62,7 @@ function InitiativeOrder({ combat, scene }: { combat: Combat; scene: Scene }) {
   );
 }
 
-/** Pagina a schermo intero per i giocatori: la scena "in onda" scelta dal master e l'ordine di iniziativa. */
+/** Pagina a schermo intero per i giocatori: la scena "in onda" scelta dal master e (se il master lo permette) l'ordine di iniziativa. */
 export function PlayerViewPage() {
   const scene = useSceneStore((s) => s.scenes.find((sc) => sc.shownToPlayers));
   const combat = useCombatStore((s) => s.combat);
@@ -69,6 +70,7 @@ export function PlayerViewPage() {
   const live = useStatusStore((s) => s.live);
   const { full, toggle } = useFullscreen();
   const handout = useLibraryStore((s) => currentHandout(s.handouts));
+  const playerView = useSettingsStore((s) => s.settings.playerView);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -78,8 +80,6 @@ export function PlayerViewPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const current = combat.active ? combat.combatants.find((c) => c.id === combat.currentId) : undefined;
-
   return (
     <div className={styles.root}>
       {scene ? (
@@ -87,12 +87,12 @@ export function PlayerViewPage() {
           <PlayerStage
             scene={scene}
             resolve={resolve}
-            currentRef={current && scene.tokens.some((t) => sameRef(t.ref, current.ref) && !t.hidden) ? current.ref : null}
+            currentRef={playerCurrentRef(combat, scene, playerView)}
             mover={partyMover(combat)}
             // ricontrolla il turno al momento del salvataggio (potrebbe essere cambiato nel frattempo)
             onMoveToken={(token) => useSceneStore.getState().update(scene.id, (s) => movePartyToken(s, token.id, token, partyMover(useCombatStore.getState().combat)))}
           />
-          <InitiativeOrder combat={combat} scene={scene} />
+          {playerView.showInitiative && <InitiativeOrder combat={combat} scene={scene} />}
         </>
       ) : (
         <div className={styles.waiting}>

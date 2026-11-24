@@ -8,6 +8,7 @@ import { InitiativePage } from "./pages/InitiativePage";
 import { PartyPage } from "./pages/PartyPage";
 import { PlayerViewPage } from "./pages/PlayerViewPage";
 import { PlayerPhonePage } from "./pages/PlayerPhonePage";
+import { SettingsPage } from "./pages/SettingsPage";
 import { CombatStatus } from "./features/initiative/CombatStatus";
 import { TransferButtons } from "./features/transfer/TransferButtons";
 import { Brand } from "./features/branding/Brand";
@@ -136,6 +137,7 @@ export function App() {
           <NavLink to="/iniziativa">Iniziativa</NavLink>
           <NavLink to="/tiri-dm">Tiri DM</NavLink>
           <NavLink to="/handout">Handout</NavLink>
+          <NavLink to="/impostazioni">Impostazioni</NavLink>
         </nav>
         <div className={styles.status}>
           {state === "ready" && <CombatStatus />}
@@ -167,6 +169,7 @@ export function App() {
             <Route path="/iniziativa" element={<InitiativePage />} />
             <Route path="/tiri-dm" element={<DmRollsPage />} />
             <Route path="/handout" element={<HandoutsPage />} />
+            <Route path="/impostazioni" element={<SettingsPage />} />
             <Route path="*" element={<Navigate to="/mappa" replace />} />
           </Routes>
         )}

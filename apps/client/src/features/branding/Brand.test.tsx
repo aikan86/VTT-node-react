@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { defaultPlayerViewSettings, defaultSettings } from "@vtt/shared";
 import { api } from "../../api/http";
 import { useSettingsStore } from "../../store/settingsStore";
 import { Brand } from "./Brand";
@@ -15,7 +16,7 @@ vi.mock("../../api/http", async (importOriginal) => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
-  useSettingsStore.getState().hydrate({ rev: 0, data: { logoUrl: null } });
+  useSettingsStore.getState().hydrate({ rev: 0, data: defaultSettings() });
 });
 
 const logo = () => screen.getByRole("img", { name: "Logo" });
@@ -35,13 +36,13 @@ describe("Brand", () => {
     await userEvent.upload(screen.getByLabelText("Scegli l'immagine del logo"), file);
     await waitFor(() => expect(logo()).toHaveAttribute("src", "/uploads/drago.png"));
     expect(api.upload).toHaveBeenCalledWith(file);
-    await waitFor(() => expect(api.settings.put).toHaveBeenCalledWith({ logoUrl: "/uploads/drago.png" }, 0));
+    await waitFor(() => expect(api.settings.put).toHaveBeenCalledWith({ logoUrl: "/uploads/drago.png", playerView: defaultPlayerViewSettings() }, 0));
     expect(screen.queryByRole("menu")).toBeNull();
 
     await userEvent.click(screen.getByRole("button", { name: "Cambia il logo" }));
     await userEvent.click(screen.getByRole("menuitem", { name: "Torna al logo predefinito" }));
     expect(logo().getAttribute("src")).toMatch(/logo-default/);
-    await waitFor(() => expect(api.settings.put).toHaveBeenLastCalledWith({ logoUrl: null }, 1));
+    await waitFor(() => expect(api.settings.put).toHaveBeenLastCalledWith({ logoUrl: null, playerView: defaultPlayerViewSettings() }, 1));
   });
 
   it("closes the menu with Esc", async () => {

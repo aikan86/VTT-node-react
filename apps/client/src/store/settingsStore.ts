@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { defaultSettings, type Settings, type Versioned } from "@vtt/shared";
+import { defaultSettings, type PlayerViewSettings, type Settings, type Versioned } from "@vtt/shared";
 import { api, isPermanentError } from "../api/http";
 import { reportError, track } from "./statusStore";
 import { DocSync } from "./sync/docSync";
@@ -11,6 +11,8 @@ interface SettingsState {
   hydrate: (v: Versioned<Settings>) => void;
   /** Cambia il logo dell'intestazione; `null` torna al logo predefinito. */
   setLogo: (url: string | null) => void;
+  /** Cambia cosa vedono i giocatori (iniziativa, PF dei PNG, PF del party). */
+  setPlayerView: (patch: Partial<PlayerViewSettings>) => void;
 }
 
 function createSync(initial: Versioned<Settings>) {
@@ -37,6 +39,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   },
 
   setLogo: (url) => settingsSync.apply((s) => ({ ...s, logoUrl: url })),
+
+  setPlayerView: (patch) => settingsSync.apply((s) => ({ ...s, playerView: { ...s.playerView, ...patch } })),
 }));
 
 /** Modifica arrivata da un altro tab (il documento sul server ha anche il campo id). */

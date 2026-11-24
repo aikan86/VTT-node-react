@@ -1,6 +1,7 @@
 import { sameRef, type Ref } from "./schemas/common";
 import type { Combat, Combatant } from "./schemas/combat";
 import type { MapElement, Scene, Token } from "./schemas/scene";
+import type { PlayerViewSettings } from "./schemas/settings";
 import type { Point } from "./grid";
 import { sortCombatants, type ModLookup } from "./initiative";
 
@@ -76,4 +77,17 @@ export function movePartyToken(scene: Scene, id: string, cell: Point, mover: Par
 export function playerCombatants(combat: Combat, scene: Scene, getMod: ModLookup): Combatant[] {
   const visible = playerTokens(scene.tokens);
   return sortCombatants(combat.combatants, getMod).filter((c) => visible.some((t) => sameRef(t.ref, c.ref)));
+}
+
+/** I giocatori vedono i PF di questo token? Dipende dalle impostazioni (PG e PNG separati). */
+export const playerSeesHp = (view: PlayerViewSettings, ref: Pick<Ref, "kind">): boolean => (ref.kind === "pc" ? view.showPartyHp : view.showNpcHp);
+
+/**
+ * Di chi è il turno, come lo vedono i giocatori: solo se il master mostra l'iniziativa (altrimenti l'evidenziazione
+ * che passa da un token all'altro rivelerebbe l'ordine) e se il combattente ha un token non nascosto sulla mappa.
+ */
+export function playerCurrentRef(combat: Pick<Combat, "active" | "currentId" | "combatants">, scene: Scene | undefined, view: Pick<PlayerViewSettings, "showInitiative">): Ref | null {
+  if (!combat.active || !view.showInitiative || !scene) return null;
+  const current = combat.combatants.find((c) => c.id === combat.currentId);
+  return current && playerTokens(scene.tokens).some((t) => sameRef(t.ref, current.ref)) ? current.ref : null;
 }

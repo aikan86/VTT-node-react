@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { playerCombatants, playerScene } from "../src/playerView";
+import { playerCombatants, playerCurrentRef, playerScene } from "../src/playerView";
 import { ELEMENT_COLORS, newScene, SceneSchema, withElementType } from "../src/schemas/scene";
 import { emptyCombat } from "../src/schemas/combat";
 
@@ -91,6 +91,24 @@ describe("playerCombatants", () => {
     const { scene, combat } = setup();
     scene.tokens.push({ id: "t4", ref: ogre, x: 3, y: 0 });
     expect(playerCombatants(combat, scene, () => 0).map((c) => c.id)).toEqual(["c3", "c2", "c1"]);
+  });
+});
+
+describe("playerCurrentRef", () => {
+  const shown = { showInitiative: true };
+
+  it("tells whose turn it is only for a combatant with a visible token", () => {
+    const { scene, combat } = setup();
+    expect(playerCurrentRef({ ...combat, currentId: "c2" }, scene, shown)).toEqual(goblin);
+    expect(playerCurrentRef({ ...combat, currentId: "c3" }, scene, shown)).toBeNull(); // l'orco è nascosto
+    expect(playerCurrentRef({ ...combat, currentId: "c4" }, scene, shown)).toBeNull(); // non è sulla mappa
+  });
+
+  it("tells nothing when the master hides the initiative, outside combat or without a scene", () => {
+    const { scene, combat } = setup();
+    expect(playerCurrentRef({ ...combat, currentId: "c2" }, scene, { showInitiative: false })).toBeNull();
+    expect(playerCurrentRef({ ...combat, active: false, currentId: "c2" }, scene, shown)).toBeNull();
+    expect(playerCurrentRef({ ...combat, currentId: "c2" }, undefined, shown)).toBeNull();
   });
 });
 
