@@ -1,12 +1,40 @@
 import { sameRef, type Ref } from "./schemas/common";
 import type { Combat, Combatant } from "./schemas/combat";
-import type { Scene, Token } from "./schemas/scene";
+import type { MapElement, Scene, Token } from "./schemas/scene";
 import type { Point } from "./grid";
 import { sortCombatants, type ModLookup } from "./initiative";
 
-/** La scena come la vedono i giocatori: senza i token nascosti dal master. */
+/** Una trappola non ancora scoperta: la vede solo il master. */
+export function isHiddenTrap(el: Pick<MapElement, "type" | "revealed">): boolean {
+  return el.type === "trap" && !el.revealed;
+}
+
+const hasMasterNotes = (el: MapElement) => el.dc !== undefined || el.notes !== undefined;
+
+/** Token visibili ai giocatori (lo stesso array se non ce n'è di nascosti). */
+function playerTokens(tokens: Token[]): Token[] {
+  return tokens.some((t) => t.hidden) ? tokens.filter((t) => !t.hidden) : tokens;
+}
+
+/** Elementi visibili ai giocatori: senza trappole nascoste né CD e note del master (lo stesso array se non c'è nulla da togliere). */
+function playerElements(elements: MapElement[]): MapElement[] {
+  if (!elements.some((el) => isHiddenTrap(el) || hasMasterNotes(el))) return elements;
+  return elements.flatMap((el) => {
+    if (isHiddenTrap(el)) return [];
+    if (!hasMasterNotes(el)) return [el];
+    const { dc: _dc, notes: _notes, ...rest } = el;
+    return [rest];
+  });
+}
+
+/**
+ * La scena come la vedono i giocatori: senza i token nascosti dal master e senza le trappole non ancora scoperte
+ * (di quelle scoperte non vedono CD e note). Se non c'è nulla da nascondere restituisce la scena stessa.
+ */
 export function playerScene(scene: Scene): Scene {
-  return scene.tokens.some((t) => t.hidden) ? { ...scene, tokens: scene.tokens.filter((t) => !t.hidden) } : scene;
+  const tokens = playerTokens(scene.tokens);
+  const elements = playerElements(scene.elements);
+  return tokens === scene.tokens && elements === scene.elements ? scene : { ...scene, tokens, elements };
 }
 
 /**
@@ -46,6 +74,6 @@ export function movePartyToken(scene: Scene, id: string, cell: Point, mover: Par
  * non nascosto (chi è in iniziativa ma non è sulla mappa, o è nascosto, non compare).
  */
 export function playerCombatants(combat: Combat, scene: Scene, getMod: ModLookup): Combatant[] {
-  const visible = playerScene(scene).tokens;
+  const visible = playerTokens(scene.tokens);
   return sortCombatants(combat.combatants, getMod).filter((c) => visible.some((t) => sameRef(t.ref, c.ref)));
 }
