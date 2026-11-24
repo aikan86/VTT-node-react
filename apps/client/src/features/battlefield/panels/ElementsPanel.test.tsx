@@ -65,7 +65,8 @@ describe("ElementsPanel doors", () => {
   it("drops the open flag when a door becomes something else", async () => {
     const { onChange } = renderPanel({ selected: { ...door, open: true } });
     await userEvent.selectOptions(screen.getByRole("combobox", { name: /tipo/i }), "wall");
-    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ type: "wall", open: undefined }));
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ type: "wall" }));
+    expect(onChange.mock.calls[0]?.[0]).not.toHaveProperty("open");
   });
 });
 
@@ -205,6 +206,7 @@ describe("ElementsPanel traps", () => {
   it("drops trap fields when turned into another element", () => {
     const { onChange } = renderPanel({ selected: { ...trap, revealed: true, dc: 15, notes: "x" } });
     fireEvent.change(screen.getByRole("combobox", { name: /tipo/i }), { target: { value: "wall" } });
-    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ type: "wall", revealed: undefined, dc: undefined, notes: undefined }));
+    const { revealed: _r, dc: _dc, notes: _n, ...base } = { ...trap, revealed: true, dc: 15, notes: "x" };
+    expect(onChange).toHaveBeenCalledWith({ ...base, type: "wall", color: "#4b5563" });
   });
 });

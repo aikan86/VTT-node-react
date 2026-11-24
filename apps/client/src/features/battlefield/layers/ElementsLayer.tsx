@@ -1,6 +1,6 @@
 import { Group, Layer, Rect, Text, Transformer } from "react-konva";
 import type Konva from "konva";
-import { cellToPx, snapPxToCell, type MapElement, type Scene } from "@vtt/shared";
+import { cellToPx, isHiddenTrap, snapPxToCell, type MapElement, type Scene } from "@vtt/shared";
 import { snapTo } from "../geometry";
 import { useTransformer } from "./useTransformer";
 
@@ -26,9 +26,9 @@ function styleOf(el: MapElement) {
   switch (el.type) {
     case "trap":
       // nascosta: tratteggiata e tenue (la vede solo il master); scoperta: bordo pieno
-      return el.revealed
-        ? { fill: el.color, opacity: 0.45, stroke: el.color, strokeWidth: 3 }
-        : { fill: el.color, opacity: 0.2, stroke: el.color, dash: [4, 4], strokeWidth: 2 };
+      return isHiddenTrap(el)
+        ? { fill: el.color, opacity: 0.2, stroke: el.color, dash: [4, 4], strokeWidth: 2 }
+        : { fill: el.color, opacity: 0.45, stroke: el.color, strokeWidth: 3 };
     case "difficult":
       return { fill: el.color, opacity: 0.35, stroke: el.color, dash: [6, 4], strokeWidth: 2 };
     case "door":

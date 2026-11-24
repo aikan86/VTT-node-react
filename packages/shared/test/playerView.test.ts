@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { playerCombatants, playerScene } from "../src/playerView";
-import { newScene, SceneSchema } from "../src/schemas/scene";
+import { ELEMENT_COLORS, newScene, SceneSchema, withElementType } from "../src/schemas/scene";
 import { emptyCombat } from "../src/schemas/combat";
 
 const pc = { kind: "pc", id: "pc1" } as const;
@@ -58,6 +58,25 @@ describe("playerScene traps", () => {
     const scene = { ...newScene(), elements: [trap("t", { dc: 14, notes: "Dardo avvelenato", revealed: false })] };
     expect(SceneSchema.safeParse(scene).success).toBe(true);
     expect(SceneSchema.safeParse({ ...scene, elements: [trap("t", { dc: 99 })] }).success).toBe(false);
+  });
+
+  it("returns the same scene when revealed traps carry nothing master-only", () => {
+    const scene = { ...newScene(), elements: [trap("found", { revealed: true, label: "Fossa" })] };
+    expect(playerScene(scene)).toBe(scene);
+  });
+
+  it("drops fields that belong to another element type when parsing", () => {
+    const wall = { id: "w", type: "wall" as const, x: 0, y: 0, w: 1, h: 1, rotation: 0, color: "#4b5563" };
+    const parsed = SceneSchema.parse({ ...newScene(), elements: [{ ...wall, dc: 12, notes: "segreto", revealed: true, open: true }, trap("t", { open: true, dc: 12 })] });
+    expect(parsed.elements).toEqual([wall, trap("t", { dc: 12 })]);
+  });
+});
+
+describe("withElementType", () => {
+  it("keeps the fields the new type shares and drops the old type's own", () => {
+    const door = { id: "d", type: "door" as const, x: 1, y: 2, w: 1, h: 1, rotation: 90, color: "#92400e", label: "Cripta", open: true };
+    expect(withElementType(door, "trap")).toEqual({ id: "d", type: "trap", x: 1, y: 2, w: 1, h: 1, rotation: 90, color: ELEMENT_COLORS.trap, label: "Cripta" });
+    expect(withElementType(door, "door")).toEqual({ ...door, color: ELEMENT_COLORS.door });
   });
 });
 

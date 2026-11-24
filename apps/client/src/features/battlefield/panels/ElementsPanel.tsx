@@ -1,4 +1,4 @@
-import { DEFAULT_LIGHT, ELEMENT_COLORS, ELEMENT_LABELS, ELEMENT_TYPES, MAX_SIGHT_BLOCKER_VERTICES, type Light, type MapElement, type SightBlocker, type Vision } from "@vtt/shared";
+import { DEFAULT_LIGHT, ELEMENT_COLORS, ELEMENT_LABELS, ELEMENT_TYPES, MAX_SIGHT_BLOCKER_VERTICES, withElementType, type Light, type MapElement, type SightBlocker, type Vision } from "@vtt/shared";
 import { NumberInput } from "../../../components/NumberInput";
 import { SIGHT_COLOR, type ElementTool } from "../types";
 import styles from "../Battlefield.module.css";
@@ -144,15 +144,7 @@ export function ElementsPanel({
                 value={selected.type}
                 onChange={(e) => {
                   const type = e.target.value as MapElement["type"];
-                  onChange({
-                    ...selected,
-                    type,
-                    color: ELEMENT_COLORS[type],
-                    open: type === "door" ? selected.open : undefined,
-                    revealed: type === "trap" ? selected.revealed : undefined,
-                    dc: type === "trap" ? selected.dc : undefined,
-                    notes: type === "trap" ? selected.notes : undefined,
-                  });
+                  onChange(withElementType(selected, type));
                 }}
               >
                 {ELEMENT_TYPES.map((t) => (
