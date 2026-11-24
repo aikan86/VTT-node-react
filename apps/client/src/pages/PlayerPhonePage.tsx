@@ -1,4 +1,4 @@
-import { currentHandout, getTotal, modLookupFrom, movePartyToken, ownMover, partyMover, playerCombatants, sameRef, type Ref } from "@vtt/shared";
+import { currentHandout, getTotal, modLookupFrom, movePartyToken, ownMover, partyMover, playerCombatants, playerCurrentRef, sameRef, type Ref } from "@vtt/shared";
 import { ConditionIcons } from "../components/Conditions";
 import { PlayerStage } from "../features/battlefield/PlayerStage";
 import { useCombatStore } from "../store/combatStore";
@@ -23,7 +23,7 @@ export function PlayerPhonePage({ pcId }: { pcId: string }) {
   const handout = useLibraryStore((s) => currentHandout(s.handouts));
   const live = useStatusStore((s) => s.live);
   const resolve = useEntityResolver();
-  const showInitiative = useSettingsStore((s) => s.settings.playerView.showInitiative);
+  const playerView = useSettingsStore((s) => s.settings.playerView);
 
   if (!character) {
     return (
@@ -38,12 +38,14 @@ export function PlayerPhonePage({ pcId }: { pcId: string }) {
 
   const me: Ref = { kind: "pc", id: character.id };
   const self = resolve(me);
-  const getMod = modLookupFrom(characters, combat.npcs);
-  // l'ordine di iniziativa si vede solo se il master lo permette nelle impostazioni
-  const order = scene && showInitiative ? playerCombatants(combat, scene, getMod) : [];
+  // l'ordine di iniziativa (e di chi è il turno) si vede solo se il master lo permette nelle impostazioni
+  const getMod = playerView.showInitiative ? modLookupFrom(characters, combat.npcs) : null;
+  const order = scene && getMod ? playerCombatants(combat, scene, getMod) : [];
   const current = combat.active ? combat.combatants.find((c) => c.id === combat.currentId) : undefined;
   const myTurn = !!current && sameRef(current.ref, me);
-  const currentName = current ? resolve(current.ref)?.name : undefined;
+  // il nome solo se i giocatori vedono chi agisce: mai un PNG nascosto o fuori mappa
+  const currentRef = playerCurrentRef(combat, scene, playerView);
+  const currentName = currentRef ? resolve(currentRef)?.name : undefined;
   const onMap = !!scene?.tokens.some((t) => sameRef(t.ref, me) && !t.hidden);
   const myPlace = order.findIndex((c) => sameRef(c.ref, me));
   const hp = character.hp;
@@ -71,7 +73,7 @@ export function PlayerPhonePage({ pcId }: { pcId: string }) {
 
       {combat.active && (
         <div className={myTurn ? `${styles.turn} ${styles.myTurn}` : styles.turn} role="status">
-          {myTurn ? "🎯 Tocca a te! Trascina il tuo segnalino e conferma." : `Round ${combat.round} · turno di ${currentName ?? "…"}${myPlace >= 0 ? ` · tu sei ${myPlace + 1}°` : ""}`}
+          {myTurn ? "🎯 Tocca a te! Trascina il tuo segnalino e conferma." : `Round ${combat.round}${currentName ? ` · turno di ${currentName}` : ""}${myPlace >= 0 ? ` · tu sei ${myPlace + 1}°` : ""}`}
         </div>
       )}
 
@@ -81,7 +83,7 @@ export function PlayerPhonePage({ pcId }: { pcId: string }) {
             <PlayerStage
               scene={scene}
               resolve={resolve}
-              currentRef={current && scene.tokens.some((t) => sameRef(t.ref, current.ref) && !t.hidden) ? current.ref : null}
+              currentRef={currentRef}
               mover={ownMover(partyMover(combat), me)}
               viewer={me}
               focus={me}
@@ -99,7 +101,7 @@ export function PlayerPhonePage({ pcId }: { pcId: string }) {
         )}
       </main>
 
-      {combat.active && order.length > 0 && (
+      {combat.active && getMod && order.length > 0 && (
         <details className={styles.order}>
           <summary>Iniziativa · round {combat.round}</summary>
           <ol>

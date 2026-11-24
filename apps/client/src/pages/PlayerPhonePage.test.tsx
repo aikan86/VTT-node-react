@@ -54,25 +54,34 @@ describe("PlayerPhonePage", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Tocca a te!");
   });
 
+  const onAir = (borinHidden = false) =>
+    useSceneStore.getState().hydrate([
+      { rev: 1, data: { ...scene, shownToPlayers: true, tokens: [...scene.tokens, { id: "t2", ref: { kind: "pc", id: "pc-b" }, x: 1, y: 0, hidden: borinHidden }] } },
+    ]);
+
   it("otherwise says whose turn it is and where the player stands", () => {
     useCombatStore.getState().hydrate({ rev: 1, data: combatWithTurn("c2") });
-    useSceneStore.getState().hydrate([{ rev: 1, data: { ...scene, tokens: [...scene.tokens, { id: "t2", ref: { kind: "pc", id: "pc-b" }, x: 1, y: 0 }] } }]);
-    render(<PlayerPhonePage pcId="pc-a" />);
-    expect(screen.getByRole("status")).toHaveTextContent("Round 2 · turno di Borin");
-  });
-
-  it("hides the initiative order unless the master shows it in the settings", () => {
-    useCombatStore.getState().hydrate({ rev: 1, data: combatWithTurn("c2") });
-    useSceneStore.getState().hydrate([{ rev: 1, data: { ...scene, shownToPlayers: true, tokens: [...scene.tokens, { id: "t2", ref: { kind: "pc", id: "pc-b" }, x: 1, y: 0 }] } }]);
-    const { unmount } = render(<PlayerPhonePage pcId="pc-a" />);
-    expect(screen.queryByText(/Iniziativa/)).toBeNull();
-    expect(screen.getByRole("status")).not.toHaveTextContent("tu sei");
-    unmount();
-
+    onAir();
     showInitiative();
     render(<PlayerPhonePage pcId="pc-a" />);
     expect(screen.getByText("Iniziativa · round 2")).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("Round 2 · turno di Borin · tu sei 1°");
+  });
+
+  it("hides the initiative order and whose turn it is unless the master shows them in the settings", () => {
+    useCombatStore.getState().hydrate({ rev: 1, data: combatWithTurn("c2") });
+    onAir();
+    render(<PlayerPhonePage pcId="pc-a" />);
+    expect(screen.queryByText(/Iniziativa/)).toBeNull();
+    expect(screen.getByRole("status")).toHaveTextContent(/^Round 2$/);
+  });
+
+  it("never names a combatant whose token the players cannot see", () => {
+    useCombatStore.getState().hydrate({ rev: 1, data: combatWithTurn("c2") });
+    onAir(true);
+    showInitiative();
+    render(<PlayerPhonePage pcId="pc-a" />);
+    expect(screen.getByRole("status")).not.toHaveTextContent("Borin");
   });
 
   it("explains a wrong link", () => {

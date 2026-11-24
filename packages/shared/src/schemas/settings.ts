@@ -1,10 +1,9 @@
 import { z } from "zod";
 import { TokenImageSchema } from "./common";
-import type { Ref } from "./common";
 
 /** Cosa mostrano le viste dei giocatori (schermo condiviso e telefono). Di default è tutto nascosto. */
 export const PlayerViewSettingsSchema = z.object({
-  /** Ordine di iniziativa. */
+  /** Ordine di iniziativa (e di chi è il turno). */
   showInitiative: z.boolean().default(false),
   /** Barre dei PF sui token dei PNG. */
   showNpcHp: z.boolean().default(false),
@@ -13,7 +12,8 @@ export const PlayerViewSettingsSchema = z.object({
 });
 export type PlayerViewSettings = z.infer<typeof PlayerViewSettingsSchema>;
 
-export const defaultPlayerViewSettings = (): PlayerViewSettings => ({ showInitiative: false, showNpcHp: false, showPartyHp: false });
+/** I default vengono dallo schema: un'unica fonte. */
+export const defaultPlayerViewSettings = (): PlayerViewSettings => PlayerViewSettingsSchema.parse({});
 
 /** Impostazioni generali del VTT: documento singleton con id "current" (versione 0 = mai salvato). */
 export const SettingsSchema = z.object({
@@ -27,6 +27,3 @@ export type Settings = z.infer<typeof SettingsSchema>;
 export const SETTINGS_DOC_ID = "current";
 
 export const defaultSettings = (): Settings => ({ logoUrl: null, playerView: defaultPlayerViewSettings() });
-
-/** I giocatori vedono i PF di questo token? Dipende dalle impostazioni (PG e PNG separati). */
-export const playerSeesHp = (view: PlayerViewSettings, ref: Pick<Ref, "kind">): boolean => (ref.kind === "pc" ? view.showPartyHp : view.showNpcHp);

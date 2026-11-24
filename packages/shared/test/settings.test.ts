@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { SettingsSchema, defaultPlayerViewSettings, playerSeesHp } from "../src/schemas/settings";
+import { SettingsSchema, defaultPlayerViewSettings } from "../src/schemas/settings";
+import { playerSeesHp } from "../src/playerView";
 
 describe("player view settings", () => {
   it("hide everything by default, also for settings saved before they existed", () => {
+    expect(defaultPlayerViewSettings()).toEqual({ showInitiative: false, showNpcHp: false, showPartyHp: false });
     expect(SettingsSchema.parse({ logoUrl: null }).playerView).toEqual({ showInitiative: false, showNpcHp: false, showPartyHp: false });
     expect(SettingsSchema.parse({ logoUrl: null, playerView: { showInitiative: true } }).playerView).toEqual({ showInitiative: true, showNpcHp: false, showPartyHp: false });
   });

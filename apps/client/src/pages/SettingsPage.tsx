@@ -3,7 +3,7 @@ import { useSettingsStore } from "../store/settingsStore";
 import styles from "./Settings.module.css";
 
 const PLAYER_VIEW_OPTIONS: { key: keyof PlayerViewSettings; label: string; hint: string }[] = [
-  { key: "showInitiative", label: "Mostra l'iniziativa", hint: "L'ordine di iniziativa sullo schermo condiviso e sui telefoni dei giocatori." },
+  { key: "showInitiative", label: "Mostra l'iniziativa", hint: "L'ordine di iniziativa e di chi è il turno, sullo schermo condiviso e sui telefoni dei giocatori." },
   { key: "showNpcHp", label: "Mostra la vita dei PNG", hint: "La barra dei punti ferita sui token dei PNG." },
   { key: "showPartyHp", label: "Mostra la vita del party", hint: "La barra dei punti ferita sui token dei PG (ognuno vede comunque i propri PF sul telefono)." },
 ];

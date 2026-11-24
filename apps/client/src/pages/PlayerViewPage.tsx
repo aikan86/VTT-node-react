@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLibraryStore } from "../store/libraryStore";
-import { currentHandout, getTotal, modLookupFrom, movePartyToken, partyMover, playerCombatants, sameRef, type Combat, type Scene } from "@vtt/shared";
+import { currentHandout, getTotal, modLookupFrom, movePartyToken, partyMover, playerCombatants, playerCurrentRef, type Combat, type Scene } from "@vtt/shared";
 import { ConditionIcons } from "../components/Conditions";
 import { PlayerStage } from "../features/battlefield/PlayerStage";
 import { useCombatStore } from "../store/combatStore";
@@ -70,7 +70,7 @@ export function PlayerViewPage() {
   const live = useStatusStore((s) => s.live);
   const { full, toggle } = useFullscreen();
   const handout = useLibraryStore((s) => currentHandout(s.handouts));
-  const showInitiative = useSettingsStore((s) => s.settings.playerView.showInitiative);
+  const playerView = useSettingsStore((s) => s.settings.playerView);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -80,8 +80,6 @@ export function PlayerViewPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const current = combat.active ? combat.combatants.find((c) => c.id === combat.currentId) : undefined;
-
   return (
     <div className={styles.root}>
       {scene ? (
@@ -89,12 +87,12 @@ export function PlayerViewPage() {
           <PlayerStage
             scene={scene}
             resolve={resolve}
-            currentRef={current && scene.tokens.some((t) => sameRef(t.ref, current.ref) && !t.hidden) ? current.ref : null}
+            currentRef={playerCurrentRef(combat, scene, playerView)}
             mover={partyMover(combat)}
             // ricontrolla il turno al momento del salvataggio (potrebbe essere cambiato nel frattempo)
             onMoveToken={(token) => useSceneStore.getState().update(scene.id, (s) => movePartyToken(s, token.id, token, partyMover(useCombatStore.getState().combat)))}
           />
-          {showInitiative && <InitiativeOrder combat={combat} scene={scene} />}
+          {playerView.showInitiative && <InitiativeOrder combat={combat} scene={scene} />}
         </>
       ) : (
         <div className={styles.waiting}>

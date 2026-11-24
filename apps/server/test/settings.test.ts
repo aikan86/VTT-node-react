@@ -85,4 +85,15 @@ describe("/api/settings", () => {
     expect((await target.app.inject({ method: "POST", url: "/api/import", payload: file })).statusCode).toBe(200);
     expect((await target.app.inject({ method: "GET", url: "/api/settings" })).json().data.playerView).toEqual(playerView);
   });
+
+  it("keeps the saved player view when a PUT does not mention it (tab with an older version of the app)", async () => {
+    const { app } = await instance();
+    const playerView = { showInitiative: true, showNpcHp: true, showPartyHp: false };
+    await app.inject({ method: "PUT", url: "/api/settings", payload: { logoUrl: null, playerView }, headers: { "if-match": "0" } });
+
+    const put = await app.inject({ method: "PUT", url: "/api/settings", payload: { logoUrl: "/uploads/logo.png" }, headers: { "if-match": "1" } });
+    expect(put.statusCode).toBe(200);
+    expect(put.json()).toEqual({ rev: 2, data: { logoUrl: "/uploads/logo.png", playerView } });
+    expect((await app.inject({ method: "GET", url: "/api/settings" })).json().data).toEqual({ logoUrl: "/uploads/logo.png", playerView });
+  });
 });
